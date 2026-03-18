@@ -664,10 +664,10 @@ async def run_agent_pipeline(
 
     # --- ADDITIVE GOD-TIER UPGRADE: ReAct Agent Primary Path ---
     react_succeeded = False
+    has_yielded_token = False
     try:
         from react_agent import run_react_agent
         logger.info(f"Attempting new ReAct Agent pathway with max_tool_calls={max_tool_calls}...")
-        has_yielded_token = False
         async for event in run_react_agent(
             message=message,
             history=history,
@@ -677,14 +677,16 @@ async def run_agent_pipeline(
             context_str=context,
             max_tool_calls=max_tool_calls
         ):
-            # If we get ANY token other than the initial marker, it means ReAct reached the generation phase
+            yield event
             if "token" in event:
-                data = json.loads(event.replace("data: ", ""))
-                if data.get("content"):
-                    has_yielded_token = True
+                try:
+                    data = json.loads(event.replace("data: ", ""))
+                    if data.get("content"):
+                        has_yielded_token = True
+                except Exception:
+                    pass
         if not has_yielded_token:
             logger.error(f"[AgentPipeline] Pro model failed to yield content for: {message[:100]}")
-            # Do NOT yield done here, let it fall through to the fallback single-shot pipeline
         else:
             react_succeeded = True
             

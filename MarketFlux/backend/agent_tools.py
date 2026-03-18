@@ -258,7 +258,7 @@ async def get_stock_snapshot(symbol: str) -> dict:
 
         if data and data.get("price"):
             # Define market hours for New York (ET)
-            from datetime import datetime
+            from datetime import datetime, timezone
             import pytz
             et = pytz.timezone("America/New_York")
             now = datetime.now(et)
