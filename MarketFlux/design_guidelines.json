@@ -1,0 +1,136 @@
+{
+  "project_name": "Market Flux",
+  "design_philosophy": {
+    "theme": "Retrofuturism / Cyberpunk Trader",
+    "core_concept": "High-Visibility Terminal for the Modern Age",
+    "emotional_tone": "Intense, Precise, Nostalgic, Electric",
+    "principles": [
+      "Data Density over White Space (Use the Bento Grid Mode B)",
+      "High Contrast for readbility in dark mode",
+      "Sharp Edges (No rounded corners larger than 2px)",
+      "Motion should feel 'glitchy' or 'mechanical', not fluid/organic"
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "headings": "\"Space Mono\", monospace",
+      "body": "\"Inter\", sans-serif",
+      "mono": "\"Space Mono\", monospace",
+      "data": "\"JetBrains Mono\", monospace"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-6xl font-bold tracking-tighter uppercase",
+      "h2": "text-3xl md:text-4xl font-bold tracking-tight uppercase",
+      "h3": "text-xl md:text-2xl font-semibold tracking-wide text-primary/90",
+      "body": "text-sm md:text-base leading-relaxed text-muted-foreground",
+      "caption": "text-xs tracking-widest uppercase text-muted-foreground/70"
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#050505",
+      "card": "#0A0A0A",
+      "card_foreground": "#FFFFFF",
+      "popover": "#0A0A0A",
+      "primary": "#00FF41",
+      "primary_foreground": "#000000",
+      "secondary": "#00F3FF",
+      "secondary_foreground": "#000000",
+      "muted": "#1a1a1a",
+      "muted_foreground": "#A1A1AA",
+      "accent": "#FFB000",
+      "accent_foreground": "#000000",
+      "destructive": "#FF3333",
+      "border": "#1E293B",
+      "input": "#1E293B",
+      "ring": "#00FF41"
+    },
+    "usage_rules": {
+      "gradients": "Avoid smooth gradients. Use sharp linear gradients or solid blocks.",
+      "text_contrast": "Ensure primary text is #EDEDED or #FFFFFF. Use Green/Cyan for data values only.",
+      "states": "Hover states should invert colors (Black text on Green bg) or add a glowing border."
+    }
+  },
+  "visual_enhancers": {
+    "scanlines": "Add a fixed pointer-events-none z-50 overlay with repeating-linear-gradient(0deg, rgba(0,0,0,0) 50%, rgba(0,255,65,0.02) 50%), background-size: 100% 4px.",
+    "glow_effects": "Use 'shadow-[0_0_10px_rgba(0,255,65,0.3)]' for active elements.",
+    "borders": "1px solid borders everywhere. No shadows for depth—use borders for definition.",
+    "grid_background": "Use a subtle SVG grid pattern on the main background (opacity 0.05)."
+  },
+  "component_strategies": {
+    "Card": {
+      "styles": "rounded-none border-border bg-card/50 backdrop-blur-sm",
+      "enhancement": "Add a 'corner bracket' effect using pseudo-elements or SVGs for that technical feel."
+    },
+    "Button": {
+      "styles": "rounded-none uppercase tracking-widest font-mono font-bold hover:bg-primary hover:text-black transition-colors duration-0"
+    },
+    "Input": {
+      "styles": "rounded-none bg-background border-border focus:border-primary focus:ring-0 font-mono"
+    },
+    "Badge": {
+      "styles": "rounded-none border-primary/50 text-primary bg-primary/10 uppercase text-[10px]"
+    },
+    "Charts": {
+      "library": "Recharts (Shadcn)",
+      "customization": "Hide grid lines or make them very subtle. Use Neon Green (#00FF41) and Cyan (#00F3FF) for lines. Darken the tooltip background."
+    },
+    "Sidebar": {
+      "styles": "Fixed left sidebar with icon-only mode on tablet, full on desktop. Border-right."
+    }
+  },
+  "layout_grids": {
+    "dashboard_mode": "Bento Grid Mode B (High Density)",
+    "specs": "grid-cols-1 md:grid-cols-4 gap-4 p-4 md:p-6",
+    "rules": "Containers must fill height (h-full). Use aspect-ratio for charts."
+  },
+  "motion": {
+    "type": "Mechanical / Glitch",
+    "library": "Framer Motion",
+    "variants": {
+      "container": {
+        "hidden": { "opacity": 0 },
+        "visible": {
+          "opacity": 1,
+          "transition": { "staggerChildren": 0.05 }
+        }
+      },
+      "item": {
+        "hidden": { "opacity": 0, "y": 10 },
+        "visible": { "opacity": 1, "y": 0, "transition": { "duration": 0.2, "ease": "linear" } }
+      }
+    }
+  },
+  "image_assets": {
+    "hero_abstract": "https://images.unsplash.com/photo-1762279389020-eeeb69c25813?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxzdG9jayUyMG1hcmtldCUyMGRhdGElMjBkaWdpdGFsJTIwYWJzdHJhY3R8ZW58MHx8fHwxNzcxOTM5OTcxfDA&ixlib=rb-4.1.0&q=85",
+    "chart_detail": "https://images.pexels.com/photos/6203470/pexels-photo-6203470.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "data_texture": "https://images.pexels.com/photos/210607/pexels-photo-210607.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "trader_bg": "https://images.unsplash.com/photo-1650303923845-fea02ee7a52f"
+  },
+  "instructions_to_main_agent": [
+    "Install 'lucide-react' for icons.",
+    "Install 'recharts' for charts.",
+    "Install 'framer-motion' for animations.",
+    "CRITICAL: Set the 'dark' class on the HTML element by default or force it in tailwind config.",
+    "Do not use rounded-xl or rounded-2xl. Keep it sharp.",
+    "Ensure the floating AI Chatbot is positioned 'fixed bottom-6 right-6 z-50' and has a 'minimize' state so it doesn't block data.",
+    "For the 'Market Mood' dashboard, use a heatmap visualization (red/green blocks).",
+    "For 'Live News', use a scrolling ticker or a dense list with 'Typewriter' effect on new items.",
+    "Use 'sonner' for notifications (install 'sonner')."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": {
+    "do_not": [
+      "Use gradients for backgrounds (use solid colors or subtle patterns)",
+      "Use rounded corners > 4px",
+      "Use Serif fonts",
+      "Use light mode (Force Dark Mode)",
+      "Use 'transition: all'"
+    ],
+    "must": [
+      "Use 'data-testid' on all interactive elements",
+      "Ensure high contrast ratio (4.5:1) for text",
+      "Use 'Space Mono' for all numeric data and headers",
+      "Implement a 'Scanline' overlay effect"
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment / Secrets
+.env
+*.env.local
+
+# Caches
+.cache/
+.diskcache/
+/tmp/market_cache/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Build
+build/
+dist/
+
+# Misc
+*.egg-info/

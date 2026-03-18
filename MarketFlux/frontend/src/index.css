@@ -1,0 +1,166 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+
+    /* LIGHT MODE */
+    :root {
+        --color-accent: #059669;
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 222.2 84% 4.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222.2 84% 4.9%;
+        /* Adjusted primary brand colors for contrast on white */
+        --primary: 135 100% 35%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 187 100% 35%;
+        --secondary-foreground: 0 0% 100%;
+        --muted: 210 40% 96.1%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --accent: 210 40% 96.1%;
+        --accent-foreground: 222.2 47.4% 11.2%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 135 100% 35%;
+        --radius: 0.125rem;
+        --chart-1: 135 100% 35%;
+        --chart-2: 187 100% 35%;
+        --chart-3: 41 100% 45%;
+        --chart-4: 0 100% 60%;
+        --chart-5: 270 50% 50%;
+        --grid-line: 215 25% 17% / 0.1;
+    }
+
+    /* DARK MODE (Matching Original Website Theme) */
+    .dark {
+        --color-accent: #00ff88;
+        --background: 0 0% 2%;
+        --foreground: 0 0% 93%;
+        --card: 0 0% 4%;
+        --card-foreground: 0 0% 100%;
+        --popover: 0 0% 4%;
+        --popover-foreground: 0 0% 100%;
+        --primary: 135 100% 50%;
+        --primary-foreground: 0 0% 0%;
+        --secondary: 187 100% 50%;
+        --secondary-foreground: 0 0% 0%;
+        --muted: 0 0% 10%;
+        --muted-foreground: 240 4% 66%;
+        --accent: 41 100% 50%;
+        --accent-foreground: 0 0% 0%;
+        --destructive: 0 100% 60%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 215 25% 17%;
+        --input: 215 25% 17%;
+        --ring: 135 100% 50%;
+        --radius: 0.125rem;
+        --grid-line: 215 25% 50% / 0.15;
+    }
+
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+
+    [data-debug-wrapper="true"] {
+        display: contents !important;
+    }
+}
+
+/* Hide emergent badge */
+#emergent-badge {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #1E293B;
+    border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #00FF41;
+}
+
+/* FIX 4: Global Text Visibility overrides */
+/* All label/key text */
+.dark .text-\[10px\].text-muted-foreground.uppercase {
+    color: #b0b0b0 !important;
+}
+
+.text-\[10px\].text-muted-foreground.uppercase {
+    font-size: 0.78rem !important;
+    letter-spacing: 0.04em !important;
+}
+
+/* All value text */
+.dark div>.font-medium.text-foreground {
+    color: #ffffff !important;
+}
+
+div>.font-medium.text-foreground {
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
+}
+
+/* Table column headers */
+.dark th {
+    color: #aaaaaa !important;
+}
+
+th {
+    font-size: 0.72rem !important;
+    letter-spacing: 0.06em !important;
+    font-weight: 600 !important;
+}
+
+/* Table row values */
+.dark td,
+.dark td .text-foreground {
+    color: #e0e0e0 !important;
+}
+
+td,
+td .text-foreground {
+    font-size: 0.85rem !important;
+}
+
+/* Section titles */
+.text-sm.font-mono.uppercase.tracking-wider {
+    font-size: 0.85rem !important;
+    letter-spacing: 0.08em !important;
+    font-weight: 700 !important;
+}
