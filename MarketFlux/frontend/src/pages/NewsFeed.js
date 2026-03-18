@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,11 @@ export default function NewsFeed() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const fetchNews = useCallback(async (pageNum = 1, append = false) => {
     setLoading(true);
@@ -27,15 +32,16 @@ export default function NewsFeed() {
       if (watchlistOnly) params.set('watchlist', 'true');
 
       const res = await api.get(`/news/feed?${params}`);
+      if (!mountedRef.current) return;
       const data = res.data;
       setArticles(prev => append ? [...prev, ...data.articles] : data.articles);
       setHasMore(data.has_more);
       setTotal(data.total);
       setPage(pageNum);
     } catch (e) {
-      console.error('News fetch error:', e);
+      if (mountedRef.current) console.error('News fetch error:', e);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [keyword, sentimentFilter, categoryFilter, watchlistOnly]);
 

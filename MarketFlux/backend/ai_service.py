@@ -299,7 +299,7 @@ async def enrich_context(tickers: list, db) -> str:
                 {
                     "$or": [
                         {"tickers": {"$in": [symbol]}},
-                        {"title": {"$regex": symbol, "$options": "i"}}
+                        {"title": {"$regex": re.escape(symbol), "$options": "i"}}
                     ],
                     "published_at": {"$gte": seven_days_ago}
                 },

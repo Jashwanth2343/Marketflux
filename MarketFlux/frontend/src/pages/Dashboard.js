@@ -92,44 +92,48 @@ export default function Dashboard() {
   const [heatmapData, setHeatmapData] = useState(null);
   const [isMarketOpen, setIsMarketOpen] = useState(null);
 
-  const fetchHeatmapOnly = async () => {
-    try {
-      const heatmapRes = await api.get('/market/heatmap');
-      setHeatmapData(heatmapRes.data);
-    } catch (e) {
-      console.error('Heatmap fetch error:', e);
-    }
-  };
+  useEffect(() => {
+    let mounted = true;
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [indicesRes, moversRes, newsRes, moodRes, heatmapRes] = await Promise.allSettled([
-        api.get('/market/overview'),
-        api.get('/market/movers'),
-        api.get('/news/feed?limit=8'),
-        api.get('/sentiment/mood'),
-        api.get('/market/heatmap')
-      ]);
-      if (indicesRes.status === 'fulfilled') {
-        setIndices(indicesRes.value.data.indices || {});
-        setIsMarketOpen(indicesRes.value.data.is_market_open);
+    const fetchHeatmapOnly = async () => {
+      try {
+        const heatmapRes = await api.get('/market/heatmap');
+        if (mounted) setHeatmapData(heatmapRes.data);
+      } catch (e) {
+        console.error('Heatmap fetch error:', e);
       }
-      if (moversRes.status === 'fulfilled') setMovers(moversRes.value.data);
-      if (newsRes.status === 'fulfilled') setNews(newsRes.value.data.articles || []);
-      if (moodRes.status === 'fulfilled') setMood(moodRes.value.data);
-      if (heatmapRes.status === 'fulfilled') setHeatmapData(heatmapRes.value.data);
-    } catch (e) {
-      console.error('Dashboard fetch error:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => { 
-    fetchData(); 
+    const fetchData = async () => {
+      if (mounted) setLoading(true);
+      try {
+        const [indicesRes, moversRes, newsRes, moodRes, heatmapRes] = await Promise.allSettled([
+          api.get('/market/overview'),
+          api.get('/market/movers'),
+          api.get('/news/feed?limit=8'),
+          api.get('/sentiment/mood'),
+          api.get('/market/heatmap')
+        ]);
+        if (mounted) {
+          if (indicesRes.status === 'fulfilled') {
+            setIndices(indicesRes.value.data.indices || {});
+            setIsMarketOpen(indicesRes.value.data.is_market_open);
+          }
+          if (moversRes.status === 'fulfilled') setMovers(moversRes.value.data);
+          if (newsRes.status === 'fulfilled') setNews(newsRes.value.data.articles || []);
+          if (moodRes.status === 'fulfilled') setMood(moodRes.value.data);
+          if (heatmapRes.status === 'fulfilled') setHeatmapData(heatmapRes.value.data);
+        }
+      } catch (e) {
+        if (mounted) console.error('Dashboard fetch error:', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchData();
     const interval = setInterval(fetchHeatmapOnly, 3 * 60 * 1000);
-    return () => clearInterval(interval);
+    return () => { mounted = false; clearInterval(interval); };
   }, []);
 
   const moodData = [

@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -17,7 +18,34 @@ import MacroDashboard from "@/pages/MacroDashboard";
 import RiskConsole from "@/pages/RiskConsole";
 import { Toaster } from "@/components/ui/sonner";
 
-import { useState, useEffect } from "react";
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    console.error('App error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center p-8">
+            <h1 className="text-2xl font-bold text-white mb-4">Something went wrong</h1>
+            <p className="text-gray-400 mb-6">The application encountered an unexpected error.</p>
+            <button onClick={() => { this.setState({ hasError: false }); window.location.href = '/'; }} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500">
+              Return to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function AppRouter() {
   const location = useLocation();
@@ -40,36 +68,38 @@ function AppRouter() {
   const mainMarginRight = isDesktop && isChatOpen ? chatWidth : 0;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden relative">
-      <div
-        className="flex-1 flex flex-col h-full overflow-hidden transition-all duration-300 ease-in-out"
-        style={{ marginRight: mainMarginRight }}
-      >
-        <TopNav />
-        <main className="flex-1 overflow-y-auto flex flex-col relative w-full">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/news" element={<NewsFeed />} />
-            <Route path="/screener" element={<AIScreener />} />
-            <Route path="/stock/:ticker" element={<StockDetail />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/research" element={<ResearchCenter />} />
-            <Route path="/macro" element={<MacroDashboard />} />
-            <Route path="/risk" element={<RiskConsole />} />
-          </Routes>
-        </main>
+    <ErrorBoundary>
+      <div className="flex h-screen bg-background overflow-hidden relative">
+        <div
+          className="flex-1 flex flex-col h-full overflow-hidden transition-all duration-300 ease-in-out"
+          style={{ marginRight: mainMarginRight }}
+        >
+          <TopNav />
+          <main className="flex-1 overflow-y-auto flex flex-col relative w-full">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/news" element={<NewsFeed />} />
+              <Route path="/screener" element={<AIScreener />} />
+              <Route path="/stock/:ticker" element={<StockDetail />} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/research" element={<ResearchCenter />} />
+              <Route path="/macro" element={<MacroDashboard />} />
+              <Route path="/risk" element={<RiskConsole />} />
+            </Routes>
+          </main>
+        </div>
+        <AIChatbot
+          isChatOpen={isChatOpen}
+          setIsChatOpen={setIsChatOpen}
+          chatWidth={chatWidth}
+          setChatWidth={setChatWidth}
+          isDesktop={isDesktop}
+        />
+        <ScanlineOverlay />
+        <Toaster position="top-right" />
       </div>
-      <AIChatbot
-        isChatOpen={isChatOpen}
-        setIsChatOpen={setIsChatOpen}
-        chatWidth={chatWidth}
-        setChatWidth={setChatWidth}
-        isDesktop={isDesktop}
-      />
-      <ScanlineOverlay />
-      <Toaster position="top-right" />
-    </div>
+    </ErrorBoundary>
   );
 }
 

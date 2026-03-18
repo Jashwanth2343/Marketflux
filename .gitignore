@@ -24,9 +24,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE / local tooling (avoid committing debug endpoints, plans, or session data)
 .idea/
 .vscode/
+.cursor/
 
 # Build
 build/

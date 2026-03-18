@@ -40,6 +40,12 @@ export default function SearchBar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const search = useCallback(async (q) => {
     if (!q || q.length < 1) {
       setResults([]);

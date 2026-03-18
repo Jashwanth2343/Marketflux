@@ -74,7 +74,7 @@ def _hash_ip(ip: str) -> str:
 from starlette.middleware.base import BaseHTTPMiddleware
 class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith("/api/ai/"):
+        if request.url.path.startswith(("/api/ai/", "/api/portfolio", "/api/streams", "/api/parse")):
             content_length = request.headers.get("content-length")
             if content_length and int(content_length) > 1048576:
                 return Response("Request too large", status_code=413)
@@ -757,7 +757,8 @@ async def ai_chat_stream_endpoint(data: ChatMessage, request: Request):
 @api_router.get("/ai/screen/history")
 async def ai_screen_history(request: Request):
     user = await get_current_user(request)
-    user_id_for_db = user["user_id"] if user else (request.client.host if request.client else "unknown")
+    _raw_ip = request.client.host if request.client else "unknown"
+    user_id_for_db = user["user_id"] if user else _hash_ip(_raw_ip)
     history = await db.screener_history.find(
         {"user_id": user_id_for_db}, 
         {"_id": 0}
@@ -781,7 +782,8 @@ async def ai_screen_endpoint(data: ScreenerQuery, request: Request):
         suggestion = "No results found. The most restrictive filter was likely your market cap or P/E bounds. Try relaxing it."
 
     user = await get_current_user(request)
-    user_id_for_db = user["user_id"] if user else (request.client.host if request.client else "unknown")
+    _raw_ip = request.client.host if request.client else "unknown"
+    user_id_for_db = user["user_id"] if user else _hash_ip(_raw_ip)
     
     await db.screener_history.insert_one({
         "user_id": user_id_for_db,
@@ -851,6 +853,8 @@ async def save_portfolio(data: PortfolioData, request: Request):
     user = await get_current_user(request)
     if not user:
         raise HTTPException(401, "Login required")
+    for h in data.holdings:
+        validate_ticker(h.ticker)
     holdings = [h.model_dump() for h in data.holdings]
     await db.portfolios.update_one(
         {"user_id": user["user_id"]},
@@ -930,9 +934,12 @@ async def portfolio_prices(tickers: str = "", response: Response = None):
 
 
 @api_router.get("/stock-digest/{ticker}")
-async def stock_digest(ticker: str, refresh: bool = False, response: Response = None):
+async def stock_digest(ticker: str, request: Request, refresh: bool = False, response: Response = None):
     """Generate an AI stock digest (Robinhood Cortex style)."""
     ticker = validate_ticker(ticker)
+    can_use = await check_and_increment_ai_usage(request)
+    if not can_use:
+        raise HTTPException(429, "AI usage limit reached.")
     cache_key = f"digest:{ticker}"
 
     if not refresh:
@@ -1004,12 +1011,17 @@ Data:
 
 @api_router.post("/parse-portfolio-image")
 async def parse_portfolio_image(file: UploadFile = File(...)):
+    if file.content_type not in ("image/png", "image/jpeg", "image/jpg", "image/webp"):
+        raise HTTPException(400, "Only PNG, JPEG, and WebP images are supported")
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Image must be under 5MB")
+
     import google.generativeai as genai
     import base64
     import json
     import os
     try:
-        contents = await file.read()
         b64_image = base64.b64encode(contents).decode("utf-8")
         mime_type = file.content_type  # e.g. "image/png"
         
@@ -1036,11 +1048,15 @@ async def parse_portfolio_image(file: UploadFile = File(...)):
     except json.JSONDecodeError:
         return {"success": False, "error": "Could not parse holdings from image. Try a clearer screenshot."}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.error(f"Portfolio image parse error: {e}")
+        return {"success": False, "error": "Failed to parse portfolio image. Please try a clearer screenshot."}
 
 @api_router.post("/ai/follow-up")
 async def ai_follow_up(request: Request):
     """Generate follow-up question suggestions based on conversation context."""
+    can_use = await check_and_increment_ai_usage(request)
+    if not can_use:
+        raise HTTPException(429, "AI usage limit reached.")
     body = await request.json()
     last_response = body.get("last_response", "")
     topic = body.get("topic", "finance")
@@ -1094,12 +1110,13 @@ async def add_to_watchlist(data: WatchlistAdd, request: Request):
     user = await get_current_user(request)
     if not user:
         raise HTTPException(401, "Login required")
+    validated = validate_ticker(data.ticker)
     await db.watchlists.update_one(
         {"user_id": user["user_id"]},
-        {"$addToSet": {"tickers": data.ticker.upper()}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}},
+        {"$addToSet": {"tickers": validated}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True,
     )
-    return {"message": f"{data.ticker.upper()} added to watchlist"}
+    return {"message": f"{validated} added to watchlist"}
 
 @api_router.delete("/watchlist/{ticker}")
 async def remove_from_watchlist(ticker: str, request: Request):

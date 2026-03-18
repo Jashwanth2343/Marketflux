@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -198,34 +199,36 @@ export default function Portfolio() {
     );
   };
 
-  // Computed values
-  const totalInvested = holdings.reduce((sum, h) => sum + h.shares * h.avg_price, 0);
+  const { enrichedHoldings, totalInvested, totalCurrentValue, totalPL, totalPLPercent, todayChangeTotal, donutData } = useMemo(() => {
+    const totalInvested = holdings.reduce((sum, h) => sum + h.shares * h.avg_price, 0);
 
-  const enrichedHoldings = holdings.map(h => {
-    const p = prices[h.ticker] || {};
-    const currentPrice = p.price || 0;
-    const currentValue = currentPrice * h.shares;
-    const costBasis = h.shares * h.avg_price;
-    const plDollar = currentValue - costBasis;
-    const plPercent = costBasis > 0 ? (plDollar / costBasis) * 100 : 0;
-    const todayChange = p.change_percent || 0;
-    return { ...h, currentPrice, currentValue, costBasis, plDollar, plPercent, todayChange };
-  });
+    const enrichedHoldings = holdings.map(h => {
+      const p = prices[h.ticker] || {};
+      const currentPrice = p.price || 0;
+      const currentValue = currentPrice * h.shares;
+      const costBasis = h.shares * h.avg_price;
+      const plDollar = currentValue - costBasis;
+      const plPercent = costBasis > 0 ? (plDollar / costBasis) * 100 : 0;
+      const todayChange = p.change_percent || 0;
+      return { ...h, currentPrice, currentValue, costBasis, plDollar, plPercent, todayChange };
+    });
 
-  const totalCurrentValue = enrichedHoldings.reduce((sum, h) => sum + h.currentValue, 0);
-  const totalPL = totalCurrentValue - totalInvested;
-  const totalPLPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
-  const todayChangeTotal = enrichedHoldings.reduce((sum, h) => {
-    return sum + (h.currentPrice * h.shares * (h.todayChange / 100));
-  }, 0);
+    const totalCurrentValue = enrichedHoldings.reduce((sum, h) => sum + h.currentValue, 0);
+    const totalPL = totalCurrentValue - totalInvested;
+    const totalPLPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
+    const todayChangeTotal = enrichedHoldings.reduce((sum, h) => {
+      return sum + (h.currentPrice * h.shares * (h.todayChange / 100));
+    }, 0);
 
-  // Donut chart data
-  const donutData = enrichedHoldings
-    .filter(h => h.currentValue > 0)
-    .map(h => ({
-      name: h.ticker,
-      value: h.currentValue,
-    }));
+    const donutData = enrichedHoldings
+      .filter(h => h.currentValue > 0)
+      .map(h => ({
+        name: h.ticker,
+        value: h.currentValue,
+      }));
+
+    return { enrichedHoldings, totalInvested, totalCurrentValue, totalPL, totalPLPercent, todayChangeTotal, donutData };
+  }, [holdings, prices]);
 
   return (
     <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="portfolio-page">
@@ -587,7 +590,7 @@ export default function Portfolio() {
           <CardContent className="px-4 pb-4">
             <div
               className="markdown-content text-sm leading-relaxed text-foreground"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(analysis) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(analysis)) }}
             />
           </CardContent>
         </Card>

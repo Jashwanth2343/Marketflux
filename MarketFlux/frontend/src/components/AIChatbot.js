@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { MessageSquare, X, Send, Zap, Lock, Loader2, Plus, History, ChevronLeft, ChevronDown, ChevronRight, Paperclip, TerminalSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -144,7 +145,7 @@ function CollapsibleMarkdown({ content, isError, streaming }) {
     <div className="relative w-full">
       <div
         className={`markdown-content text-xs leading-relaxed ${isError ? 'text-destructive' : ''}`}
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(displayText) || '' }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(displayText)) || '' }}
       />
       {streaming && <span className="inline-block w-1.5 h-3 bg-primary ml-1 animate-pulse" />}
 

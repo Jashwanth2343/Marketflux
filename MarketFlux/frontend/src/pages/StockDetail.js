@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -546,7 +547,7 @@ export default function StockDetail() {
             </div>
           ) : digest?.digest ? (
             <div className="bg-muted/10 rounded-lg p-1">
-              <div className="markdown-content text-[13.5px] leading-relaxed text-foreground/90 font-medium" dangerouslySetInnerHTML={{ __html: renderMarkdown(digest.digest) }} />
+              <div className="markdown-content text-[13.5px] leading-relaxed text-foreground/90 font-medium" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(digest.digest)) }} />
             </div>
           ) : (
             <p className="text-xs font-mono text-muted-foreground py-6 text-center uppercase tracking-widest">Digest unavailable. Click refresh to try again.</p>
