@@ -1,0 +1,9 @@
+node_modules
+build
+.git
+.env
+.env.*
+*.md
+coverage
+.npm
+.yarn

@@ -1,0 +1,35 @@
+# MarketFlux - Production deployment
+# Uses MongoDB Atlas (external) and optional Redis. Set env vars in .env.
+
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./backend/.env
+    environment:
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-http://localhost:8001}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+# Optional: use local Redis if REDIS_HOST not set to external
+#  redis:
+#    image: redis:7-alpine
+#    ports:
+#      - "6379:6379"
