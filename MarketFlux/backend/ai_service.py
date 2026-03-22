@@ -53,42 +53,42 @@ def configure_gemini():
             genai.configure(api_key=api_key)
             _gemini_configured = True
 
+GEMINI_FLASH = "gemini-2.5-flash"
+GEMINI_PRO = "gemini-2.5-pro"
+
 def select_model_id(message: str, intent: Optional[str] = None, user_id: Optional[str] = None) -> str:
     """
     Route to the right Gemini model based on task complexity.
     Uses Flash for simple tasks and Pro for deep analysis.
+    Falls back to Flash if Pro fails or is rate-limited.
     """
-    selected_model = "models/gemini-3-flash-preview"
-    
-    # 1. Check intent-based complexity
-    pro_intents = {"comparison", "portfolio_review", "deep_analysis", "macro_stress_test", "earnings_sincerity"}
-    if intent in pro_intents:
-        selected_model = "models/gemini-3.1-pro-preview"
+    selected_model = GEMINI_FLASH
 
-    # 2. Check message-based complexity (length and trigger words)
-    if selected_model == "models/gemini-3-flash-preview":
-        trigger_words = {"analyze", "compare", "vs", "why", "explain", "deep dive", "opinion", "forecast", "valuation"}
+    pro_intents = {"comparison", "portfolio_review", "deep_analysis", "macro_stress_test"}
+    if intent in pro_intents:
+        selected_model = GEMINI_PRO
+
+    if selected_model == GEMINI_FLASH:
+        trigger_words = {"compare", "vs", "deep dive", "forecast", "valuation", "stress test"}
         message_lower = message.lower()
         is_complex = len(message.split()) > 50 or any(word in message_lower for word in trigger_words)
-        
         if is_complex:
-            selected_model = "models/gemini-3.1-pro-preview"
+            selected_model = GEMINI_PRO
 
-    # 3. Check cost protection / rate limit for Pro model
-    if selected_model == "models/gemini-3.1-pro-preview":
+    if selected_model == GEMINI_PRO:
         if user_id:
             usage_key = f"pro_usage:{user_id}:{datetime.now().strftime('%Y-%m-%d')}"
             count = _usage_cache.get(usage_key, 0)
             if count >= 20:
                 logger.info(f"User {user_id} reached Pro limit. Falling back to Flash.")
-                selected_model = "models/gemini-3-flash-preview"
+                selected_model = GEMINI_FLASH
             else:
-                _usage_cache.set(usage_key, count + 1, expire=86400) # 24h
-            
+                _usage_cache.set(usage_key, count + 1, expire=86400)
+
     logger.info(f"[ModelSelector] Selected {selected_model} for intent={intent}")
     return selected_model
 
-def get_gemini_model(model_id: str = "models/gemini-3-flash-preview", system_instruction: Optional[str] = None):
+def get_gemini_model(model_id: str = GEMINI_FLASH, system_instruction: Optional[str] = None):
     configure_gemini()
     
     # Safety settings to avoid blocking financial analysis
@@ -434,9 +434,21 @@ async def stream_ai_chat(
                     full_response += chunk.text
                     await asyncio.sleep(0.01)
         except Exception as e:
-            logger.error(f"Stream generation error: {e}")
-            yield "I'm having trouble generating a response right now. Please try again."
-            return
+            logger.warning(f"Stream generation error: {e}")
+            try:
+                response = await asyncio.to_thread(chat.send_message, final_user_text, stream=False)
+                txt = (response.text or "").strip()
+                if txt:
+                    full_response = txt
+                    for i in range(0, len(txt), 50):
+                        chunk = txt[i : i + 50]
+                        yield chunk
+                        await asyncio.sleep(0.005)
+            except Exception as e2:
+                logger.error(f"Retry failed: {e2}")
+                if not full_response:
+                    yield "I'm having trouble generating a response right now. Please try again."
+                    return
 
         await db.chat_messages.insert_one({
             "user_id": user_id_for_db,

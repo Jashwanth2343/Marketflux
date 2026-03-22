@@ -50,7 +50,7 @@ Churn has two types requiring different strategies:
 | **Voluntary** | Customer chooses to cancel | Cancel flows, save offers, exit surveys |
 | **Involuntary** | Payment fails | Dunning emails, smart retries, card updaters |
 
-Voluntary churn is typically 50-70% of total churn. Involuntary churn is 30-50% but is often easier to fix.
+Voluntary churn is usually the majority of total churn, while involuntary churn makes up the smaller remainder and is often easier to fix. A common rule of thumb is roughly 75% voluntary and 25% involuntary, though the mix varies by business.
 
 This skill supports three modes:
 
@@ -262,7 +262,7 @@ Health Score = (
 
 ## Involuntary Churn: Payment Recovery
 
-Failed payments cause 30-50% of all churn but are the most recoverable.
+Failed payments often account for about 25% of total churn and are among the most recoverable.
 
 ### The Dunning Stack
 
@@ -370,7 +370,7 @@ Test one variable at a time:
 - **Making cancellation hard to find** — Hidden cancel buttons breed resentment and bad reviews. Many jurisdictions require easy cancellation (FTC Click-to-Cancel rule)
 - **Same offer for every reason** — A blanket discount doesn't address "missing feature" or "not using it"
 - **Discounts too deep** — 50%+ discounts train customers to cancel-and-return for deals
-- **Ignoring involuntary churn** — Often 30-50% of total churn and the easiest to fix
+- **Ignoring involuntary churn** — Often about 25% of total churn and among the easiest to fix
 - **No dunning emails** — Letting payment failures silently cancel accounts
 - **Guilt-trip copy** — "Are you sure you want to abandon us?" damages brand trust
 - **Not tracking save offer LTV** — A "saved" customer who churns 30 days later wasn't really saved

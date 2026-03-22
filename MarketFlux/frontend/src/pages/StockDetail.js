@@ -175,16 +175,18 @@ export default function StockDetail() {
       }
     };
     if (ticker) fetchData();
-  }, [ticker]); // Only run on ticker change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticker]);
 
   // Handle period changes separately to use cache
   useEffect(() => {
     if (ticker && !loading) {
       loadChartForPeriod(period);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, loadChartForPeriod]);
 
-  // PROBLEM 2: Pre-warm common chart periods in background
+  // Pre-warm common chart periods in background
   useEffect(() => {
     if (ticker) {
       const preWarm = async () => {

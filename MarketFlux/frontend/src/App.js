@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import TopNav from "@/components/TopNav";
-import AIChatbot from "@/components/AIChatbot";
+
+const AIChatbot = lazy(() => import("@/components/AIChatbot"));
 import ScanlineOverlay from "@/components/ScanlineOverlay";
 import AuthCallback from "@/components/AuthCallback";
 import Dashboard from "@/pages/Dashboard";
@@ -89,6 +90,7 @@ function AppRouter() {
             </Routes>
           </main>
         </div>
+        <Suspense fallback={null}>
         <AIChatbot
           isChatOpen={isChatOpen}
           setIsChatOpen={setIsChatOpen}
@@ -96,6 +98,7 @@ function AppRouter() {
           setChatWidth={setChatWidth}
           isDesktop={isDesktop}
         />
+        </Suspense>
         <ScanlineOverlay />
         <Toaster position="top-right" />
       </div>

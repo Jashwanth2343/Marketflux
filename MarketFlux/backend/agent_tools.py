@@ -802,12 +802,14 @@ async def get_market_overview_tool() -> dict:
         return cached
 
     try:
+        from datetime import datetime, timezone
         from market_data import get_market_overview, get_top_movers
 
         overview = await get_market_overview()
         movers = await get_top_movers()
 
         result = {
+            "as_of": datetime.now(timezone.utc).isoformat(),
             "indices": {},
             "top_gainers": [],
             "top_losers": [],
@@ -856,6 +858,72 @@ async def get_market_overview_tool() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# TOOL: get_sector_performance — SPDR sector ETF % change for sector-impact queries
+# ---------------------------------------------------------------------------
+# SPDR sector ETFs: XLE=Energy, XLF=Financials, XLK=Tech, XLV=Healthcare,
+# XLI=Industrials, XLP=Staples, XLY=Discretionary, XLB=Materials, XLU=Utilities
+_SECTOR_ETFS = [
+    ("XLE", "Energy"), ("XLF", "Financials"), ("XLK", "Technology"),
+    ("XLV", "Healthcare"), ("XLI", "Industrials"), ("XLP", "Consumer Staples"),
+    ("XLY", "Consumer Discretionary"), ("XLB", "Materials"), ("XLU", "Utilities"),
+]
+
+
+async def get_sector_performance() -> dict:
+    """
+    Fetch real-time performance of major market sectors via SPDR sector ETFs.
+    Used when users ask "which sectors are most impacted" or sector-level analysis.
+    """
+    cache_key = "tool_sector_performance"
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
+
+    def _fetch():
+        import yfinance as yf
+        import pandas as pd
+
+        syms = [s[0] for s in _SECTOR_ETFS]
+        df = yf.download(
+            syms, period="5d", interval="1d",
+            group_by="column", auto_adjust=True, progress=False, threads=True
+        )
+        if df is None or df.empty or len(df) < 2:
+            return []
+        sectors = []
+        for sym, name in _SECTOR_ETFS:
+            try:
+                if isinstance(df.columns, pd.MultiIndex) and "Close" in df.columns:
+                    close_ser = df["Close"][sym] if sym in df["Close"].columns else pd.Series(dtype=float)
+                else:
+                    close_ser = df["Close"] if "Close" in df.columns else pd.Series(dtype=float)
+                if close_ser is None or len(close_ser) < 2:
+                    sectors.append({"sector": name, "symbol": sym, "change_percent": None, "price": None})
+                    continue
+                prev = float(close_ser.iloc[-2])
+                curr = float(close_ser.iloc[-1])
+                chg_pct = round((curr - prev) / prev * 100, 2) if prev and prev > 0 else None
+                sectors.append({"sector": name, "symbol": sym, "change_percent": chg_pct, "price": round(curr, 2)})
+            except Exception:
+                sectors.append({"sector": name, "symbol": sym, "change_percent": None, "price": None})
+        return sectors
+
+    try:
+        from datetime import datetime, timezone
+
+        sectors = await asyncio.to_thread(_fetch)
+        result = {
+            "as_of": datetime.now(timezone.utc).isoformat(),
+            "sectors": sectors,
+        }
+        _cache_set(cache_key, result, expire=300)
+        return result
+    except Exception as e:
+        logger.error(f"Sector performance tool error: {e}")
+        return {"error": str(e), "sectors": []}
+
+
+# ---------------------------------------------------------------------------
 # TOOL: tavily_search — AI-optimized search (Primary)
 # ---------------------------------------------------------------------------
 async def tavily_search(query: str, search_depth: str = "advanced") -> dict:
@@ -901,7 +969,7 @@ async def tavily_search(query: str, search_depth: str = "advanced") -> dict:
                 "results": results,
                 "source": "tavily"
             }
-            _cache_set(cache_key, result, expire=3600)  # 1 hour
+            _cache_set(cache_key, result, expire=900)
             return result
     except Exception as e:
         logger.error(f"Tavily search error: {e}")
@@ -913,14 +981,16 @@ async def tavily_search(query: str, search_depth: str = "advanced") -> dict:
 # ---------------------------------------------------------------------------
 async def web_search(query: str) -> dict:
     """General web search. Uses Tavily as primary, DuckDuckGo as fallback."""
-    # Try Tavily first
+    from datetime import datetime, timezone
+    year = datetime.now(timezone.utc).strftime("%Y")
+    dated_query = f"{query} {year}" if year not in query else query
+
     if os.getenv("TAVILY_API_KEY"):
-        t_res = await tavily_search(query)
+        t_res = await tavily_search(dated_query)
         if not t_res.get("error"):
             return t_res
 
-    # Fallback to DDG
-    cache_key = f"tool_websearch:{query[:50]}"
+    cache_key = f"tool_websearch:{dated_query[:50]}"
     cached = _cache_get(cache_key)
     if cached:
         return cached
@@ -930,7 +1000,7 @@ async def web_search(query: str) -> dict:
 
         def _search():
             with DDGS() as ddgs:
-                results = list(ddgs.text(query, max_results=10))
+                results = list(ddgs.text(dated_query, max_results=10, timelimit="m"))
             return results
 
         results = await asyncio.to_thread(_search)
@@ -942,12 +1012,12 @@ async def web_search(query: str) -> dict:
                 "url": r.get("href", ""),
             })
 
-        result = {"query": query, "results": formatted, "source": "duckduckgo_web"}
-        _cache_set(cache_key, result, expire=1800)  # 30 min
+        result = {"query": dated_query, "results": formatted, "source": "duckduckgo_web"}
+        _cache_set(cache_key, result, expire=900)
         return result
     except Exception as e:
         logger.error(f"Web search error: {e}")
-        return {"query": query, "results": [], "error": str(e)}
+        return {"query": dated_query, "results": [], "error": str(e)}
 
 
 # ---------------------------------------------------------------------------
@@ -955,14 +1025,16 @@ async def web_search(query: str) -> dict:
 # ---------------------------------------------------------------------------
 async def web_search_news(query: str) -> dict:
     """News search. Uses Tavily as primary, DuckDuckGo as fallback."""
-    # Try Tavily first
+    from datetime import datetime, timezone
+    year = datetime.now(timezone.utc).strftime("%Y")
+    dated_query = f"{query} {year}" if year not in query else query
+
     if os.getenv("TAVILY_API_KEY"):
-        t_res = await tavily_search(query)
+        t_res = await tavily_search(dated_query)
         if not t_res.get("error"):
             return t_res
 
-    # Fallback to DDG
-    cache_key = f"tool_webnews:{query[:50]}"
+    cache_key = f"tool_webnews:{dated_query[:50]}"
     cached = _cache_get(cache_key)
     if cached:
         return cached
@@ -972,7 +1044,7 @@ async def web_search_news(query: str) -> dict:
 
         def _search():
             with DDGS() as ddgs:
-                results = list(ddgs.news(query, max_results=10))
+                results = list(ddgs.news(dated_query, max_results=10, timelimit="w"))
             return results
 
         results = await asyncio.to_thread(_search)
@@ -986,12 +1058,394 @@ async def web_search_news(query: str) -> dict:
                 "url": r.get("url", ""),
             })
 
-        result = {"query": query, "results": formatted, "source": "duckduckgo_news"}
-        _cache_set(cache_key, result, expire=1800)  # 30 min
+        result = {"query": dated_query, "results": formatted, "source": "duckduckgo_news"}
+        _cache_set(cache_key, result, expire=900)
         return result
     except Exception as e:
         logger.error(f"Web news search error: {e}")
-        return {"query": query, "results": [], "error": str(e)}
+        return {"query": dated_query, "results": [], "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Shared: Ticker → CIK mapping (cached for SEC EDGAR APIs)
+# ---------------------------------------------------------------------------
+_cik_cache: Dict[str, str] = {}
+_cik_map_cache = None
+
+async def _get_cik(symbol: str) -> Optional[str]:
+    global _cik_map_cache
+    symbol_upper = symbol.upper()
+    if symbol_upper in _cik_cache:
+        return _cik_cache[symbol_upper]
+    try:
+        if _cik_map_cache is None:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    "https://www.sec.gov/files/company_tickers.json",
+                    headers={"User-Agent": "MarketFlux research@marketflux.app"}
+                )
+                _cik_map_cache = resp.json()
+        for _, val in _cik_map_cache.items():
+            if val.get("ticker", "").upper() == symbol_upper:
+                cik = str(val.get("cik_str")).zfill(10)
+                _cik_cache[symbol_upper] = cik
+                return cik
+    except Exception as e:
+        logger.warning(f"CIK lookup failed for {symbol}: {e}")
+    return None
+
+
+# ---------------------------------------------------------------------------
+# TOOL: get_sec_financials — SEC EDGAR XBRL CompanyFacts (free, no key)
+# ---------------------------------------------------------------------------
+async def get_sec_financials(symbol: str) -> dict:
+    """Structured financial data direct from SEC EDGAR XBRL filings."""
+    cache_key = f"tool_sec_xbrl:{symbol}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
+
+    cik = await _get_cik(symbol)
+    if not cik:
+        return {"symbol": symbol, "error": "CIK not found for this ticker"}
+
+    try:
+        url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "MarketFlux research@marketflux.app"})
+            if resp.status_code != 200:
+                return {"symbol": symbol, "error": f"SEC API returned {resp.status_code}"}
+            data = resp.json()
+
+        facts = data.get("facts", {})
+        gaap = facts.get("us-gaap", {})
+
+        def _latest_annual(concept_name: str, unit: str = "USD"):
+            concept = gaap.get(concept_name, {})
+            vals = concept.get("units", {}).get(unit, [])
+            annuals = [v for v in vals if v.get("form") == "10-K"]
+            annuals.sort(key=lambda x: x.get("end", ""), reverse=True)
+            return annuals[:8]
+
+        def _latest_quarterly(concept_name: str, unit: str = "USD"):
+            concept = gaap.get(concept_name, {})
+            vals = concept.get("units", {}).get(unit, [])
+            quarterlies = [v for v in vals if v.get("form") == "10-Q"]
+            quarterlies.sort(key=lambda x: x.get("end", ""), reverse=True)
+            return quarterlies[:8]
+
+        def _format_series(items):
+            return [{"period_end": v.get("end", ""), "value": v.get("val"), "filed": v.get("filed", "")} for v in items]
+
+        result = {
+            "symbol": symbol.upper(),
+            "entity_name": data.get("entityName", ""),
+            "source": "SEC EDGAR XBRL (official)",
+            "annual_revenue": _format_series(_latest_annual("Revenues") or _latest_annual("RevenueFromContractWithCustomerExcludingAssessedTax")),
+            "annual_net_income": _format_series(_latest_annual("NetIncomeLoss")),
+            "annual_total_assets": _format_series(_latest_annual("Assets")),
+            "annual_total_liabilities": _format_series(_latest_annual("Liabilities")),
+            "annual_stockholders_equity": _format_series(_latest_annual("StockholdersEquity")),
+            "annual_eps": _format_series(_latest_annual("EarningsPerShareDiluted", "USD/shares")),
+            "annual_shares_outstanding": _format_series(_latest_annual("CommonStockSharesOutstanding", "shares")),
+            "quarterly_revenue": _format_series(_latest_quarterly("Revenues") or _latest_quarterly("RevenueFromContractWithCustomerExcludingAssessedTax")),
+            "quarterly_net_income": _format_series(_latest_quarterly("NetIncomeLoss")),
+            "quarterly_eps": _format_series(_latest_quarterly("EarningsPerShareDiluted", "USD/shares")),
+        }
+
+        _cache_set(cache_key, result, expire=7200)
+        return result
+    except Exception as e:
+        logger.error(f"SEC XBRL error for {symbol}: {e}")
+        return {"symbol": symbol, "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# TOOL: get_finnhub_news — Finnhub company news (higher quality than yfinance)
+# ---------------------------------------------------------------------------
+async def get_finnhub_news(symbol: str) -> dict:
+    """Recent company news from Finnhub (1000+ sources)."""
+    api_key = os.environ.get("FINNHUB_KEY", "")
+    if not api_key:
+        return {"symbol": symbol, "articles": [], "error": "FINNHUB_KEY not set"}
+
+    cache_key = f"tool_finnhub_news:{symbol}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        date_to = now.strftime("%Y-%m-%d")
+        date_from = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://finnhub.io/api/v1/company-news",
+                params={"symbol": symbol.upper(), "from": date_from, "to": date_to, "token": api_key}
+            )
+            if resp.status_code != 200:
+                return {"symbol": symbol, "articles": [], "error": f"Finnhub returned {resp.status_code}"}
+            articles_raw = resp.json()
+
+        articles = []
+        for art in articles_raw[:15]:
+            articles.append({
+                "title": art.get("headline", ""),
+                "summary": art.get("summary", "")[:400],
+                "source": art.get("source", ""),
+                "published_at": art.get("datetime", ""),
+                "url": art.get("url", ""),
+                "category": art.get("category", ""),
+            })
+
+        if articles:
+            embed_and_store_news(symbol, [
+                {"title": a["title"], "summary": a["summary"], "source": a["source"],
+                 "published_at": a["published_at"], "source_url": a["url"]}
+                for a in articles
+            ])
+
+        result = {"symbol": symbol, "articles": articles, "source": "finnhub", "count": len(articles)}
+        _cache_set(cache_key, result, expire=900)
+        return result
+    except Exception as e:
+        logger.error(f"Finnhub news error for {symbol}: {e}")
+        return {"symbol": symbol, "articles": [], "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# TOOL: get_earnings_calendar — Finnhub upcoming earnings dates
+# ---------------------------------------------------------------------------
+async def get_earnings_calendar(symbol: str) -> dict:
+    """Upcoming and recent earnings dates, EPS estimates from Finnhub."""
+    api_key = os.environ.get("FINNHUB_KEY", "")
+    if not api_key:
+        return {"symbol": symbol, "error": "FINNHUB_KEY not set"}
+
+    cache_key = f"tool_earnings_cal:{symbol}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        date_from = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+        date_to = (now + timedelta(days=90)).strftime("%Y-%m-%d")
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://finnhub.io/api/v1/calendar/earnings",
+                params={"from": date_from, "to": date_to, "symbol": symbol.upper(), "token": api_key}
+            )
+            if resp.status_code != 200:
+                return {"symbol": symbol, "error": f"Finnhub returned {resp.status_code}"}
+            data = resp.json()
+
+        earnings = data.get("earningsCalendar", [])
+        events = []
+        for e in earnings[:5]:
+            events.append({
+                "date": e.get("date", ""),
+                "eps_estimate": e.get("epsEstimate"),
+                "eps_actual": e.get("epsActual"),
+                "revenue_estimate": e.get("revenueEstimate"),
+                "revenue_actual": e.get("revenueActual"),
+                "hour": e.get("hour", ""),
+                "quarter": e.get("quarter"),
+                "year": e.get("year"),
+            })
+
+        result = {"symbol": symbol.upper(), "earnings_events": events, "source": "finnhub"}
+        _cache_set(cache_key, result, expire=3600)
+        return result
+    except Exception as e:
+        logger.error(f"Earnings calendar error for {symbol}: {e}")
+        return {"symbol": symbol, "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# TOOL: get_earnings_transcript — Finnhub transcripts with chunking + search
+# ---------------------------------------------------------------------------
+_transcript_store: Dict[str, list] = {}
+
+def _chunk_text(text: str, chunk_size: int = 2000, overlap: int = 200) -> List[str]:
+    """Split text into overlapping chunks by character count (~500 tokens each)."""
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        if end < len(text):
+            boundary = text.rfind(". ", start, end)
+            if boundary > start + chunk_size // 2:
+                end = boundary + 1
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        start = end - overlap if end < len(text) else len(text)
+    return chunks
+
+async def get_earnings_transcript(symbol: str, query: str = "") -> dict:
+    """Fetch latest earnings transcript from Finnhub, chunk it, and return semantically relevant passages."""
+    api_key = os.environ.get("FINNHUB_KEY", "")
+    if not api_key:
+        return {"symbol": symbol, "passages": [], "error": "FINNHUB_KEY not set"}
+
+    cache_key = f"tool_transcript:{symbol}"
+    cached = _cache_get(cache_key)
+
+    transcript_text = None
+    transcript_meta = {}
+
+    if cached and cached.get("full_text"):
+        transcript_text = cached["full_text"]
+        transcript_meta = cached.get("meta", {})
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                list_resp = await client.get(
+                    "https://finnhub.io/api/v1/stock/transcripts/list",
+                    params={"symbol": symbol.upper(), "token": api_key}
+                )
+                if list_resp.status_code != 200:
+                    return {"symbol": symbol, "passages": [], "error": f"Finnhub transcripts list returned {list_resp.status_code}"}
+
+                transcripts = list_resp.json().get("transcripts", [])
+                if not transcripts:
+                    return {"symbol": symbol, "passages": [], "error": "No transcripts available"}
+
+                latest = transcripts[0]
+                transcript_id = latest.get("id", "")
+                transcript_meta = {"id": transcript_id, "title": latest.get("title", ""), "time": latest.get("time", "")}
+
+                await asyncio.sleep(0.15)
+
+                t_resp = await client.get(
+                    "https://finnhub.io/api/v1/stock/transcripts",
+                    params={"id": transcript_id, "token": api_key}
+                )
+                if t_resp.status_code == 403:
+                    return {"symbol": symbol, "passages": [], "error": "Earnings transcripts require Finnhub premium plan"}
+                if t_resp.status_code != 200:
+                    return {"symbol": symbol, "passages": [], "error": f"Transcript fetch returned {t_resp.status_code}"}
+
+                t_data = t_resp.json()
+                segments = t_data.get("transcript", [])
+                lines = []
+                for seg in segments:
+                    speaker = seg.get("name", "Speaker")
+                    for speech in seg.get("speech", []):
+                        lines.append(f"[{speaker}]: {speech}")
+                transcript_text = "\n".join(lines)
+
+                _cache_set(cache_key, {"full_text": transcript_text, "meta": transcript_meta}, expire=86400)
+        except Exception as e:
+            logger.error(f"Earnings transcript error for {symbol}: {e}")
+            return {"symbol": symbol, "passages": [], "error": str(e)}
+
+    if not transcript_text:
+        return {"symbol": symbol, "passages": [], "error": "Empty transcript"}
+
+    chunks = _chunk_text(transcript_text)
+    if not chunks:
+        return {"symbol": symbol, "passages": [], "error": "Failed to chunk transcript"}
+
+    model = _get_embedding_model()
+    if model is None:
+        return {"symbol": symbol, "passages": chunks[:3], "source": "finnhub_transcript", "meta": transcript_meta, "note": "No embedding model, returning first chunks"}
+
+    try:
+        search_query = query if query else f"{symbol} earnings performance outlook guidance"
+        chunk_embeddings = model.encode(chunks, normalize_embeddings=True, show_progress_bar=False)
+        query_embedding = model.encode([search_query], normalize_embeddings=True, show_progress_bar=False)[0]
+        similarities = np.dot(chunk_embeddings, query_embedding)
+        top_indices = np.argsort(similarities)[::-1][:5]
+        passages = []
+        for idx in top_indices:
+            if similarities[idx] < 0.15:
+                continue
+            passages.append({"text": chunks[idx], "relevance": round(float(similarities[idx]), 3)})
+
+        return {
+            "symbol": symbol.upper(),
+            "passages": passages,
+            "total_chunks": len(chunks),
+            "source": "finnhub_transcript",
+            "meta": transcript_meta,
+        }
+    except Exception as e:
+        logger.error(f"Transcript semantic search error for {symbol}: {e}")
+        return {"symbol": symbol, "passages": [{"text": c} for c in chunks[:3]], "source": "finnhub_transcript", "meta": transcript_meta}
+
+
+# ---------------------------------------------------------------------------
+# TOOL: get_fred_macro — FRED API for key economic indicators
+# ---------------------------------------------------------------------------
+async def get_fred_macro() -> dict:
+    """Key macro indicators from FRED (Federal Reserve Economic Data)."""
+    from datetime import datetime, timezone
+    api_key = os.environ.get("FRED_API_KEY", "")
+
+    cache_key = "tool_fred_macro"
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
+
+    series = {
+        "DFF": "Fed Funds Rate",
+        "DGS10": "10-Year Treasury Yield",
+        "DGS2": "2-Year Treasury Yield",
+        "UNRATE": "Unemployment Rate",
+        "CPIAUCSL": "CPI (All Urban Consumers)",
+        "T10Y2Y": "10Y-2Y Yield Spread",
+        "DCOILWTICO": "Crude Oil WTI",
+        "GOLDAMGBD228NLBM": "Gold Price",
+    }
+
+    if not api_key:
+        return {"indicators": {}, "error": "FRED_API_KEY not set. Sign up free at https://fred.stlouisfed.org/docs/api/api_key.html", "source": "fred"}
+
+    results = {}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            tasks = []
+            for series_id in series:
+                tasks.append(client.get(
+                    "https://api.stlouisfed.org/fred/series/observations",
+                    params={"series_id": series_id, "api_key": api_key, "file_type": "json",
+                            "sort_order": "desc", "limit": 5}
+                ))
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for (series_id, label), resp in zip(series.items(), responses):
+                if isinstance(resp, Exception):
+                    results[label] = {"error": str(resp)}
+                    continue
+                if resp.status_code != 200:
+                    results[label] = {"error": f"HTTP {resp.status_code}"}
+                    continue
+                obs = resp.json().get("observations", [])
+                valid = [o for o in obs if o.get("value", ".") != "."]
+                if valid:
+                    results[label] = {
+                        "latest_value": valid[0].get("value"),
+                        "date": valid[0].get("date"),
+                        "previous_value": valid[1].get("value") if len(valid) > 1 else None,
+                        "previous_date": valid[1].get("date") if len(valid) > 1 else None,
+                    }
+
+        result = {
+            "as_of": datetime.now(timezone.utc).isoformat(),
+            "indicators": results,
+            "source": "FRED (Federal Reserve)",
+        }
+        _cache_set(cache_key, result, expire=3600)
+        return result
+    except Exception as e:
+        logger.error(f"FRED macro error: {e}")
+        return {"as_of": datetime.now(timezone.utc).isoformat(), "indicators": {}, "error": str(e), "source": "fred"}
 
 
 # ---------------------------------------------------------------------------
@@ -1046,6 +1500,11 @@ TOOL_REGISTRY = {
         "label": "Loading market overview",
         "needs_symbol": False,
     },
+    "get_sector_performance": {
+        "fn": get_sector_performance,
+        "label": "Loading sector performance",
+        "needs_symbol": False,
+    },
     "web_search": {
         "fn": web_search,
         "label": "Searching the web",
@@ -1066,20 +1525,48 @@ TOOL_REGISTRY = {
         "needs_symbol": False,
         "needs_query": True,
     },
+    "get_sec_financials": {
+        "fn": get_sec_financials,
+        "label": "Loading {symbol} SEC financial data",
+        "needs_symbol": True,
+    },
+    "get_finnhub_news": {
+        "fn": get_finnhub_news,
+        "label": "Fetching {symbol} news from Finnhub",
+        "needs_symbol": True,
+    },
+    "get_earnings_calendar": {
+        "fn": get_earnings_calendar,
+        "label": "Checking {symbol} earnings calendar",
+        "needs_symbol": True,
+    },
+    "get_earnings_transcript": {
+        "fn": get_earnings_transcript,
+        "label": "Searching {symbol} earnings transcripts",
+        "needs_symbol": True,
+        "needs_query": True,
+    },
+    "get_fred_macro": {
+        "fn": get_fred_macro,
+        "label": "Loading FRED economic indicators",
+        "needs_symbol": False,
+    },
 }
 
-# Query type → default tool sets (Section 5)
+# Query type → default tool sets
 QUERY_TYPE_TOOLS = {
     "price_lookup": ["get_stock_snapshot"],
-    "stock_analysis": ["get_stock_snapshot", "get_fundamentals", "get_analyst_targets", "get_news"],
+    "stock_analysis": ["get_stock_snapshot", "get_fundamentals", "get_analyst_targets", "get_news", "get_finnhub_news"],
     "technical_analysis": ["get_stock_snapshot", "get_technical_indicators"],
-    "market_overview": ["get_market_overview", "get_macro_context", "web_search"],
-    "news_query": ["get_news", "web_search_news"],
+    "market_overview": ["get_market_overview", "get_sector_performance", "get_macro_context", "get_fred_macro", "web_search"],
+    "news_query": ["get_news", "get_finnhub_news", "web_search_news"],
     "insider_activity": ["get_insider_transactions"],
     "company_info": ["get_company_profile"],
+    "earnings_query": ["get_stock_snapshot", "get_earnings_calendar", "get_earnings_transcript", "get_finnhub_news"],
+    "comparison": ["get_stock_snapshot", "get_fundamentals", "get_analyst_targets", "get_sec_financials"],
     "deep_analysis": [
         "get_stock_snapshot", "get_fundamentals", "get_analyst_targets",
-        "get_news", "get_technical_indicators", "get_insider_transactions",
-        "tavily_search"
+        "get_news", "get_sec_financials", "get_earnings_transcript",
+        "get_technical_indicators", "get_insider_transactions",
     ],
 }

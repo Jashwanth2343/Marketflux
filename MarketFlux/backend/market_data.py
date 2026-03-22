@@ -153,15 +153,34 @@ def _get_ticker_data(symbol: str) -> Dict:
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.info or {}
-        hist = ticker.history(period="2d")
+
+        # Indices can be delayed/out-of-sync in .info fields intraday. Prefer 1m bars when available.
+        is_index_like = symbol.startswith("^") or symbol in MAJOR_INDICES
+        intraday = None
+        if is_index_like:
+            try:
+                intraday = ticker.history(period="1d", interval="1m")
+            except Exception:
+                intraday = None
+
+        hist = None
+        if intraday is None or getattr(intraday, "empty", True):
+            hist = ticker.history(period="2d")
 
         current_price = info.get("currentPrice") or info.get("regularMarketPrice", 0)
         previous_close = info.get("previousClose") or info.get("regularMarketPreviousClose", 0)
 
-        if not current_price and len(hist) > 0:
-            current_price = float(hist["Close"].iloc[-1])
-        if not previous_close and len(hist) > 1:
+        # If intraday bars exist, use last bar for current price
+        if (not current_price) and intraday is not None and not intraday.empty:
+            current_price = float(intraday["Close"].iloc[-1])
+
+        # Prefer "previous close" from daily history if missing
+        if (not previous_close) and hist is not None and len(hist) > 1:
             previous_close = float(hist["Close"].iloc[-2])
+
+        # Fallback current from daily history if still missing
+        if (not current_price) and hist is not None and len(hist) > 0:
+            current_price = float(hist["Close"].iloc[-1])
 
         change = current_price - previous_close if current_price and previous_close else 0
         change_pct = (change / previous_close * 100) if previous_close else 0
@@ -171,6 +190,8 @@ def _get_ticker_data(symbol: str) -> Dict:
         result = {
             "symbol": symbol,
             "name": info.get("shortName") or info.get("longName", symbol),
+            "as_of": datetime.now(timezone.utc).isoformat(),
+            "source": "yfinance",
             "price": round(float(current_price), 2) if current_price else 0,
             "change": round(float(change), 2),
             "change_percent": round(float(change_pct), 2),
@@ -191,7 +212,7 @@ def _get_ticker_data(symbol: str) -> Dict:
         return result
     except Exception as e:
         logger.error(f"Error fetching ticker {symbol}: {e}")
-        return {"symbol": symbol, "name": symbol, "price": 0, "change": 0, "change_percent": 0}
+        return {"symbol": symbol, "name": symbol, "as_of": datetime.now(timezone.utc).isoformat(), "source": "yfinance", "price": 0, "change": 0, "change_percent": 0}
 
 
 def _get_chart_data(symbol: str, period: str = "1mo", interval: str = "1d") -> List[Dict]:

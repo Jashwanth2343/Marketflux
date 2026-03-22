@@ -373,16 +373,18 @@ async def market_overview(response: Response):
         response.headers["X-Cache"] = "HIT"
         # Since is_market_open relies on time, recalculate it
         cached["is_market_open"] = is_market_open()
+        if "as_of" not in cached:
+            cached["as_of"] = datetime.now(timezone.utc).isoformat()
         return cached
     try:
         data = await get_market_overview()
-        result = {"indices": data, "is_market_open": is_market_open()}
+        result = {"indices": data, "is_market_open": is_market_open(), "as_of": datetime.now(timezone.utc).isoformat()}
         redis_cache_set(cache_key, result, ttl=30)
         response.headers["X-Cache"] = "MISS"
         return result
     except Exception as e:
         logger.error(f"Market overview error: {e}")
-        return {"indices": {}, "is_market_open": is_market_open()}
+        return {"indices": {}, "is_market_open": is_market_open(), "as_of": datetime.now(timezone.utc).isoformat()}
 
 @api_router.get("/market/movers")
 async def market_movers():

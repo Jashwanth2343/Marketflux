@@ -29,21 +29,22 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # System prompt with Section 13 behavioral rules
 # ---------------------------------------------------------------------------
-AGENT_SYSTEM_PROMPT = """You are MarketFlux AI — a premium financial research assistant.
+_AGENT_PROMPT_TEMPLATE = """\
+You are MarketFlux AI — a premium financial research assistant.
 Your goal is to provide deep, analytical, and visually stunning responses.
 
-═══════════════════════════════════════
-COMMAND: EXECUTION OVER DESCRIPTION
-═══════════════════════════════════════
+TODAY'S DATE: {{TODAY}}
+You MUST use this date as your reference point. All "current" and "recent" data refers to {{TODAY}}. Do NOT fabricate prices, statistics, or events. Only use data provided by your tools.
+
+===== COMMAND: EXECUTION OVER DESCRIPTION =====
 
 - LIVE DATA IS ALWAYS AVAILABLE: You have access to a real-time market snapshot (Indices, VIX, Fear & Greed) which is injected into your context. Use THESE exact numbers if the user asks any macro or market questions.
 - DATA IS MANDATORY: Never describe what a report *would* contain. You MUST populate every section with actual numbers from the live tools results provided below.
 - NO META-DESCRIPTION: Never say "I have already analyzed this" or "Here is what I can show you." Just show the data.
 - ANALYTICAL PROSE: Every section must start with a 1-sentence expert takeaway. Use professional finance terminology.
+- CURRENT DATA ONLY: When discussing current market conditions, ONLY use data from tools. If a data point is not available from tools, say "data unavailable" rather than guessing from memory.
 
-═══════════════════════════════════════
-PREMIUM DESIGN PRINCIPLES
-═══════════════════════════════════════
+===== PREMIUM DESIGN PRINCIPLES =====
 
 1. VISUAL EXCELLENCE: Use rich Markdown (##, ###, bold, clear spacing). Format like a Goldman Sachs research note.
 
@@ -51,35 +52,33 @@ PREMIUM DESIGN PRINCIPLES
 
 3. STRUCTURED SECTIONS:
    - Use H3 headers (###) for major sections.
-   - For stocks, use: ### 📊 Price Performance, ### 📈 Technical Outlook, ### 💰 Fundamentals & Valuation, ### 📰 Market Sentiment.
-   - For macro, use: ### 🌍 Economic Indicators, ### 🎙️ Key News Impact, ### 💡 Market Context.
-   - For company info: ### 🏢 Company Profile.
+   - For stocks, use: ### Price Performance, ### Technical Outlook, ### Fundamentals & Valuation, ### Market Sentiment.
+   - For macro, start with a small Markdown table titled **Drivers** (2–8 rows, columns: Driver | Impact) summarising the main reasons for the current risk-on or risk-off mood, then use: ### Economic Indicators, ### Key News Impact, ### Market Context.
+   - For company info: ### Company Profile.
 
-4. MACRO QUESTIONS: Every macro/market response MUST use the live index/VIX/Fear & Greed data provided in the snapshot. Do not say "the market is volatile" without citing the VIX number.
+4. MACRO QUESTIONS: Every macro/market response MUST use the live index/VIX/Fear & Greed data provided in the snapshot. Do not say "the market is volatile" without citing the VIX number. When SECTOR PERFORMANCE data is in tool results, use it to answer sector-impact questions — present the table and highlight which sectors are leading/lagging.
 
 5. COMPANY INFO & FACTUAL DATA: It is NEVER appropriate to add an investment disclaimer to company_info or price_lookup queries. See specific rules below.
 
 6. NO REFUSALS: Provide data-driven analysis for investment queries. End with "This is not financial advice."
 
-═══════════════════════════════════════
-RESPONSE LENGTH RULES — NON-NEGOTIABLE:
-═══════════════════════════════════════
+===== RESPONSE LENGTH RULES — NON-NEGOTIABLE =====
 
 You are a precision instrument, not a research report generator. Match your response length exactly to what was asked. More words do not mean better answers.
 
 company_info queries (CEO, headquarters, founded date, employee count, website, leadership):
-→ Maximum: 2 sentences OR one small table (3 rows max)
-→ Only include the specific person/place/date asked for
-→ NEVER add financial metrics, P/E, revenue, or margins
-→ NEVER add the investment disclaimer
-→ Correct: "Tim Cook has been Apple's CEO since 2011."
-→ Wrong: anything with a fundamentals table attached
+- Maximum: 2 sentences OR one small table (3 rows max)
+- Only include the specific person/place/date asked for
+- NEVER add financial metrics, P/E, revenue, or margins
+- NEVER add the investment disclaimer
+- Correct: "Tim Cook has been Apple's CEO since 2011."
+- Wrong: anything with a fundamentals table attached
 
 price_lookup queries (current price, single metric):
-→ State the number in the first sentence always
-→ One sentence of context maximum
-→ No tables unless the user asked to compare tickers
-→ NEVER add the investment disclaimer
+- State the number in the first sentence always
+- One sentence of context maximum
+- No tables unless the user asked to compare tickers
+- NEVER add the investment disclaimer
 
 The investment disclaimer ending with "Always do your own research before investing" is ONLY for:
 deep_analysis, stock_analysis, comparison queries.
@@ -89,6 +88,13 @@ Attaching an investment disclaimer to "who is the CEO" is like a restaurant addi
 
 End every report with: "This analysis is based on available data. Always do your own research before investing." (ONLY IF APPLICABLE PER RULES ABOVE)
 """
+
+def _build_agent_system_prompt():
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
+    return _AGENT_PROMPT_TEMPLATE.replace("{{TODAY}}", today)
+
+AGENT_SYSTEM_PROMPT = _build_agent_system_prompt()
 
 INTENT_PROMPTS = {
     "comparison": """
@@ -117,6 +123,11 @@ Provide ONLY the requested factual data (CEO, HQ, etc.) from `get_company_profil
 - DO NOT provide any financial performance data (P/E, Revenue, Market Cap), stock charts, or valuation analysis unless specifically asked.
 - Max length: 3 sentences or 1 simple table.
 - If multiple stocks share a ticker (e.g. SEI vs SEIC), add one brief clarification sentence.
+""",
+    "market_overview": """
+### 🌍 Market & Sector Analysis
+Use the live market overview, sector performance, and macro data from tools.
+For sector-impact questions ("which sectors are most impacted"): present the SECTOR PERFORMANCE table, rank sectors by % change, and explain which are leading/lagging. Link to macro drivers (oil, rates, geopolitics) when relevant.
 """,
 }
 
@@ -151,7 +162,7 @@ Query type rules:
 - "price_lookup": Just the price
 - "stock_analysis": General analysis
 - "technical_analysis": RSI, MACD, etc.
-- "market_overview": General market/macro context
+- "market_overview": General market/macro context, sector performance, "which sectors are impacted"
 - "news_query": Recent news/headlines
 - "insider_activity": Buying/selling by executives
 - "company_info": CEO, HQ, employees, profile
@@ -190,8 +201,8 @@ Return ONLY valid JSON, nothing else."""
         # Validate and fill defaults
         if "symbols" not in result:
             result["symbols"] = []
-        if "tools_needed" not in result:
-            result["tools_needed"] = QUERY_TYPE_TOOLS.get(result["query_type"], ["get_stock_snapshot"])
+        query_type = result.get("query_type", "stock_analysis")
+        result["tools_needed"] = QUERY_TYPE_TOOLS.get(query_type, ["get_stock_snapshot"])
         if "needs" not in result:
             result["needs"] = {"price": True, "fundamentals": True, "news": True, "technicals": False, "macro": False}
 
@@ -209,6 +220,11 @@ Return ONLY valid JSON, nothing else."""
             for tool in ["get_technical_indicators", "get_stock_snapshot", "get_fundamentals", "get_analyst_targets", "get_news"]:
                 if tool not in result["tools_needed"]:
                     result["tools_needed"].append(tool)
+
+        # Sector-impact questions need sector performance data
+        if "sector" in msg_lower or "sectors" in msg_lower:
+            if "get_sector_performance" not in result["tools_needed"]:
+                result["tools_needed"].insert(0, "get_sector_performance")
 
         return result
 
@@ -240,7 +256,8 @@ async def _heuristic_classify(message: str, ticker_hint: Optional[str] = None) -
              "ENTRY", "POINT", "WORTH", "RIGHT", "TIME", "EVEN", "BEEN", "EACH",
              "NEED", "BEEN", "ONLY", "FIND", "SAME", "YEAR", "FULL", "TYPE",
              "MADE", "DEAL", "DEALS", "MUCH", "DOWN", "WORK", "DONE", "PLAN",
-             "MOVE", "REAL", "LIVE", "LATE", "DATA", "OPEN", "SHOW", "VIEW"}
+             "MOVE", "REAL", "LIVE", "LATE", "DATA", "OPEN", "SHOW", "VIEW",
+             "BOTH", "CHARTS", "COMPARE", "VS", "VERSUS", "BETTER", "WITH"}
     symbols = [s for s in symbols if s not in _SKIP][:3]
 
     # If no symbols found, try to resolve company names from the message
@@ -270,7 +287,12 @@ async def _heuristic_classify(message: str, ticker_hint: Optional[str] = None) -
         symbols = [ticker_hint.upper()]
 
     # Classify query type
-    if any(w in msg_lower for w in ["price", "how much", "trading at", "current price"]):
+    # Comparison detection — must come first since "compare" queries may also match other patterns
+    _COMPARE_WORDS = ["compare", "vs", "versus", "comparison", "head to head", "side by side", 
+                      "which is better", "difference between", "better investment"]
+    if any(w in msg_lower for w in _COMPARE_WORDS) or (len(symbols) >= 2 and any(w in msg_lower for w in ["and", "vs", "or", "with"])):
+        query_type = "comparison"
+    elif any(w in msg_lower for w in ["price", "how much", "trading at", "current price"]):
         query_type = "price_lookup"
     elif any(w in msg_lower for w in ["technical", "rsi", "macd", "sma", "oversold", "overbought", "chart"]):
         query_type = "technical_analysis"
@@ -481,6 +503,8 @@ def _format_tool_context(tool_results: Dict) -> str:
         elif tool_name in ["get_market_overview", "get_market_overview_tool"]:
             if isinstance(data, dict):
                 lines = ["=== MARKET OVERVIEW ==="]
+                if data.get("as_of"):
+                    lines.append(f"Data as of (UTC): {data.get('as_of')}")
                 for name, info in (data.get("indices") or {}).items():
                     lines.append(f"{name}: {info.get('price', 0):,.2f} ({info.get('change_percent', 0):+.2f}%)")
                 if data.get("top_gainers"):
@@ -496,6 +520,17 @@ def _format_tool_context(tool_results: Dict) -> str:
                     lines.append(f"\nFear & Greed Index: {fng.get('value', 50)} ({fng.get('classification', 'Neutral')})")
                 sections.append("\n".join(lines))
 
+        elif tool_name == "get_sector_performance":
+            if isinstance(data, dict) and data.get("sectors"):
+                lines = ["=== SECTOR PERFORMANCE (SPDR ETFs) ==="]
+                if data.get("as_of"):
+                    lines.append(f"Data as of (UTC): {data.get('as_of')}")
+                for s in data["sectors"]:
+                    chg = s.get("change_percent")
+                    chg_str = f"{chg:+.2f}%" if chg is not None else "N/A"
+                    lines.append(f"{s.get('sector', '')} ({s.get('symbol', '')}): {chg_str}")
+                sections.append("\n".join(lines))
+
         elif tool_name in ["web_search", "web_search_news"]:
             if isinstance(data, dict):
                 results = data.get("results", [])
@@ -506,7 +541,120 @@ def _format_tool_context(tool_results: Dict) -> str:
                         lines.append(f"- {r.get('title', '')}: {r.get('body', '')[:200]}")
                     sections.append("\n".join(lines))
 
+        elif tool_name == "get_sec_financials":
+            if isinstance(data, dict) and not data.get("error"):
+                lines = [f"=== {data.get('symbol', '')} SEC EDGAR FINANCIAL DATA (Official) ==="]
+                lines.append(f"Entity: {data.get('entity_name', '')}")
+                for series_key, label in [
+                    ("annual_revenue", "Annual Revenue"), ("annual_net_income", "Annual Net Income"),
+                    ("annual_eps", "Annual EPS (Diluted)"), ("annual_total_assets", "Annual Total Assets"),
+                    ("annual_stockholders_equity", "Annual Equity"), ("quarterly_revenue", "Quarterly Revenue"),
+                    ("quarterly_net_income", "Quarterly Net Income"), ("quarterly_eps", "Quarterly EPS"),
+                ]:
+                    series = data.get(series_key, [])
+                    if series:
+                        vals = [f"{s['period_end']}: {s['value']:,.0f}" if isinstance(s.get('value'), (int, float)) and abs(s['value']) > 100
+                                else f"{s['period_end']}: {s['value']}" for s in series[:4]]
+                        lines.append(f"{label}: {' | '.join(vals)}")
+                sections.append("\n".join(lines))
+
+        elif tool_name == "get_finnhub_news":
+            if isinstance(data, dict):
+                articles = data.get("articles", [])
+                if articles:
+                    lines = [f"=== {data.get('symbol', '')} FINNHUB NEWS ({data.get('count', 0)} articles) ==="]
+                    for art in articles[:7]:
+                        lines.append(f"- {art.get('title', '')} — {art.get('source', '')} ({str(art.get('published_at', ''))[:10]})")
+                    sections.append("\n".join(lines))
+
+        elif tool_name == "get_earnings_calendar":
+            if isinstance(data, dict):
+                events = data.get("earnings_events", [])
+                if events:
+                    lines = [f"=== {data.get('symbol', '')} EARNINGS CALENDAR ==="]
+                    for ev in events:
+                        actual = f", Actual EPS: {ev['eps_actual']}" if ev.get("eps_actual") is not None else ""
+                        estimate = f"Est. EPS: {ev.get('eps_estimate', 'N/A')}"
+                        lines.append(f"- {ev.get('date', '')} (Q{ev.get('quarter', '?')} {ev.get('year', '')}): {estimate}{actual} | Hour: {ev.get('hour', 'N/A')}")
+                    sections.append("\n".join(lines))
+
+        elif tool_name == "get_earnings_transcript":
+            if isinstance(data, dict):
+                passages = data.get("passages", [])
+                meta = data.get("meta", {})
+                if passages:
+                    lines = [f"=== {data.get('symbol', '')} EARNINGS TRANSCRIPT EXCERPTS ==="]
+                    if meta.get("title"):
+                        lines.append(f"Source: {meta['title']}")
+                    for i, p in enumerate(passages[:3], 1):
+                        text = p.get("text", "")[:600]
+                        lines.append(f"\n[Passage {i}] (relevance: {p.get('relevance', 'N/A')})\n{text}")
+                    sections.append("\n".join(lines))
+                elif data.get("error"):
+                    sections.append(f"=== {data.get('symbol', '')} EARNINGS TRANSCRIPT ===\n{data['error']}")
+
+        elif tool_name == "get_fred_macro":
+            if isinstance(data, dict):
+                indicators = data.get("indicators", {})
+                if indicators:
+                    lines = ["=== FRED ECONOMIC INDICATORS (Federal Reserve) ==="]
+                    if data.get("as_of"):
+                        lines.append(f"Data as of (UTC): {data.get('as_of')}")
+                    for name, info in indicators.items():
+                        if isinstance(info, dict) and info.get("latest_value"):
+                            prev = f" (prev: {info['previous_value']} on {info['previous_date']})" if info.get("previous_value") else ""
+                            lines.append(f"{name}: {info['latest_value']} (as of {info.get('date', 'N/A')}){prev}")
+                    sections.append("\n".join(lines))
+
     return "\n\n".join(sections) if sections else "No data available from tools."
+
+
+def _build_fallback_from_tools(
+    tool_results: Dict, symbols: List[str], query_type: str, message: str
+) -> Optional[str]:
+    """When LLM fails, build a minimal markdown response from tool data."""
+    if not tool_results:
+        return None
+    lines = ["### Data Summary (AI formatting unavailable)\n"]
+    snapshots = {}
+    for k, v in tool_results.items():
+        if isinstance(v, dict) and v.get("price") and "snapshot" in k.lower():
+            sym = v.get("symbol") or k.split(":")[-1]
+            snapshots[sym] = v
+    fundamentals = {k.split(":")[-1]: v for k, v in tool_results.items()
+                   if isinstance(v, dict) and "fundamentals" in k.lower() and v.get("symbol")}
+    for k, v in tool_results.items():
+        if isinstance(v, dict) and v.get("pe_ratio") is not None and k not in fundamentals:
+            sym = v.get("symbol") or k.split(":")[-1]
+            fundamentals[sym] = v
+    if symbols and snapshots:
+        cols = symbols[:5]
+        rows = [f"| Metric | " + " | ".join(cols) + " |", "|--------|" + "|".join("----------" for _ in cols) + "|"]
+        for key, label in [
+            ("price", "Price"), ("change_percent", "Change %"), ("market_cap", "Market Cap"), ("pe_ratio", "P/E"),
+        ]:
+            vals = []
+            for sym in cols:
+                snap = snapshots.get(sym) or {}
+                fund = fundamentals.get(sym) or {}
+                val = snap.get(key) if key in snap else fund.get(key)
+                if val is not None:
+                    if key == "market_cap":
+                        vals.append(f"${float(val):,.0f}"[:14])
+                    elif key == "change_percent":
+                        vals.append(f"{float(val):+.2f}%")
+                    elif key == "price":
+                        vals.append(f"${float(val):.2f}")
+                    else:
+                        vals.append(str(val)[:14])
+                else:
+                    vals.append("—")
+            rows.append(f"| {label} | " + " | ".join(vals) + " |")
+        lines.append("\n".join(rows))
+    else:
+        lines.append(_format_tool_context(tool_results)[:3500])
+    lines.append("\n\n*Response generated from live data. AI formatting was temporarily unavailable — please try again for a fuller analysis.*")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -554,8 +702,8 @@ def _token_event(content: str) -> str:
     return _sse_event("token", {"content": content})
 
 
-def _done_event() -> str:
-    return _sse_event("done", {})
+def _done_event(**extra) -> str:
+    return _sse_event("done", extra)
 
 
 # ---------------------------------------------------------------------------
@@ -597,6 +745,39 @@ async def run_agent_pipeline(
     # Step 1: Intent classification (PRE-FLIGHT)
     yield _thinking_event("intent", "🔍 Classifying intent and routing...")
     
+    # Capabilities fast-path: "what can you do" etc. — no tools, no LLM
+    msg_lower = message.lower().strip()
+    _CAPABILITIES_PHRASES = [
+        "what can you do", "things you can do", "what are you capable",
+        "capabilities", "what do you do", "how can you help", "what are your features",
+        "help me", "what can i ask", "what questions can i ask"
+    ]
+    if any(p in msg_lower for p in _CAPABILITIES_PHRASES):
+        cap = """**Stock Analysis** — Real-time prices, fundamentals, analyst ratings, technical indicators (RSI, MACD), and insider trading data.
+
+**Company Information** — CEO, headquarters, employee count, and business descriptions.
+
+**Market Overview** — Live snapshot of major indices (S&P 500, Dow, NASDAQ), top gainers/losers, and the Fear & Greed Index.
+
+**Macro Context** — Fed Funds Rate, Treasury yields, CPI, unemployment, and other economic indicators.
+
+**News & Web Search** — Targeted news for specific stocks and general web research for market questions.
+
+**Comparison** — Side-by-side analysis of 2+ stocks with charts and financial metrics."""
+        yield _thinking_event("generate", "✨ Preparing capabilities overview...")
+        yield _token_event(cap)
+        yield _done_event()
+        if db is not None and user_id:
+            try:
+                await db.chat_messages.insert_one({
+                    "user_id": user_id, "session_id": session_id,
+                    "message": message, "response": cap,
+                    "query_type": "capabilities", "created_at": datetime.now(timezone.utc),
+                })
+            except Exception as e:
+                logger.error(f"DB save error: {e}")
+        return
+
     # Step 0: Follow-up detection — check if this is a context-dependent query
     # (e.g. "give me it in a table", "explain more", "compare those")
     # IMPORTANT: Only treat as follow-up if the message has NO substantive subjects
@@ -653,51 +834,78 @@ async def run_agent_pipeline(
     intent = await classify_intent(message, effective_ticker)
     query_type = intent.get("query_type", "stock_analysis")
     symbols = intent.get("symbols", [])
+
+    # Portfolio gating:
+    # If the user asks about portfolio impact/holdings but we can't load holdings for this user,
+    # skip the expensive ReAct path (which can trigger web search) and answer using macro drivers only.
+    portfolio_request = any(k in msg_lower for k in ["portfolio", "holdings", "allocation", "my current portfolio"])
+    portfolio_holdings_missing = False
+    if portfolio_request and db is not None and user_id:
+        try:
+            portfolio_doc = await db.portfolios.find_one({"user_id": user_id}, {"holdings": 1})
+            holdings = (portfolio_doc or {}).get("holdings", []) if isinstance(portfolio_doc, dict) else []
+            portfolio_holdings_missing = len(holdings) == 0
+        except Exception as e:
+            logger.warning(f"Portfolio holdings lookup failed; using macro-only response. err={e}")
+            portfolio_holdings_missing = True
     
-    # Fix 1: Determine tool call ceiling
+    # Determine tool call ceiling per intent
     if query_type in ("company_info", "price_lookup", "factual"):
-        max_tool_calls = 1
-    elif query_type in ("stock_analysis", "technical_analysis", "news_query", "insider_activity"):
+        max_tool_calls = 2
+    elif query_type in ("technical_analysis", "insider_activity"):
         max_tool_calls = 3
-    else:
+    elif query_type in ("stock_analysis", "news_query", "earnings_query"):
         max_tool_calls = 5
+    elif query_type in ("comparison",):
+        max_tool_calls = 12
+    else:
+        max_tool_calls = 7
+
+    if portfolio_holdings_missing and portfolio_request:
+        # Force macro-only tool set (no web_search) to reduce token waste.
+        query_type = "market_overview"
+        intent["query_type"] = "market_overview"
+        intent["tools_needed"] = ["get_market_overview", "get_macro_context", "get_fred_macro"]
+        intent["needs"] = {"price": False, "fundamentals": False, "news": False, "technicals": False, "macro": True}
+        symbols = []
+        max_tool_calls = 3
 
     # --- ADDITIVE GOD-TIER UPGRADE: ReAct Agent Primary Path ---
     react_succeeded = False
     has_yielded_token = False
-    try:
-        from react_agent import run_react_agent
-        logger.info(f"Attempting new ReAct Agent pathway with max_tool_calls={max_tool_calls}...")
-        async for event in run_react_agent(
-            message=message,
-            history=history,
-            db=db,
-            user_id=user_id,
-            session_id=session_id,
-            context_str=context,
-            max_tool_calls=max_tool_calls
-        ):
-            yield event
-            if "token" in event:
-                try:
-                    data = json.loads(event.replace("data: ", ""))
-                    if data.get("content"):
-                        has_yielded_token = True
-                except Exception:
-                    pass
-        if not has_yielded_token:
-            logger.error(f"[AgentPipeline] Pro model failed to yield content for: {message[:100]}")
-        else:
-            react_succeeded = True
-            
-    except Exception as e:
-        logger.warning(f"ReAct Agent error: {e}")
-        if has_yielded_token:
-            logger.error("Crash occurred AFTER ReAct started streaming tokens. Aborting to prevent dual responses.")
-            yield _token_event("\n\n*Agent encountered an error while writing. Please check the data above.*")
-            yield _done_event()
-            return
-        logger.info("Falling back to single-shot pipeline.")
+    if not portfolio_holdings_missing:
+        try:
+            from react_agent import run_react_agent
+            logger.info(f"Attempting new ReAct Agent pathway with max_tool_calls={max_tool_calls}...")
+            async for event in run_react_agent(
+                message=message,
+                history=history,
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                context_str=context,
+                max_tool_calls=max_tool_calls
+            ):
+                yield event
+                if "token" in event:
+                    try:
+                        data = json.loads(event.replace("data: ", ""))
+                        if data.get("content"):
+                            has_yielded_token = True
+                    except Exception:
+                        pass
+            if not has_yielded_token:
+                logger.error(f"[AgentPipeline] Pro model failed to yield content for: {message[:100]}")
+            else:
+                react_succeeded = True
+        except Exception as e:
+            logger.warning(f"ReAct Agent error: {e}")
+            if has_yielded_token:
+                logger.error("Crash occurred AFTER ReAct started streaming tokens. Aborting to prevent dual responses.")
+                yield _token_event("\n\n*Agent encountered an error while writing. Please check the data above.*")
+                yield _done_event()
+                return
+            logger.info("Falling back to single-shot pipeline.")
     # --- END UPGRADE ---
 
     # If ReAct was perfectly successful and yielded tokens, we are done
@@ -750,7 +958,7 @@ async def run_agent_pipeline(
             logger.info(f"No symbols in classifier output, using history: {symbols}")
 
         # Build final system prompt with intent-specific additions
-        system_msg = AGENT_SYSTEM_PROMPT
+        system_msg = _build_agent_system_prompt()
         if query_type in INTENT_PROMPTS:
             system_msg += f"\n\n{INTENT_PROMPTS[query_type]}"
         
@@ -818,7 +1026,7 @@ async def run_agent_pipeline(
 
             yield _done_event()
 
-            if db:
+            if db is not None:
                 try:
                     await db.chat_messages.insert_one({
                         "user_id": user_id,
@@ -856,7 +1064,7 @@ async def run_agent_pipeline(
             yield _done_event()
 
             # Save to DB
-            if db:
+            if db is not None:
                 try:
                     await db.chat_messages.insert_one({
                         "user_id": user_id,
@@ -896,11 +1104,17 @@ async def run_agent_pipeline(
             "get_technical_indicators": ("indicators", "📈"),
             "get_macro_context": ("macro", "🌍"),
             "get_market_overview": ("macro", "🌍"),
+            "get_sector_performance": ("macro", "📊"),
             "get_insider_transactions": ("insider", "🕴️"),
             "get_analyst_targets": ("analyst", "🎯"),
             "get_company_profile": ("company", "🏢"),
             "web_search": ("web", "🌐"),
             "web_search_news": ("web", "🌐"),
+            "get_sec_financials": ("sec", "🏛️"),
+            "get_finnhub_news": ("news", "📰"),
+            "get_earnings_calendar": ("earnings", "📅"),
+            "get_earnings_transcript": ("transcript", "🎙️"),
+            "get_fred_macro": ("macro", "🏦"),
         }
 
         for tool_name in tools_needed:
@@ -921,63 +1135,6 @@ async def run_agent_pipeline(
         # Step 4: Build Focused Context
         tool_context = _format_tool_context(tool_results)
 
-        # Step 5: Generate LLM response
-        yield _thinking_event("generate", "✍️ Finalizing research report...")
-
-        from ai_service import configure_gemini
-        configure_gemini()
-        model = genai.GenerativeModel(
-            model_id,
-            system_instruction=system_msg,
-            safety_settings=safety_settings,
-        )
-
-        chat = model.start_chat(history=[]) # Could add history here if needed
-        
-        # Build prompt for LLM
-        llm_prompt = f"User: {message}\n\n"
-        if context:
-            llm_prompt += f"System Context: {context}\n\n"
-        llm_prompt += f"--- TOOL RESULTS ---\n{tool_context}\n--- END TOOL RESULTS ---"
-
-        try:
-            response_stream = await asyncio.to_thread(
-                chat.send_message, llm_prompt, stream=True
-            )
-            for chunk in response_stream:
-                try:
-                    text = chunk.text
-                    if text:
-                        yield _token_event(text)
-                        full_response += text
-                        await asyncio.sleep(0.01)
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.error(f"LLM streaming error: {e}")
-            yield _token_event("\n\nI'm sorry, I encountered an error while generating the full response.")
-
-        yield _done_event()
-
-        # Save to DB
-        if db:
-            try:
-                await db.chat_messages.insert_one({
-                    "user_id": user_id,
-                    "session_id": session_id,
-                    "message": message,
-                    "response": full_response,
-                    "query_type": query_type,
-                    "symbols": symbols,
-                    "model": model_id,
-                    "created_at": datetime.now(timezone.utc),
-                })
-            except Exception as e:
-                logger.error(f"DB save error: {e}")
-
-        # Build context from tool results
-        tool_context = _format_tool_context(tool_results)
-
         # Build conversation history for chat
         from ai_service import _trim_history
         history = history or []
@@ -994,6 +1151,12 @@ async def run_agent_pipeline(
         if context:
             final_user_text += f"Page context: {context}\n\n"
         final_user_text += f"User question: {message}\n\n"
+        if portfolio_holdings_missing and portfolio_request:
+            final_user_text += (
+                "PORTFOLIO ACCESS NOTE: You do NOT have access to the user's portfolio holdings in this chat request. "
+                "You must clearly tell the user this limitation and ask them to paste/upload holdings so you can map macro drivers to their allocations. "
+                "Do NOT claim you analyzed specific holdings.\n\n"
+            )
         final_user_text += f"--- TOOL RESULTS (Live Data) ---\n{tool_context}\n--- END TOOL RESULTS ---\n\n"
 
         # Dynamic format instruction based on query context
@@ -1017,6 +1180,8 @@ async def run_agent_pipeline(
             )
 
         # Step 5: Stream LLM response
+        yield _thinking_event("generate", "✍️ Finalizing research report...")
+
         from ai_service import configure_gemini
         configure_gemini()
 
@@ -1028,13 +1193,15 @@ async def run_agent_pipeline(
         }
 
         model = genai.GenerativeModel(
-            "models/gemini-2.0-flash",
-            system_instruction=AGENT_SYSTEM_PROMPT,
+            model_id,
+            system_instruction=system_msg,
             safety_settings=safety_settings,
         )
 
         chat = model.start_chat(history=gemini_history)
 
+        # Attempt 1: Stream (original behavior)
+        stream_ok = False
         try:
             response_stream = await asyncio.to_thread(
                 chat.send_message, final_user_text, stream=True
@@ -1046,22 +1213,57 @@ async def run_agent_pipeline(
                         yield _token_event(text)
                         full_response += text
                         await asyncio.sleep(0.01)
+                        stream_ok = True
                 except Exception:
-                    # Catch ALL chunk-level exceptions: ValueError, StopCandidateException,
-                    # IncompleteIterationError, AttributeError, etc.
                     pass
         except Exception as e:
-            logger.error(f"LLM streaming error: {e}")
-            if not full_response:
-                error_msg = "I'm having trouble generating a response right now. Please try again."
-                yield _token_event(error_msg)
-                full_response = error_msg
-            # If we already have a response, just log the error and move on
+            logger.warning(f"LLM streaming failed: {type(e).__name__}: {e}")
 
-        yield _done_event()
+        # Attempt 2: Non-stream retry (often more stable)
+        if not full_response.strip():
+            await asyncio.sleep(0.5)
+            try:
+                response = await asyncio.to_thread(
+                    chat.send_message, final_user_text, stream=False
+                )
+                txt = (response.text or "").strip()
+                if txt:
+                    for i in range(0, len(txt), 50):
+                        chunk = txt[i : i + 50]
+                        yield _token_event(chunk)
+                        full_response += chunk
+                        await asyncio.sleep(0.01)
+            except Exception as e2:
+                logger.warning(f"LLM non-stream retry failed: {type(e2).__name__}: {e2}")
+
+        # Attempt 3: Fallback from tool data
+        if not full_response.strip() and tool_context and len(tool_context) > 100:
+            fallback = _build_fallback_from_tools(tool_results, symbols, query_type, message)
+            if fallback:
+                full_response = fallback
+                yield _token_event(fallback)
+                logger.info("Emitted fallback response from tool context (LLM failed)")
+            else:
+                full_response = (
+                    "I gathered the data but couldn't generate a full analysis.\n\n"
+                    + tool_context[:4000]
+                )
+                if len(tool_context) > 4000:
+                    full_response += "\n\n*(Data truncated. Try a more specific question.)*"
+                full_response += "\n\n*Please try again in a moment — our AI had a temporary hiccup.*"
+                yield _token_event(full_response)
+        elif not full_response.strip():
+            error_msg = "I'm having trouble generating a response right now. Please try again in a moment."
+            full_response = error_msg
+            yield _token_event(error_msg)
+
+        done_payload = {}
+        if query_type == "comparison" and len(symbols) >= 2:
+            done_payload["chart_tickers"] = symbols[:5]  # max 5 tickers for chart
+        yield _done_event(**done_payload)
 
         # Step 6: Save to MongoDB
-        if db:
+        if db is not None:
             try:
                 await db.chat_messages.insert_one({
                     "user_id": user_id,

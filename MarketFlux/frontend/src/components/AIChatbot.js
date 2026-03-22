@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import DOMPurify from 'dompurify';
-import { MessageSquare, X, Send, Zap, Lock, Loader2, Plus, History, ChevronLeft, ChevronDown, ChevronRight, Paperclip, TerminalSquare } from 'lucide-react';
+import { MessageSquare, X, Send, Zap, Lock, Loader2, Plus, History, ChevronLeft, ChevronDown, ChevronRight, Paperclip, TerminalSquare, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import api, { API_BASE } from '@/lib/api';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 
 const CUSTOM_STYLES = `
   .terminal-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -29,6 +30,19 @@ const CUSTOM_STYLES = `
   @keyframes eq-bounce {
     0%, 100% { height: 6px; }
     50% { height: 16px; }
+  }
+
+  .candle-tick { width: 2px; border-radius: 1px; background: rgba(255,255,255,0.15); }
+  .candle-tick:nth-child(1) { height: 8px;  animation: candle-tick 1.4s ease-in-out infinite; animation-delay: 0s; }
+  .candle-tick:nth-child(2) { height: 14px; animation: candle-tick 1.4s ease-in-out infinite; animation-delay: 0.15s; }
+  .candle-tick:nth-child(3) { height: 6px;  animation: candle-tick 1.4s ease-in-out infinite; animation-delay: 0.3s; }
+  .candle-tick:nth-child(4) { height: 12px; animation: candle-tick 1.4s ease-in-out infinite; animation-delay: 0.45s; }
+  .candle-tick:nth-child(5) { height: 10px; animation: candle-tick 1.4s ease-in-out infinite; animation-delay: 0.6s; }
+  .candle-tick:nth-child(6) { height: 16px; animation: candle-tick 1.4s ease-in-out infinite; animation-delay: 0.75s; }
+  .candle-tick:nth-child(7) { height: 4px;  animation: candle-tick 1.4s ease-in-out infinite; animation-delay: 0.9s; }
+  @keyframes candle-tick {
+    0%, 100% { opacity: 0.4; transform: scaleY(0.6); }
+    50% { opacity: 1; transform: scaleY(1); }
   }
 
   .fin-card {
@@ -61,6 +75,106 @@ const CUSTOM_STYLES = `
   .dark .fin-impact-badge { color: var(--color-accent); }
   .fin-impact-text { font-size: 12px; line-height: 1.5; opacity: 0.8; }
 `;
+
+// Google Finance-style comparison chart (multi-line % change)
+const CHART_COLORS = ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#ec4899'];
+function ComparisonChart({ tickers }) {
+  const [chartData, setChartData] = useState([]);
+  const [period, setPeriod] = useState('1y');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!tickers || tickers.length < 2) return;
+    const fetchAll = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const interval = period === '1d' ? '5m' : period === '5d' ? '15m' : period === '1m' || period === '6m' ? '1d' : '1wk';
+        const results = await Promise.all(
+          tickers.map((t) => api.get(`/market/chart/${t}?period=${period}&interval=${interval}`).then((r) => ({ ticker: t, data: r.data.data || [] })))
+        );
+        const byDate = {};
+        results.forEach(({ ticker, data }) => {
+          data.forEach((d) => {
+            const dt = (d.date || d.Date || '').slice(0, 10);
+            if (!dt) return;
+            if (!byDate[dt]) byDate[dt] = { date: dt };
+            const close = d.close ?? d.Close ?? 0;
+            if (close > 0) byDate[dt][ticker] = close;
+          });
+        });
+        const sorted = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+        if (sorted.length < 2) {
+          setChartData([]);
+          return;
+        }
+        const withPct = sorted.map((row) => {
+          const out = { ...row };
+          tickers.forEach((t) => {
+            const vals = sorted.map((r) => r[t]).filter(Boolean);
+            const first = vals[0];
+            const cur = row[t];
+            if (first && cur) out[`${t}_pct`] = ((cur / first - 1) * 100);
+          });
+          return out;
+        });
+        setChartData(withPct);
+      } catch (e) {
+        setError('Chart data unavailable');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickers?.join(','), period]);
+
+  if (!tickers || tickers.length < 2) return null;
+  const periodMap = { '1D': '1d', '5D': '5d', '1M': '1mo', '6M': '6mo', 'YTD': 'ytd', '1Y': '1y', '5Y': '5y', 'MAX': 'max' };
+
+  return (
+    <div className="my-4 rounded-lg border border-[rgba(34,197,94,0.2)] bg-[rgba(0,0,0,0.3)] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex gap-2 flex-wrap">
+          {tickers.map((t, i) => (
+            <span key={t} className="flex items-center gap-1 text-[10px] font-mono">
+              <span className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-[#3b82f6]' : i === 1 ? 'bg-[#f97316]' : 'bg-[#22c55e]'}`} />
+              {t}
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-1">
+          {Object.keys(periodMap).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(periodMap[p])}
+              className={`px-2 py-0.5 text-[10px] font-mono rounded-md transition-colors ${period === periodMap[p] ? 'bg-[#22c55e]/20 text-[#22c55e]' : 'text-[#9ca3af] hover:text-[#e5e7eb]'}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+      {loading && <div className="h-[200px] flex items-center justify-center text-[11px] text-[#9ca3af]">Loading chart...</div>}
+      {error && <div className="h-[200px] flex items-center justify-center text-[11px] text-[#ef4444]">{error}</div>}
+      {!loading && !error && chartData.length > 0 && (
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+            <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9ca3af' }} tickFormatter={(v) => (v || '').toString().slice(5)} />
+            <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} tickFormatter={(v) => `${v}%`} domain={['auto', 'auto']} />
+            <Tooltip contentStyle={{ background: '#0f0f0f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} formatter={(v) => [`${Number(v).toFixed(2)}%`, '']} />
+            <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="2 2" />
+            {tickers.map((t, i) => (
+              <Line key={t} type="monotone" dataKey={`${t}_pct`} name={t} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} connectNulls />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
 
 function renderMarkdown(text) {
   if (!text) return '';
@@ -133,39 +247,22 @@ function renderMarkdown(text) {
 
 
 function CollapsibleMarkdown({ content, isError, streaming }) {
-  const [expanded, setExpanded] = useState(false);
-
-  // Only truncate if not streaming, otherwise the user sees a jarring cut during generation
-  const words = content.split(/\s+/);
-  const isLong = !streaming && words.length > 400;
-
-  const displayText = (!isLong || expanded) ? content : words.slice(0, 200).join(' ') + '...';
-
   return (
     <div className="relative w-full">
       <div
         className={`markdown-content text-xs leading-relaxed ${isError ? 'text-destructive' : ''}`}
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(displayText)) || '' }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(content)) || '' }}
       />
       {streaming && <span className="inline-block w-1.5 h-3 bg-primary ml-1 animate-pulse" />}
-
-      {isLong && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="mt-3 dark:text-[#00ff88] text-[#059669] text-[11px] hover:underline cursor-pointer font-sans transition-colors block"
-        >
-          {expanded ? 'Show less ▴' : 'Show full analysis ▾'}
-        </button>
-      )}
     </div>
   );
 }
 
+// Google Finance-style Analysis Complete bar (thin green border, subtle bg, checkmark, expandable)
 function ThinkingAccordion({ steps, isProcessing }) {
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    // Auto-expand while processing, auto-collapse when done
     if (isProcessing) setExpanded(true);
     else setExpanded(false);
   }, [isProcessing]);
@@ -173,38 +270,30 @@ function ThinkingAccordion({ steps, isProcessing }) {
   if (!steps || steps.length === 0) return null;
 
   return (
-    <div className="mb-3 border border-primary/20 rounded-md bg-primary/5 overflow-hidden shadow-sm">
+    <div className="mb-3 border border-[rgba(34,197,94,0.35)] rounded-lg bg-[rgba(34,197,94,0.04)] overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-primary/5 hover:bg-primary/10 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[rgba(34,197,94,0.06)] transition-colors"
       >
         <div className="flex items-center gap-2">
           {isProcessing ? (
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
           ) : (
-            <span className="text-primary font-bold text-xs">✓</span>
+            <Check className="w-3.5 h-3.5 text-[#22c55e]" strokeWidth={3} />
           )}
-          <span className={`text-[11px] font-mono tracking-wide ${isProcessing ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>
-            {isProcessing ? '⚡ Analyzing Markets...' : 'Analysis Complete'}
+          <span className={`text-[11px] font-sans tracking-wide ${isProcessing ? 'text-[#e5e7eb] font-medium' : 'text-[#9ca3af]'}`}>
+            {isProcessing ? 'Analyzing...' : 'Analysis Complete'}
           </span>
         </div>
-        {expanded ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
+        {expanded ? <ChevronDown className="w-3.5 h-3.5 text-[#6b7280]" /> : <ChevronRight className="w-3.5 h-3.5 text-[#6b7280]" />}
       </button>
 
       {expanded && (
-        <div className="px-3 py-2 space-y-2 border-t border-primary/10">
+        <div className="px-3 py-2 space-y-1.5 border-t border-[rgba(34,197,94,0.12)]">
           {steps.map((step, i) => (
-            <div
-              key={step.id || i}
-              className="flex items-start gap-2 text-[11px] font-mono"
-              style={{ animation: `fadeIn 150ms ease-out ${i * 150}ms both` }}
-            >
-              <span className={`mt-0.5 ${!isProcessing && i === steps.length - 1 ? 'text-primary' : 'text-muted-foreground'}`}>
-                [✓]
-              </span>
-              <span className={!isProcessing || i < steps.length - 1 ? 'text-muted-foreground' : 'text-primary'}>
-                {step.message}
-              </span>
+            <div key={step.id || i} className="flex items-start gap-2 text-[11px] font-mono" style={{ animation: `fadeIn 150ms ease-out ${i * 80}ms both` }}>
+              <Check className={`w-3 h-3 mt-0.5 shrink-0 ${!isProcessing && i === steps.length - 1 ? 'text-[#22c55e]' : 'text-[#6b7280]'}`} strokeWidth={2} />
+              <span className={!isProcessing && i === steps.length - 1 ? 'text-[#d1d5db]' : 'text-[#6b7280]'}>{step.message}</span>
             </div>
           ))}
         </div>
@@ -390,19 +479,29 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
     setThinkingSteps([]);
 
     try {
-      let detectedTicker = getCurrentTicker();
+      let detectedTicker = null;
+      const msgLower = sentInput.toLowerCase();
+      const isGeneralQuery = /\b(market|macro|economy|war|geopolitic|sector|index|indices|fed|inflation|recession|gdp|interest rate|oil|gold|crypto|bitcoin)\b/i.test(sentInput);
+
       const tickerMatch = sentInput.toUpperCase().match(/\b([A-Z]{1,5})\b/);
-      if (tickerMatch && ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'JPM', 'V', 'WMT', 'JNJ', 'XOM', 'AMD', 'INTC', 'NFLX', 'DIS', 'BA', 'GS', 'PFE', 'KO'].includes(tickerMatch[1])) {
+      const KNOWN_TICKERS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'JPM', 'V', 'WMT', 'JNJ', 'XOM', 'AMD', 'INTC', 'NFLX', 'DIS', 'BA', 'GS', 'PFE', 'KO', 'UBER', 'SQ', 'COIN', 'PLTR', 'SOFI', 'SNOW', 'CRM', 'ORCL', 'AVGO', 'COST'];
+      if (tickerMatch && KNOWN_TICKERS.includes(tickerMatch[1])) {
         detectedTicker = tickerMatch[1];
+      }
+
+      if (!detectedTicker && !isGeneralQuery) {
+        detectedTicker = getCurrentTicker();
       }
 
       const token = localStorage.getItem('mf_token');
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      const res = await fetch(`${API_BASE}/api/ai/chat/stream`, {
+      const base = API_BASE || '';
+      const res = await fetch(`${base}/api/ai/chat/stream`, {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({
           message: sentInput,
           session_id: sessionId.current,
@@ -427,82 +526,65 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
       let buffer = '';
       let currentThinkingSteps = [];
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+      const processLine = (line) => {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) return;
+        try {
+          const jsonStr = trimmed.slice(6);
+          const event = JSON.parse(jsonStr);
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-          try {
-            const jsonStr = trimmed.slice(6);
-            const event = JSON.parse(jsonStr);
-
-            if (event.type === 'thinking') {
-              const newStep = { step: event.step, message: event.message, id: Date.now() };
-              currentThinkingSteps = [...currentThinkingSteps, newStep];
-              setThinkingSteps(currentThinkingSteps);
-
-              // If we already started the assistant message, update its thinking array
-              if (assistantMsgAdded) {
-                setMessages(prev => {
-                  const n = [...prev];
-                  n[n.length - 1] = { ...n[n.length - 1], thinking: currentThinkingSteps };
-                  return n;
-                });
-              }
-            } else if (event.type === 'token') {
-              if (!assistantMsgAdded) {
-                assistantMsgAdded = true;
-                setMessages(prev => [...prev, {
-                  role: 'assistant',
-                  content: '',
-                  streaming: true,
-                  thinking: currentThinkingSteps
-                }]);
-                // We keep currentThinkingSteps around, just in case more thinking events come (unlikely but possible)
-              }
-              responseContent += event.content;
-              const snap = responseContent;
+          if (event.type === 'thinking') {
+            const newStep = { step: event.step, message: event.message, id: Date.now() };
+            currentThinkingSteps = [...currentThinkingSteps, newStep];
+            setThinkingSteps(currentThinkingSteps);
+            if (assistantMsgAdded) {
+              setMessages(prev => {
+                const n = [...prev];
+                if (n.length > 0) n[n.length - 1] = { ...n[n.length - 1], thinking: currentThinkingSteps };
+                return n;
+              });
+            }
+          } else if (event.type === 'token') {
+            if (!assistantMsgAdded) {
+              assistantMsgAdded = true;
+              setMessages(prev => [...prev, { role: 'assistant', content: '', streaming: true, thinking: currentThinkingSteps }]);
+            }
+            responseContent += event.content || '';
+            const snap = responseContent;
+            const now = new Date();
+            setMessages(prev => {
+              const n = [...prev];
+              if (n.length > 0) n[n.length - 1] = { ...n[n.length - 1], content: snap, streaming: true, timestamp: now };
+              return n;
+            });
+          } else if (event.type === 'done') {
+            const chartTickers = event.chart_tickers || null;
+            if (assistantMsgAdded) {
+              const final = responseContent;
               const now = new Date();
               setMessages(prev => {
                 const n = [...prev];
                 if (n.length > 0) {
-                  n[n.length - 1] = {
-                    ...n[n.length - 1],
-                    content: snap,
-                    streaming: true,
-                    timestamp: now
-                  };
+                  n[n.length - 1] = { ...n[n.length - 1], content: final, streaming: false, timestamp: now, sources: ['Market APIs'], ...(chartTickers && chartTickers.length >= 2 ? { chartTickers } : {}) };
                 }
                 return n;
               });
-            } else if (event.type === 'done') {
-              if (assistantMsgAdded) {
-                const final = responseContent;
-                const now = new Date();
-                setMessages(prev => {
-                  const n = [...prev];
-                  if (n.length > 0) {
-                    n[n.length - 1] = {
-                      ...n[n.length - 1],
-                      content: final,
-                      streaming: false,
-                      timestamp: now,
-                      sources: ['Market APIs']
-                    };
-                  }
-                  return n;
-                });
-              }
-              setThinkingSteps([]);
             }
-          } catch { }
-        }
+            setThinkingSteps([]);
+          }
+        } catch (_) { /* skip malformed lines */ }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += value ? decoder.decode(value, { stream: !done }) : '';
+        const lines = buffer.split('\n');
+        buffer = done ? '' : (lines.pop() || '');
+
+        for (const line of lines) processLine(line);
+        if (done) break;
       }
+      if (buffer.trim()) processLine(buffer);
 
       if (!assistantMsgAdded && responseContent) {
         setMessages(prev => [...prev, {
@@ -561,13 +643,14 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
       {isChatOpen && (
         <div
           data-testid="chatbot-window"
-          className={`fixed z-[999] flex flex-col overflow-hidden transition-transform duration-300 ease-in-out dark:bg-[#0a0a0f] bg-slate-50 dark:border-primary/15 border-border ${isDesktop
+          className={`fixed z-[999] flex flex-col overflow-hidden transition-transform duration-300 ease-in-out border-[rgba(255,255,255,0.08)] ${isDesktop
             ? 'top-0 right-0 bottom-0 h-full border-l shadow-2xl'
             : 'bottom-6 right-6 w-[380px] h-[580px] max-h-[85vh] rounded-[12px] shadow-[0_0_40px_rgba(0,255,136,0.05)] border-t border-l border-r'
             }`}
           style={{
             width: isDesktop ? `${chatWidth}px` : '380px',
-            transform: isDesktop ? `translateX(${isChatOpen ? 0 : '100%'})` : 'none'
+            transform: isDesktop ? `translateX(${isChatOpen ? 0 : '100%'})` : 'none',
+            backgroundColor: '#000000'
           }}
         >
           {/* Resize Handle */}
@@ -581,7 +664,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
           )}
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b dark:border-primary/15 border-border dark:bg-gradient-to-b dark:from-[#0d1117] dark:to-[#0a0a0f] dark:bg-muted/30 bg-muted">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)]" style={{ backgroundColor: '#0a0a0a' }}>
             <div className="flex items-center gap-2">
               {showHistory && (
                 <button onClick={() => setShowHistory(false)} className="mr-1">
@@ -647,7 +730,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
           ) : (
             <>
               {/* Messages */}
-              <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-4 terminal-scrollbar relative">
+              <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-4 terminal-scrollbar relative" style={{ backgroundColor: '#000000' }}>
                 {messages.length === 0 && (
                   <div className="text-center py-8">
                     <span className="inline-block w-4 h-4 rounded-full bg-primary/30 terminal-pulse mb-3" />
@@ -672,8 +755,8 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
                   <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                     <div
                       className={`px-3 py-2 text-sm ${msg.role === 'user'
-                        ? 'bg-[rgba(99,102,241,0.15)] dark:bg-[rgba(99,102,241,0.2)] border border-[rgba(99,102,241,0.3)] dark:border-[rgba(99,102,241,0.4)] text-foreground dark:text-[#e0e0e0] rounded-[12px_12px_2px_12px] text-[13px] ml-auto max-w-[80%] shadow-sm'
-                        : 'text-foreground max-w-[95%] w-full'
+                        ? 'bg-[#1a237e] text-[#e8eaf6] rounded-2xl rounded-br-md text-[13px] ml-auto max-w-[85%] shadow-sm font-sans'
+                        : 'text-[#e5e7eb] max-w-[95%] w-full font-sans leading-relaxed'
                         }`}
                     >
                       {msg.role === 'assistant' ? (
@@ -684,6 +767,12 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
                               steps={msg.thinking}
                               isProcessing={msg.streaming || (i === messages.length - 1 && loading)}
                             />
+                          )}
+
+                          {msg.chartTickers && msg.chartTickers.length >= 2 && !msg.streaming && (
+                            <div className="mb-3 mt-1">
+                              <ComparisonChart tickers={msg.chartTickers} />
+                            </div>
                           )}
 
                           <CollapsibleMarkdown content={msg.content} isError={msg.isError} streaming={msg.streaming} />
@@ -728,10 +817,10 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
 
                 {loading && thinkingSteps.length === 0 && (
                   <div className="flex items-center gap-3 px-2 py-3">
-                    <div className="flex items-end gap-[3px] h-4">
-                      <div className="eq-bar h-2" />
-                      <div className="eq-bar h-4" />
-                      <div className="eq-bar h-2" />
+                    <div className="flex items-end gap-[2px] h-4 align-bottom">
+                      {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                        <div key={i} className="candle-tick" />
+                      ))}
                     </div>
                     <span className="text-[11px] font-mono text-muted-foreground">Querying live market data...</span>
                   </div>
@@ -765,7 +854,8 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
 
               {/* Input */}
               <div
-                className="p-3 border-t dark:border-primary/15 border-border dark:bg-gradient-to-t dark:from-[#0d1117] dark:to-[#0a0a0f] dark:bg-muted/20 bg-muted"
+                className="p-3 border-t border-[rgba(255,255,255,0.08)]"
+                style={{ backgroundColor: '#0a0a0a' }}
               >
                 <form
                   onSubmit={(e) => {

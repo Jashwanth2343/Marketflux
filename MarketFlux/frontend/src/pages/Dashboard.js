@@ -84,6 +84,7 @@ function SpeedometerGauge({ score, mood }) {
 
 export default function Dashboard() {
   const [indices, setIndices] = useState({});
+  const [indicesAsOf, setIndicesAsOf] = useState(null);
   const [movers, setMovers] = useState({ gainers: [], losers: [] });
   const [news, setNews] = useState([]);
   const [mood, setMood] = useState({ bullish: 0, bearish: 0, neutral: 0 });
@@ -118,6 +119,7 @@ export default function Dashboard() {
           if (indicesRes.status === 'fulfilled') {
             setIndices(indicesRes.value.data.indices || {});
             setIsMarketOpen(indicesRes.value.data.is_market_open);
+            setIndicesAsOf(indicesRes.value.data.as_of || null);
           }
           if (moversRes.status === 'fulfilled') setMovers(moversRes.value.data);
           if (newsRes.status === 'fulfilled') setNews(newsRes.value.data.articles || []);
@@ -174,6 +176,11 @@ export default function Dashboard() {
             })
           )}
         </div>
+        {indicesAsOf && (
+          <div className="px-4 pb-2 text-[10px] font-mono text-muted-foreground">
+            Data as of (UTC): {indicesAsOf}
+          </div>
+        )}
       </Card>
 
       {/* Main Grid: 4 columns on large screens */}
