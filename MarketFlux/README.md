@@ -41,6 +41,17 @@ AI-powered investment research platform with real-time stock data, natural langu
 - Watchlists
 - Market Overview Dashboard
 
+## vNext Quant Research OS
+
+This repo now also includes a parallel `vNext` foundation for the public AI-native quant research product:
+
+- `backend/vnext/` for new research engines and `/api/vnext/*` routes
+- `backend/sql/vnext_pgvector_schema.sql` for the planned Postgres + pgvector schema
+- `docker-compose.vnext.yml` for local Postgres/Redis infrastructure
+- `quant-app/` for the new `Next.js` product shell
+
+See [VNEXT_IMPLEMENTATION.md](/Users/jashwanthkanderi/Downloads/Financegptwebdashboard-main/MarketFlux/VNEXT_IMPLEMENTATION.md) for the implementation overview.
+
 ## Local Setup
 1. Clone the repository: `git clone https://github.com/Jashwanth2343/MarketFlux_v1.git`
 2. Install Backend Dependencies: `cd backend && pip install -r requirements.txt`

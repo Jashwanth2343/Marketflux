@@ -6,9 +6,11 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import TopNav from "@/components/TopNav";
 
 const AIChatbot = lazy(() => import("@/components/AIChatbot"));
+const StrategyTerminal = lazy(() => import("@/components/StrategyTerminal"));
 import ScanlineOverlay from "@/components/ScanlineOverlay";
 import AuthCallback from "@/components/AuthCallback";
 import Dashboard from "@/pages/Dashboard";
+import FundOS from "@/pages/FundOS";
 import NewsFeed from "@/pages/NewsFeed";
 import StockDetail from "@/pages/StockDetail";
 import AIScreener from "@/pages/AIScreener";
@@ -51,14 +53,27 @@ class ErrorBoundary extends React.Component {
 function AppRouter() {
   const location = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isStrategyTerminalOpen, setIsStrategyTerminalOpen] = useState(false);
   const [chatWidth, setChatWidth] = useState(380);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  const isFundOsRoute = location.pathname === '/fund-os';
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const openTerminal = () => setIsChatOpen(true);
+    const closeTerminal = () => setIsChatOpen(false);
+    window.addEventListener("marketflux:open-terminal", openTerminal);
+    window.addEventListener("marketflux:close-terminal", closeTerminal);
+    return () => {
+      window.removeEventListener("marketflux:open-terminal", openTerminal);
+      window.removeEventListener("marketflux:close-terminal", closeTerminal);
+    };
+  }, [isFundOsRoute]);
 
   // Check URL fragment for session_id synchronously during render
   if (location.hash?.includes('session_id=')) {
@@ -79,6 +94,9 @@ function AppRouter() {
           <main className="flex-1 overflow-y-auto flex flex-col relative w-full">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/fund-os" element={<FundOS />} />
+              <Route path="/fund-os/terminal" element={<Suspense fallback={<div className="flex h-full items-center justify-center"><div className="animate-spin text-primary">Loading...</div></div>}><StrategyTerminal /></Suspense>} />
+              <Route path="/fund-os/terminal/:strategyId" element={<Suspense fallback={<div className="flex h-full items-center justify-center"><div className="animate-spin text-primary">Loading...</div></div>}><StrategyTerminal /></Suspense>} />
               <Route path="/news" element={<NewsFeed />} />
               <Route path="/screener" element={<AIScreener />} />
               <Route path="/stock/:ticker" element={<StockDetail />} />

@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Command, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
+import { cn } from '@/lib/utils';
 
-export default function SearchBar() {
+export default function SearchBar({ variant = 'default', className = '' }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -13,6 +14,7 @@ export default function SearchBar() {
   const containerRef = useRef(null);
   const debounceRef = useRef(null);
   const navigate = useNavigate();
+  const isHero = variant === 'hero';
 
   useEffect(() => {
     const handler = (e) => {
@@ -53,10 +55,15 @@ export default function SearchBar() {
     }
     setLoading(true);
     try {
-      const res = await api.get(`/search-stocks?q=${encodeURIComponent(q)}`);
+      const res = await api.get(`/fundos/search?q=${encodeURIComponent(q)}`);
       setResults(res.data.results || []);
     } catch {
-      setResults([]);
+      try {
+        const fallbackRes = await api.get(`/search-stocks?q=${encodeURIComponent(q)}`);
+        setResults(fallbackRes.data.results || []);
+      } catch {
+        setResults([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -71,8 +78,15 @@ export default function SearchBar() {
     debounceRef.current = setTimeout(() => search(val), 300);
   };
 
-  const handleSelect = (symbol) => {
-    navigate(`/stock/${symbol}`);
+  const handleSelect = (item) => {
+    if (typeof item === 'string') {
+      navigate(`/stock/${item}`);
+    } else if (item.kind === 'strategy') {
+      // Just route to fund-os for now, or could have a modal
+      navigate(`/fund-os?strategy=${item.id}`);
+    } else {
+      navigate(`/stock/${item.symbol || item}`);
+    }
     setOpen(false);
     setQuery('');
     setResults([]);
@@ -102,9 +116,13 @@ export default function SearchBar() {
   };
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-lg" data-testid="global-search-bar">
+    <div
+      ref={containerRef}
+      className={cn('relative w-full', isHero ? 'max-w-none' : 'max-w-lg', className)}
+      data-testid="global-search-bar"
+    >
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Search className={cn('absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground', isHero ? 'w-5 h-5 left-5' : 'w-4 h-4')} />
         <input
           ref={inputRef}
           data-testid="global-search-input"
@@ -113,10 +131,20 @@ export default function SearchBar() {
           onChange={handleChange}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search by company name or ticker..."
-          className="w-full pl-10 pr-16 py-2 bg-background border border-border text-sm font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 transition-colors"
+          placeholder={isHero ? "Search tickers, issuers, sectors, or macro themes..." : "Search by company name or ticker..."}
+          className={cn(
+            'w-full text-foreground placeholder:text-muted-foreground/50 focus:outline-none transition-colors',
+            isHero
+              ? 'rounded-[22px] border border-primary/15 bg-card/80 pl-14 pr-24 py-4 text-base shadow-[0_18px_48px_rgba(0,0,0,0.18)] backdrop-blur-xl focus:border-primary/40'
+              : 'pl-10 pr-16 py-2 bg-background border border-border text-sm font-mono focus:border-primary/50'
+          )}
         />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground bg-muted border border-border">
+        <kbd
+          className={cn(
+            'absolute top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 text-[10px] font-mono text-muted-foreground border',
+            isHero ? 'right-4 rounded-full bg-background/90 px-2.5 py-1 border-primary/15' : 'right-3 px-1.5 py-0.5 bg-muted border-border'
+          )}
+        >
           <Command className="w-3 h-3" />K
         </kbd>
       </div>
@@ -124,7 +152,10 @@ export default function SearchBar() {
       {open && query.length > 0 && (
         <div
           data-testid="search-dropdown"
-          className="absolute top-full left-0 right-0 mt-1 bg-card border border-border z-50 max-h-80 overflow-y-auto shadow-lg shadow-black/50"
+          className={cn(
+            'absolute top-full left-0 right-0 z-50 max-h-80 overflow-y-auto shadow-lg shadow-black/30',
+            isHero ? 'mt-3 rounded-[22px] border border-primary/15 bg-card/95 backdrop-blur-xl' : 'mt-1 bg-card border border-border'
+          )}
         >
           {loading && (
             <div className="px-4 py-3 text-xs font-mono text-muted-foreground">Searching...</div>
@@ -137,22 +168,24 @@ export default function SearchBar() {
               </div>
               {results.map((result, idx) => (
                 <button
-                  key={`${result.symbol}-${idx}`}
-                  data-testid={`search-result-${result.symbol}`}
-                  onClick={() => handleSelect(result.symbol)}
+                  key={`${result.id || result.symbol}-${idx}`}
+                  data-testid={`search-result-${result.id || result.symbol}`}
+                  onClick={() => handleSelect(result)}
                   className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition-colors ${
                     idx === selectedIdx ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:dark:bg-muted/50 hover:bg-muted border-l-2 border-l-transparent'
                   }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-bold text-primary">{result.symbol}</span>
+                      <span className={cn("font-mono text-sm font-bold", result.kind === 'strategy' ? "text-[#00ff88]" : "text-primary")}>
+                        {result.kind === 'strategy' ? result.title : result.symbol}
+                      </span>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">{result.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{result.kind === 'strategy' ? `Strategy for ${result.ticker} • ${result.status}` : result.name}</p>
                   </div>
                   <div className="text-right flex-shrink-0 ml-4">
-                    <span className="text-[10px] font-mono text-muted-foreground block">{result.type || 'Equity'}</span>
-                    <span className="text-[10px] font-mono text-muted-foreground/60">{result.exchange}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground block">{result.kind === 'strategy' ? 'Strategy' : (result.type || 'Equity')}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground/60">{result.kind === 'strategy' ? `${result.confidence}/100` : result.exchange}</span>
                   </div>
                 </button>
               ))}

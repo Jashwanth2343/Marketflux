@@ -115,30 +115,72 @@ def get_react_model(model_id: str = "gemini-2.5-flash", system_instruction: str 
         agent_tools.get_earnings_transcript,
     ]
 
-    # Enable thinking/reasoning for complex queries (requires newer SDK)
-    generation_config = None
-    if model_id and 'pro' in model_id:
-        try:
-            generation_config = genai.types.GenerationConfig(
-                thinking_config=genai.types.ThinkingConfig(
+    model = genai.GenerativeModel(
+        model_name=model_id,
+        system_instruction=system_instruction,
+        safety_settings=safety_settings,
+        tools=tools,
+    )
+    return model
+
+
+async def _thinking_generate(message: str, tool_data: str, system_prompt: str, symbols: list) -> str | None:
+    """Use the new google-genai SDK with thinking mode for higher-quality analysis."""
+    try:
+        from google import genai as genai_new
+        from google.genai import types as genai_types
+        import os
+        
+        api_key = os.environ.get('GEMINI_API_KEY', '')
+        if not api_key:
+            return None
+        
+        client = genai_new.Client(api_key=api_key)
+        
+        prompt = (
+            f"{system_prompt}\n\n"
+            f"User question: \"{message}\"\n\n"
+            f"Here is ALL live data collected from our financial tools:\n\n"
+            f"--- TOOL DATA ---\n{tool_data[:12000]}\n--- END ---\n\n"
+            f"Provide your comprehensive, well-formatted analysis. "
+            f"Use markdown headers (##, ###), tables for ALL numerical data, and professional finance language.\n"
+        )
+        
+        if len(symbols) >= 2:
+            prompt += (
+                f"This is a COMPARISON query for {', '.join(symbols)}. "
+                f"Create a side-by-side comparison table. Follow with detailed comparative analysis.\n"
+            )
+        
+        prompt += "\nEnd with: 'This analysis is based on available data. Always do your own research before investing.'"
+        
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model='gemini-2.5-pro',
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                thinking_config=genai_types.ThinkingConfig(
                     thinking_budget=8192
                 )
             )
-        except (AttributeError, TypeError) as e:
-            logger.info(f"Thinking mode not available in this SDK version ({e}), proceeding without it")
-            generation_config = None
-
-    model_kwargs = {
-        "model_name": model_id,
-        "system_instruction": system_instruction,
-        "safety_settings": safety_settings,
-        "tools": tools,
-    }
-    if generation_config:
-        model_kwargs["generation_config"] = generation_config
-
-    model = genai.GenerativeModel(**model_kwargs)
-    return model
+        )
+        
+        # Extract only the non-thought text parts
+        text_parts = []
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, 'thought') and part.thought:
+                continue  # Skip thinking parts
+            if part.text:
+                text_parts.append(part.text)
+        
+        result = ''.join(text_parts)
+        if result.strip():
+            logger.info(f"Thinking-enhanced generation produced {len(result)} chars")
+            return result
+        return None
+    except Exception as e:
+        logger.warning(f"Thinking-enhanced generation failed: {e}")
+        return None
 
 def _sse_event(event_type: str, data: dict) -> str:
     """Format a Server-Sent Event line."""
@@ -442,7 +484,23 @@ async def run_react_agent(
             except Exception as e:
                 logger.error(f"Summary request failed: {e}")
         
-        # Attempt 3: Use a fresh Flash model with all tool data as context (no function calling)
+        # Attempt 3: Use thinking-enhanced generation for complex queries (new SDK)
+        if not final_text and all_tool_results and query_type in ('comparison', 'deep_analysis', 'stock_analysis'):
+            logger.info("Attempting thinking-enhanced generation with new SDK...")
+            yield _thinking_event("generate", "Deep analysis with extended reasoning...")
+            try:
+                from agent_router import _format_tool_context
+                tool_context = _format_tool_context(all_tool_results)
+                symbols = intent_data.get("symbols", [])
+                final_text = await _thinking_generate(
+                    message, tool_context, current_system_prompt, symbols
+                )
+                if final_text:
+                    logger.info("Thinking-enhanced generation succeeded.")
+            except Exception as e:
+                logger.error(f"Thinking generation error: {e}")
+        
+        # Attempt 4: Use a fresh Flash model with all tool data as context (no function calling)
         if not final_text and all_tool_results:
             logger.warning("Primary model failed to produce text. Trying Flash model with tool context...")
             yield _thinking_event("generate", "Formatting analysis...")

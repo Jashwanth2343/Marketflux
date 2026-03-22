@@ -1,7 +1,11 @@
 import logging
 import asyncio
 import yfinance as yf
-import akshare as ak
+
+try:
+    import akshare as ak
+except Exception:
+    ak = None
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +19,7 @@ class ProviderRouter:
     def get_provider_for_ticker(ticker: str) -> str:
         ticker = ticker.upper()
         # AKShare strengths: China (SS/SZ) and Hong Kong (HK)
-        if any(ticker.endswith(suffix) for suffix in [".SS", ".SZ", ".HK"]):
+        if ak is not None and any(ticker.endswith(suffix) for suffix in [".SS", ".SZ", ".HK"]):
             return "akshare"
         return "yfinance"
 
@@ -44,6 +48,8 @@ class ProviderRouter:
 
     @staticmethod
     async def _get_akshare_quote(ticker: str) -> dict:
+        if ak is None:
+            return {"error": "AKShare is not installed", "ticker": ticker}
         try:
             # Simple spot fetching
             if ticker.endswith(".HK"):

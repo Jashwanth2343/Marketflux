@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield } from 'lucide-react';
+import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, TerminalSquare, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -14,6 +14,7 @@ const navItems = [
     { path: '/macro', icon: Globe, label: 'Macro' },
     { path: '/risk', icon: Shield, label: 'Risk' },
     { path: '/portfolio', icon: Briefcase, label: 'Portfolio' },
+    { path: '/fund-os', icon: TerminalSquare, label: 'Fund OS' },
 ];
 
 const TickerTapeWidget = memo(({ isDark }) => {
@@ -62,7 +63,6 @@ export default function TopNav() {
 
     return (
         <div className="w-full flex flex-col z-50 sticky top-0 dark:bg-card/80 bg-card backdrop-blur-md border-b border-border">
-            {/* Ticker Tape */}
             <TickerTapeWidget isDark={isDark} />
 
             {/* Main Nav */}
@@ -75,15 +75,20 @@ export default function TopNav() {
                             MARKET FLUX
                         </span>
                     </Link>
+
+                    {/* Desktop Nav Links */}
                     <nav className="hidden lg:flex items-center gap-1">
-                        {navItems.map(({ path, label }) => (
+                        {navItems.map(({ path, icon: Icon, label }) => (
                             <Link
                                 key={path}
                                 to={path}
-                                data-testid={`nav-${label.toLowerCase().replace(/\s/g, '-')}`}
-                                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors rounded-sm ${isActive(path) ? 'bg-primary/10 text-primary font-bold' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                                    }`}
+                                className={`flex items-center gap-2 px-3 py-2 text-xs font-mono uppercase tracking-wider rounded-md transition-colors ${
+                                    isActive(path) 
+                                        ? 'bg-primary/10 text-primary font-bold' 
+                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                }`}
                             >
+                                <Icon className="w-4 h-4" />
                                 {label}
                             </Link>
                         ))}
