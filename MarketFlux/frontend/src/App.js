@@ -12,6 +12,9 @@ import StockDetail from "@/pages/StockDetail";
 import AIScreener from "@/pages/AIScreener";
 import Portfolio from "@/pages/Portfolio";
 import Auth from "@/pages/Auth";
+import ResearchCenter from "@/pages/ResearchCenter";
+import MacroDashboard from "@/pages/MacroDashboard";
+import RiskConsole from "@/pages/RiskConsole";
 import { Toaster } from "@/components/ui/sonner";
 
 import { useState, useEffect } from "react";
@@ -51,6 +54,9 @@ function AppRouter() {
             <Route path="/stock/:ticker" element={<StockDetail />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/research" element={<ResearchCenter />} />
+            <Route path="/macro" element={<MacroDashboard />} />
+            <Route path="/risk" element={<RiskConsole />} />
           </Routes>
         </main>
       </div>

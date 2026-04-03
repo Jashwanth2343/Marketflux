@@ -1148,6 +1148,349 @@ async def delete_stream(stream_id: str, request: Request):
     return {"message": "Stream deleted"}
 
 
+# ===========================================================================
+# ===== Hedge Fund Research Routes (FundOS) =====
+# ===========================================================================
+
+class ResearchMemoRequest(BaseModel):
+    ticker: str
+    force_refresh: bool = False
+
+class RiskAnalysisRequest(BaseModel):
+    holdings: List[PortfolioHolding]
+
+class ThematicRequest(BaseModel):
+    theme: str
+
+class SignalScanRequest(BaseModel):
+    tickers: List[str]
+
+
+# --- Quantitative Signal Endpoints ---
+
+@api_router.get("/research/signals/{ticker}")
+async def get_quant_signals(ticker: str, request: Request, response: Response):
+    """Get 20+ quantitative signals for a ticker with composite score."""
+    ticker = validate_ticker(ticker)
+    cache_key = f"signals:{ticker}"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    try:
+        from signal_engine import compute_signals
+        result = await compute_signals(ticker, db=db)
+        redis_cache_set(cache_key, result, ttl=900)  # 15 min cache
+        response.headers["X-Cache"] = "MISS"
+        return result
+    except Exception as e:
+        logger.error(f"Signal computation error for {ticker}: {e}")
+        raise HTTPException(500, f"Signal computation failed: {str(e)}")
+
+
+@api_router.post("/research/signals/scan")
+async def scan_signals(data: SignalScanRequest, request: Request):
+    """Batch signal scan across a list of tickers."""
+    can_use = await check_and_increment_ai_usage(request)
+    if not can_use:
+        raise HTTPException(429, "AI usage limit reached. Please login for unlimited access.")
+
+    tickers = [validate_ticker(t) for t in data.tickers[:20]]  # cap at 20
+    try:
+        from signal_engine import scan_universe
+        results = await scan_universe(tickers, db=db, concurrency=3)
+        return {"results": results, "count": len(results)}
+    except Exception as e:
+        logger.error(f"Signal scan error: {e}")
+        raise HTTPException(500, f"Signal scan failed: {str(e)}")
+
+
+# --- Research Memo Endpoints ---
+
+@api_router.post("/research/memo")
+async def generate_research_memo(data: ResearchMemoRequest, request: Request):
+    """Generate a full Goldman Sachs-style research memo using multi-agent AI."""
+    can_use = await check_and_increment_ai_usage(request)
+    if not can_use:
+        raise HTTPException(429, "AI usage limit reached. Please login for unlimited access.")
+
+    ticker = validate_ticker(data.ticker)
+    cache_key = f"research_memo:{ticker}"
+
+    if not data.force_refresh:
+        cached = redis_cache_get(cache_key)
+        if cached:
+            return cached
+
+    try:
+        from multi_agent import run_multi_agent_research
+        result = await run_multi_agent_research(ticker, db=db)
+
+        # Cache for 6 hours (fundamentals don't change hourly)
+        redis_cache_set(cache_key, result, ttl=21600)
+
+        # Persist to MongoDB for research history
+        await db.research_memos.replace_one(
+            {"symbol": ticker},
+            {**result, "created_at": datetime.now(timezone.utc).isoformat()},
+            upsert=True,
+        )
+
+        return result
+    except Exception as e:
+        logger.error(f"Research memo error for {ticker}: {e}")
+        raise HTTPException(500, f"Research memo generation failed: {str(e)}")
+
+
+@api_router.get("/research/memo/{ticker}/stream")
+async def stream_research_memo(ticker: str, request: Request):
+    """Stream a research memo generation with live SSE events."""
+    ticker = validate_ticker(ticker)
+    can_use = await check_and_increment_ai_usage(request)
+    if not can_use:
+        raise HTTPException(429, "AI usage limit reached. Please login for unlimited access.")
+
+    from multi_agent import stream_multi_agent_research
+    return StreamingResponse(
+        stream_multi_agent_research(ticker, db=db),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@api_router.get("/research/memo/history")
+async def get_research_history(request: Request):
+    """Get list of previously generated research memos."""
+    memos = await db.research_memos.find(
+        {}, {"_id": 0, "symbol": 1, "name": 1, "signal_score": 1, "signal_label": 1, "created_at": 1}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    return {"memos": memos}
+
+
+# --- Macro Dashboard Endpoint ---
+
+@api_router.get("/macro/dashboard")
+async def macro_dashboard(response: Response):
+    """Full macro dashboard: yield curve, VIX regime, sectors, calendar."""
+    cache_key = "macro_dashboard"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    try:
+        from macro_data import get_macro_dashboard
+        result = await get_macro_dashboard(db=db)
+        redis_cache_set(cache_key, result, ttl=300)  # 5 min cache
+        response.headers["X-Cache"] = "MISS"
+        return result
+    except Exception as e:
+        logger.error(f"Macro dashboard error: {e}")
+        raise HTTPException(500, f"Macro dashboard failed: {str(e)}")
+
+
+# --- Risk Engine Endpoints ---
+
+@api_router.post("/risk/portfolio")
+async def portfolio_risk_analysis(data: RiskAnalysisRequest, request: Request):
+    """Comprehensive portfolio risk analysis: beta, correlation, stress tests, VaR."""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Login required for portfolio risk analysis")
+
+    holdings_dicts = [h.model_dump() for h in data.holdings]
+
+    try:
+        from risk_engine import analyze_portfolio_risk
+        result = await analyze_portfolio_risk(holdings_dicts, db=db)
+        return result
+    except Exception as e:
+        logger.error(f"Portfolio risk analysis error: {e}")
+        raise HTTPException(500, f"Risk analysis failed: {str(e)}")
+
+
+@api_router.get("/risk/stock/{ticker}")
+async def stock_risk_profile(ticker: str, response: Response):
+    """Single stock risk profile: beta, VaR, drawdown, position sizing."""
+    ticker = validate_ticker(ticker)
+    cache_key = f"stock_risk:{ticker}"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    try:
+        from risk_engine import analyze_single_stock_risk
+        result = await analyze_single_stock_risk(ticker)
+        redis_cache_set(cache_key, result, ttl=3600)  # 1 hr cache
+        response.headers["X-Cache"] = "MISS"
+        return result
+    except Exception as e:
+        logger.error(f"Stock risk profile error for {ticker}: {e}")
+        raise HTTPException(500, f"Risk profile failed: {str(e)}")
+
+
+# --- Earnings Intelligence Endpoints ---
+
+@api_router.get("/research/earnings/{ticker}")
+async def earnings_intelligence(ticker: str, request: Request, response: Response):
+    """Earnings intelligence: pre/post analysis, beat rate, surprise probability."""
+    ticker = validate_ticker(ticker)
+    can_use = await check_and_increment_ai_usage(request)
+    if not can_use:
+        raise HTTPException(429, "AI usage limit reached. Please login for unlimited access.")
+
+    cache_key = f"earnings_intel:{ticker}"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    try:
+        from earnings_intel import get_earnings_intelligence
+        result = await get_earnings_intelligence(ticker, db=db)
+        redis_cache_set(cache_key, result, ttl=3600)  # 1 hr cache
+        response.headers["X-Cache"] = "MISS"
+        return result
+    except Exception as e:
+        logger.error(f"Earnings intelligence error for {ticker}: {e}")
+        raise HTTPException(500, f"Earnings intelligence failed: {str(e)}")
+
+
+@api_router.post("/research/earnings/calendar")
+async def earnings_calendar(data: SignalScanRequest):
+    """Get upcoming earnings dates for a list of tickers."""
+    tickers = [validate_ticker(t) for t in data.tickers[:30]]
+    try:
+        from earnings_intel import get_earnings_calendar
+        result = await get_earnings_calendar(tickers)
+        return {"calendar": result}
+    except Exception as e:
+        logger.error(f"Earnings calendar error: {e}")
+        raise HTTPException(500, f"Earnings calendar failed: {str(e)}")
+
+
+# --- Idea Generation / Research Ideas Endpoint ---
+
+@api_router.get("/research/ideas")
+async def get_research_ideas(request: Request, response: Response):
+    """Get today's morning briefing with top ideas, anomalies, and macro context."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cache_key = f"morning_briefing:{today}"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    # Check MongoDB first
+    db_briefing = await db.morning_briefings.find_one({"date": today}, {"_id": 0})
+    if db_briefing:
+        redis_cache_set(cache_key, db_briefing, ttl=1800)
+        response.headers["X-Cache"] = "DB_HIT"
+        return db_briefing
+
+    # Generate fresh (auth required for full generation)
+    can_use = await check_and_increment_ai_usage(request)
+    if not can_use:
+        raise HTTPException(429, "AI usage limit reached. Please login for unlimited access.")
+
+    try:
+        from nightly_batch import generate_morning_briefing
+        result = await generate_morning_briefing(db=db)
+        redis_cache_set(cache_key, result, ttl=1800)
+        response.headers["X-Cache"] = "GENERATED"
+        return result
+    except Exception as e:
+        logger.error(f"Morning briefing error: {e}")
+        raise HTTPException(500, f"Ideas generation failed: {str(e)}")
+
+
+# --- Thematic Research Endpoint ---
+
+@api_router.post("/research/thematic")
+async def thematic_research(data: ThematicRequest, request: Request):
+    """Thematic research engine: given a theme, score related stocks and produce ideas."""
+    can_use = await check_and_increment_ai_usage(request)
+    if not can_use:
+        raise HTTPException(429, "AI usage limit reached. Please login for unlimited access.")
+
+    if not data.theme or len(data.theme.strip()) < 3:
+        raise HTTPException(400, "Theme must be at least 3 characters")
+
+    # Sanitise theme input
+    theme = data.theme.strip()[:200]
+    theme = ''.join(c for c in theme if c.isprintable())
+
+    cache_key = f"thematic:{hash(theme.lower())}"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        from nightly_batch import run_thematic_research
+        result = await run_thematic_research(theme, db=db)
+        redis_cache_set(cache_key, result, ttl=3600)
+        return result
+    except Exception as e:
+        logger.error(f"Thematic research error: {e}")
+        raise HTTPException(500, f"Thematic research failed: {str(e)}")
+
+
+# --- Anomaly Detection Endpoint ---
+
+@api_router.get("/research/anomalies")
+async def market_anomalies(response: Response):
+    """Scan top stocks for volume anomalies, breakouts, RSI extremes."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cache_key = f"anomalies:{today}"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    try:
+        from nightly_batch import detect_anomalies, SP500_WATCHLIST
+        results = await detect_anomalies(SP500_WATCHLIST[:50])
+        redis_cache_set(cache_key, {"anomalies": results, "scanned": len(SP500_WATCHLIST[:50])}, ttl=1800)
+        response.headers["X-Cache"] = "MISS"
+        return {"anomalies": results, "scanned": len(SP500_WATCHLIST[:50])}
+    except Exception as e:
+        logger.error(f"Anomaly detection error: {e}")
+        raise HTTPException(500, f"Anomaly detection failed: {str(e)}")
+
+
+# --- Sector Rotation Endpoint ---
+
+@api_router.get("/research/sector-rotation")
+async def sector_rotation(response: Response):
+    """Get current sector rotation analysis and phase classification."""
+    cache_key = "sector_rotation"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    try:
+        from nightly_batch import analyze_sector_rotation
+        result = await analyze_sector_rotation()
+        redis_cache_set(cache_key, result, ttl=1800)
+        response.headers["X-Cache"] = "MISS"
+        return result
+    except Exception as e:
+        logger.error(f"Sector rotation error: {e}")
+        raise HTTPException(500, f"Sector rotation analysis failed: {str(e)}")
+
+
+# ===========================================================================
+# ===== End Hedge Fund Research Routes =====
+# ===========================================================================
+
+
 # ===== Background Tasks =====
 async def fetch_and_store_news():
     try:
