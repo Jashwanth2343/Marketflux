@@ -338,6 +338,10 @@ async def research_loop(iterations: int, log_path: Path) -> None:
             f"{'✅ ACCEPTED' if accepted else '❌ REJECTED'}"
         )
 
+        # Snapshot scores before any mutation so log entries are always correct.
+        old_composite = best_composite
+        old_scores = {k: v for k, v in baseline_scores.items() if k != "raw_results"}
+
         if accepted:
             # Keep the new source as the new baseline
             current_source = new_source
@@ -351,20 +355,9 @@ async def research_loop(iterations: int, log_path: Path) -> None:
             {
                 "iteration": iteration,
                 "change_description": change_description,
-                "baseline_composite": best_composite if not accepted else (best_composite - delta),
+                "baseline_composite": old_composite,
                 "new_composite": new_composite,
-                "scores_before": {
-                    k: v
-                    for k, v in baseline_scores.items()
-                    if k != "raw_results"
-                }
-                if not accepted
-                else {
-                    "avg_correctness": baseline_scores["avg_correctness"] - (new_scores["avg_correctness"] - baseline_scores["avg_correctness"]),
-                    "avg_formatting": baseline_scores["avg_formatting"],
-                    "avg_conciseness": baseline_scores["avg_conciseness"],
-                    "composite": best_composite - delta,
-                },
+                "scores_before": old_scores,
                 "scores_after": {k: v for k, v in new_scores.items() if k != "raw_results"},
                 "accepted": accepted,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
