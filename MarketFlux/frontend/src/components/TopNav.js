@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, Sun, Moon, LogIn, LogOut, User, Menu, X } from 'lucide-react';
+import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -10,6 +10,9 @@ const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/news', icon: Newspaper, label: 'News Feed' },
     { path: '/screener', icon: Search, label: 'AI Screener' },
+    { path: '/research', icon: Brain, label: 'Research' },
+    { path: '/macro', icon: Globe, label: 'Macro' },
+    { path: '/risk', icon: Shield, label: 'Risk' },
     { path: '/portfolio', icon: Briefcase, label: 'Portfolio' },
 ];
 
