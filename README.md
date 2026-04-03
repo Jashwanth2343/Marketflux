@@ -88,4 +88,41 @@ graph TD
 
 ---
 
+## 🤖 Autoresearch Mode
+Inspired by [Andrej Karpathy's autoresearch](https://github.com/karpathy/autoresearch), MarketFlux
+can improve its own AI agent overnight — completely autonomously.
+
+### How it works
+| Karpathy's autoresearch | MarketFlux equivalent |
+|---|---|
+| `train.py` — LLM training code | `react_agent.py` — AI agent system prompt |
+| `val_bpb` metric (lower is better) | Composite eval score (higher is better, max 5.0) |
+| `program.md` — research instructions | `program.md` — what to optimise |
+| 5-minute training budget | Fixed eval test-suite (~6 financial queries) |
+
+Each iteration the agent:
+1. Reads `program.md` for guidance on what to optimise.
+2. Proposes one targeted improvement to `REACT_SYSTEM_PROMPT` in `react_agent.py`.
+3. Runs `eval_pipeline.py` (LLM-as-a-judge on 6 representative queries).
+4. **Keeps the change** if the composite score improves; **reverts** otherwise.
+5. Logs everything to `autoresearch_log.json`.
+
+### Running autoresearch
+```bash
+cd MarketFlux/backend
+# Run 10 iterations (approx. overnight default)
+python autoresearch.py --iterations 10
+
+# Run a quick 3-iteration test
+python autoresearch.py --iterations 3
+
+# Custom log path
+python autoresearch.py --iterations 20 --log my_experiments.json
+```
+
+In the morning, inspect `autoresearch_log.json` to see which changes were accepted.
+Edit `program.md` to steer the agent toward different optimisation goals.
+
+---
+
 Created by [Jashwanth2343](https://github.com/Jashwanth2343)

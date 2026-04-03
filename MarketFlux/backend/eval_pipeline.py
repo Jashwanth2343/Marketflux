@@ -100,39 +100,42 @@ async def run_test_case(test_case):
         "eval_scores": eval_result
     }
 
+# Module-level test cases — importable by autoresearch.py without running main()
+TEST_CASES = [
+    # Type A: Factual
+    {
+        "query": "who is the CEO of XOM?",
+        "expected_tools_subset": ["get_company_profile"]
+    },
+    # Type C: Single Metric
+    {
+        "query": "what's the next earnings date for tesla, what are the consensus expectations",
+        "expected_tools_subset": ["get_earnings_history"]
+    },
+    # Type C: Core Fundamentals
+    {
+        "query": "what is the P/E ratio and market cap for NVDA?",
+        "expected_tools_subset": ["get_fundamentals"]
+    },
+    # Type E: Full Analysis
+    {
+        "query": "Give me a full fundamental breakdown of MSFT and tell me if it's a buy.",
+        "expected_tools_subset": ["get_fundamentals", "get_analyst_targets"] # expect multiple
+    },
+    # Type G: General Knowledge (The Fix Verification)
+    {
+        "query": "What are common factors that drive the stock market?",
+        "expected_tools_subset": [] # Should answer from internal knowledge
+    },
+    # Type M: Market Wide
+    {
+        "query": "What is driving the market today?",
+        "expected_tools_subset": ["get_market_overview"]
+    }
+]
+
 async def main():
-    test_cases = [
-        # Type A: Factual
-        {
-            "query": "who is the CEO of XOM?",
-            "expected_tools_subset": ["get_company_profile"]
-        },
-        # Type C: Single Metric
-        {
-            "query": "what's the next earnings date for tesla, what are the consensus expectations",
-            "expected_tools_subset": ["get_earnings_history"]
-        },
-        # Type C: Core Fundamentals
-        {
-            "query": "what is the P/E ratio and market cap for NVDA?",
-            "expected_tools_subset": ["get_fundamentals"]
-        },
-        # Type E: Full Analysis
-        {
-            "query": "Give me a full fundamental breakdown of MSFT and tell me if it's a buy.",
-            "expected_tools_subset": ["get_fundamentals", "get_analyst_targets"] # expect multiple
-        },
-        # Type G: General Knowledge (The Fix Verification)
-        {
-            "query": "What are common factors that drive the stock market?",
-            "expected_tools_subset": [] # Should answer from internal knowledge
-        },
-        # Type M: Market Wide
-        {
-            "query": "What is driving the market today?",
-            "expected_tools_subset": ["get_market_overview"]
-        }
-    ]
+    test_cases = TEST_CASES
     
     results = []
     print("====================================")
