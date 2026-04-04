@@ -225,4 +225,95 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             
         return {"status": "ok"}
 
+    # -----------------------------------------------------------------------
+    # Quant Agent — autonomous research + backtest endpoints
+    # -----------------------------------------------------------------------
+
+    @router.post("/quant-agent/run")
+    async def quant_agent_run(request: Request):
+        """
+        Stream an autonomous quant research session as Server-Sent Events.
+
+        Request body JSON:
+          ticker        str   required  e.g. "NVDA"
+          capital       float optional  default 100000
+          risk_profile  str   optional  "conservative" | "balanced" | "aggressive"
+        """
+        user = await get_current_user(request)
+
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(422, "Invalid JSON body")
+
+        ticker = (body.get("ticker") or "").strip().upper()
+        if not ticker:
+            raise HTTPException(422, "ticker is required")
+
+        capital = float(body.get("capital") or 100_000)
+        risk_profile = str(body.get("risk_profile") or "balanced")
+        user_id = user.get("user_id") if user else None
+
+        from fastapi.responses import StreamingResponse
+        import sys
+        import os
+        # Ensure backend root is on path so quant_agent can be imported
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+
+        from quant_agent import run_autonomous_research
+
+        return StreamingResponse(
+            run_autonomous_research(
+                ticker=ticker,
+                capital=capital,
+                risk_profile=risk_profile,
+                user_id=user_id,
+                db=db,
+            ),
+            media_type="text/event-stream",
+        )
+
+    @router.post("/quant-agent/backtest")
+    async def quant_agent_backtest(request: Request):
+        """
+        Run a single named backtest and return the full result as JSON.
+
+        Request body JSON:
+          ticker    str   required
+          strategy  str   optional  "sma_crossover" | "rsi_mean_reversion" | "momentum"
+          period    str   optional  yfinance period string, default "2y"
+          capital   float optional  default 100000
+          params    dict  optional  strategy-specific parameters
+        """
+        await get_current_user(request)
+
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(422, "Invalid JSON body")
+
+        ticker = (body.get("ticker") or "").strip().upper()
+        if not ticker:
+            raise HTTPException(422, "ticker is required")
+
+        strategy = str(body.get("strategy") or "sma_crossover")
+        period = str(body.get("period") or "2y")
+        capital = float(body.get("capital") or 100_000)
+        params = body.get("params") or {}
+
+        import asyncio
+        import sys
+        import os
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+        from quant_agent import run_backtest
+
+        result = await asyncio.to_thread(run_backtest, ticker, strategy, period, capital, params)
+        if "error" in result:
+            raise HTTPException(400, result["error"])
+        return result
+
     return router
