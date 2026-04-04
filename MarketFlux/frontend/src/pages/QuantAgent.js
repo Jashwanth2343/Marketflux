@@ -32,7 +32,7 @@ function fmtPct(v) {
   return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
 }
 
-function fmtCurrency(v, capital = 100000) {
+function fmtCurrency(v) {
   if (v === null || v === undefined) return '--';
   return `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
@@ -44,7 +44,6 @@ const STRATEGY_LABELS = {
 };
 
 const RISK_PROFILES = ['conservative', 'balanced', 'aggressive'];
-const PERIODS = ['6mo', '1y', '2y', '3y', '5y'];
 
 const METRIC_COLOR = (v, goodHigh = true) => {
   if (v === null || v === undefined) return 'text-muted-foreground';
@@ -252,7 +251,6 @@ export default function QuantAgent() {
   const [ticker, setTicker] = useState('NVDA');
   const [capital, setCapital] = useState('100000');
   const [riskProfile, setRiskProfile] = useState('balanced');
-  const [selectedPeriod] = useState('2y');
 
   // ── run state ──
   const [running, setRunning] = useState(false);

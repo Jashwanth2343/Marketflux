@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import numpy as np
 import yfinance as yf
+
+_log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +234,8 @@ def _run_rsi_strategy(
         avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gains[i - 1]) / period
         avg_loss[i] = (avg_loss[i - 1] * (period - 1) + losses[i - 1]) / period
 
-    rsi = np.where(avg_loss == 0, 100.0, 100 - 100 / (1 + avg_gain / (avg_loss + 1e-10)))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rsi = np.where(avg_loss == 0, 100.0, 100 - 100 / (1 + avg_gain / avg_loss))
 
     position = 0
     cash = capital
@@ -467,6 +471,7 @@ async def run_autonomous_research(
         from vnext.engines import build_macro_regime_view
         macro = await build_macro_regime_view()
     except Exception:
+        _log.warning("build_macro_regime_view failed", exc_info=True)
         macro = {"regime": "unknown", "confidence": 50, "summary": "Macro data unavailable"}
 
     yield _sse("data", {"section": "macro", "macro": {
@@ -489,6 +494,7 @@ async def run_autonomous_research(
         pe = snapshot.get("pe_ratio")
         trend = technicals.get("trend")
     except Exception:
+        _log.warning("build_ticker_workspace(%s) failed", ticker, exc_info=True)
         snapshot = {}
         price = None
         change_pct = None
@@ -520,6 +526,7 @@ async def run_autonomous_research(
         )
         yield _sse("data", {"section": "swarm", "swarm_summary": swarm_result.get("final_strategy", "")[:2000]})
     except Exception as e:
+        _log.warning("Strategy swarm failed for %s", ticker, exc_info=True)
         yield _sse("data", {"section": "swarm", "swarm_summary": f"Strategy swarm unavailable: {e}"})
     await asyncio.sleep(0.05)
 
