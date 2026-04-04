@@ -206,7 +206,7 @@ export default function FundOS() {
                       <TableBody>
                         {queue.items.map((item) => (
                           <TableRow key={item.strategy_id} className="border-white/10">
-                            <TableCell className="font-mono text-sm text-foreground/90">{item.ticker}</TableCell>
+                            <TableCell className="font-mono text-sm text-foreground/90">{item.focus || item.ticker || '---'}</TableCell>
                             <TableCell className="font-medium max-w-[200px] truncate text-foreground">
                               <Link to={`/fund-os/terminal/${item.strategy_id}`} className="hover:underline text-primary transition-colors">
                                 {item.title}

@@ -54,6 +54,7 @@ export default function Portfolio() {
   // Real-time prices
   const [prices, setPrices] = useState({});
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [pricesUnavailable, setPricesUnavailable] = useState(false);
 
   // Image upload
   const [uploadImage, setUploadImage] = useState(null);
@@ -67,15 +68,24 @@ export default function Portfolio() {
   // Fetch real-time prices when holdings change
   useEffect(() => {
     const fetchPrices = async () => {
-      if (holdings.length === 0) return;
+      if (holdings.length === 0) {
+        setPrices({});
+        setPricesUnavailable(false);
+        return;
+      }
       setPricesLoading(true);
+      setPricesUnavailable(false);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       try {
         const tickers = holdings.map(h => h.ticker).join(',');
-        const res = await api.get(`/portfolio-prices?tickers=${tickers}`);
+        const res = await api.get(`/portfolio-prices?tickers=${tickers}`, { signal: controller.signal });
         setPrices(res.data);
       } catch (err) {
         console.error('Price fetch error:', err);
+        setPricesUnavailable(true);
       } finally {
+        clearTimeout(timeoutId);
         setPricesLoading(false);
       }
     };
@@ -244,7 +254,13 @@ export default function Portfolio() {
 
       {/* Summary Cards */}
       {holdings.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="space-y-2">
+          {pricesUnavailable && (
+            <div className="rounded-none border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] font-mono text-amber-200">
+              ⚠ Price feed unavailable. Showing cached/last known values where possible.
+            </div>
+          )}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="rounded-none border-border dark:bg-card/50 bg-card">
             <CardContent className="p-4">
               <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1">Total Value</div>
@@ -281,6 +297,7 @@ export default function Portfolio() {
               <div className="font-data text-xl text-foreground">{holdings.length}</div>
             </CardContent>
           </Card>
+        </div>
         </div>
       )}
 
