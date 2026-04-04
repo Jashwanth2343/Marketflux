@@ -23,6 +23,7 @@ import Auth from "@/pages/Auth";
 import ResearchCenter from "@/pages/ResearchCenter";
 import MacroDashboard from "@/pages/MacroDashboard";
 import RiskConsole from "@/pages/RiskConsole";
+import QuantAgent from "@/pages/QuantAgent";
 import { Toaster } from "@/components/ui/sonner";
 
 class ErrorBoundary extends React.Component {
@@ -113,6 +114,7 @@ function AppRouter() {
               <Route path="/research" element={<ResearchCenter />} />
               <Route path="/macro" element={<MacroDashboard />} />
               <Route path="/risk" element={<RiskConsole />} />
+              <Route path="/quant-agent" element={<QuantAgent />} />
             </Routes>
           </main>
         </div>
