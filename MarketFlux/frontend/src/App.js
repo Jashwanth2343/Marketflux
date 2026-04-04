@@ -15,6 +15,10 @@ import NewsFeed from "@/pages/NewsFeed";
 import StockDetail from "@/pages/StockDetail";
 import AIScreener from "@/pages/AIScreener";
 import Portfolio from "@/pages/Portfolio";
+import Theses from "@/pages/Theses";
+import ThesisNew from "@/pages/ThesisNew";
+import ThesisWorkspace from "@/pages/ThesisWorkspace";
+import ThesisTradeLab from "@/pages/ThesisTradeLab";
 import Auth from "@/pages/Auth";
 import ResearchCenter from "@/pages/ResearchCenter";
 import MacroDashboard from "@/pages/MacroDashboard";
@@ -101,6 +105,10 @@ function AppRouter() {
               <Route path="/screener" element={<AIScreener />} />
               <Route path="/stock/:ticker" element={<StockDetail />} />
               <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/theses" element={<Theses />} />
+              <Route path="/theses/new" element={<ThesisNew />} />
+              <Route path="/theses/:thesisId" element={<ThesisWorkspace />} />
+              <Route path="/theses/:thesisId/trade-lab" element={<ThesisTradeLab />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/research" element={<ResearchCenter />} />
               <Route path="/macro" element={<MacroDashboard />} />

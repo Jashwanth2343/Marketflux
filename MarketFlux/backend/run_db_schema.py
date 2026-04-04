@@ -1,24 +1,21 @@
 import sys
 import asyncio
 import asyncpg
+import os
 from pathlib import Path
 
 async def main():
-    # URL provided by user
-    db_url = "postgresql://postgres.hsmcuvimxwbkrzojgjkr:Mainnet%2343%23@aws-1-us-east-2.pooler.supabase.com:6543/postgres"
+    db_url = os.getenv("MARKETFLUX_VNEXT_DATABASE_URL") or os.getenv("FUNDOS_DATABASE_URL")
+    if not db_url:
+        print("Set MARKETFLUX_VNEXT_DATABASE_URL or FUNDOS_DATABASE_URL before running this script.")
+        sys.exit(1)
+
     print("Connecting to the database...")
     try:
         conn = await asyncpg.connect(db_url)
     except Exception as e:
         print(f"Connection failed: {e}")
-        # Retrying password encoding just in case
-        print("Retrying alternative password URL encoding...")
-        try:
-            db_url_2 = "postgresql://postgres.hsmcuvimxwbkrzojgjkr:Mainnet%252343%23@aws-1-us-east-2.pooler.supabase.com:6543/postgres"
-            conn = await asyncpg.connect(db_url_2)
-        except Exception as e2:
-            print(f"Failed again: {e2}")
-            sys.exit(1)
+        sys.exit(1)
         
     print("Connected successfully. Enabling pgvector...")
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")

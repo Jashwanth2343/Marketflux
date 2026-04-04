@@ -1564,11 +1564,28 @@ async def startup():
     except Exception:
         pass
 
+    try:
+        from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
+
+        if is_pg_configured():
+            await get_pg_pool()
+            logger.info("Shared vNext Postgres pool initialized")
+        else:
+            logger.info("Shared vNext Postgres pool skipped: MARKETFLUX_VNEXT_DATABASE_URL/FUNDOS_DATABASE_URL not configured")
+    except Exception as exc:
+        logger.warning(f"Postgres pool initialization failed: {exc}")
+
     asyncio.create_task(periodic_news_fetch())
     logger.info("MarketFlux backend started")
 
 @app.on_event("shutdown")
 async def shutdown():
+    try:
+        from vnext.fundos_pg_client import close_pg_pool
+
+        await close_pg_pool()
+    except Exception:
+        pass
     client.close()
 
 app.include_router(api_router)

@@ -213,6 +213,97 @@ CREATE TABLE IF NOT EXISTS research_documents (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS theses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_user_id TEXT NOT NULL,
+    portfolio_id UUID,
+    legacy_saved_thesis_id TEXT UNIQUE,
+    ticker TEXT NOT NULL,
+    time_horizon TEXT NOT NULL DEFAULT 'medium_term',
+    status TEXT NOT NULL DEFAULT 'active',
+    claim TEXT NOT NULL,
+    why_now TEXT NOT NULL DEFAULT '',
+    invalidation_conditions JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (status IN ('active', 'retired'))
+);
+
+CREATE TABLE IF NOT EXISTS thesis_revisions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    thesis_id UUID NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    change_summary TEXT,
+    claim TEXT NOT NULL,
+    why_now TEXT NOT NULL DEFAULT '',
+    time_horizon TEXT NOT NULL,
+    status TEXT NOT NULL,
+    invalidation_conditions JSONB NOT NULL DEFAULT '[]'::jsonb,
+    snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (thesis_id, version)
+);
+
+CREATE TABLE IF NOT EXISTS evidence_blocks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    thesis_id UUID NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
+    revision_id UUID REFERENCES thesis_revisions(id) ON DELETE SET NULL,
+    source TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    confidence NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    freshness TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    links JSONB NOT NULL DEFAULT '[]'::jsonb,
+    observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS memos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    thesis_id UUID NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
+    revision_id UUID REFERENCES thesis_revisions(id) ON DELETE SET NULL,
+    summary TEXT NOT NULL,
+    body TEXT NOT NULL,
+    generated_by TEXT NOT NULL DEFAULT 'ai',
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (generated_by IN ('user', 'ai'))
+);
+
+CREATE TABLE IF NOT EXISTS policy_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_user_id TEXT NOT NULL,
+    rule_type TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    params JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (owner_user_id, rule_type)
+);
+
+CREATE TABLE IF NOT EXISTS paper_trades (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_user_id TEXT NOT NULL,
+    thesis_id UUID NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
+    thesis_revision_id UUID REFERENCES thesis_revisions(id) ON DELETE SET NULL,
+    ticker TEXT NOT NULL,
+    side TEXT NOT NULL,
+    size NUMERIC(18, 4) NOT NULL,
+    entry_price NUMERIC(18, 4) NOT NULL,
+    exit_price NUMERIC(18, 4),
+    status TEXT NOT NULL DEFAULT 'open',
+    policy_check_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+    opened_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    closed_at TIMESTAMPTZ,
+    pnl NUMERIC(18, 4),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (side IN ('buy', 'sell')),
+    CHECK (status IN ('open', 'closed', 'blocked'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_daily_briefs_date ON daily_briefs (brief_date DESC);
 CREATE INDEX IF NOT EXISTS idx_research_runs_owner_created ON research_runs (owner_user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_signal_events_created ON signal_events (created_at DESC);
@@ -225,3 +316,12 @@ CREATE INDEX IF NOT EXISTS idx_execution_approvals_strategy_created ON execution
 CREATE INDEX IF NOT EXISTS idx_paper_orders_strategy_created ON paper_orders (strategy_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_paper_positions_owner_symbol ON paper_positions (owner_user_id, symbol);
 CREATE INDEX IF NOT EXISTS idx_model_usage_events_session_created ON model_usage_events (session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_theses_owner_updated ON theses (owner_user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_theses_owner_ticker ON theses (owner_user_id, ticker, status);
+CREATE INDEX IF NOT EXISTS idx_thesis_revisions_thesis_version ON thesis_revisions (thesis_id, version DESC);
+CREATE INDEX IF NOT EXISTS idx_evidence_blocks_thesis_observed ON evidence_blocks (thesis_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_evidence_blocks_source ON evidence_blocks (source, freshness DESC);
+CREATE INDEX IF NOT EXISTS idx_memos_thesis_created ON memos (thesis_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_policy_rules_owner_type ON policy_rules (owner_user_id, rule_type);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_owner_status ON paper_trades (owner_user_id, status, opened_at DESC);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_thesis_status ON paper_trades (thesis_id, status, opened_at DESC);

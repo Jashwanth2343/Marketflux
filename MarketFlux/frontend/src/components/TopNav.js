@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, TerminalSquare, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield } from 'lucide-react';
+import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, TerminalSquare, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield, BookOpenText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -14,6 +14,7 @@ const navItems = [
     { path: '/macro', icon: Globe, label: 'Macro' },
     { path: '/risk', icon: Shield, label: 'Risk' },
     { path: '/portfolio', icon: Briefcase, label: 'Portfolio' },
+    { path: '/theses', icon: BookOpenText, label: 'Theses' },
     { path: '/fund-os', icon: TerminalSquare, label: 'Fund OS' },
 ];
 
@@ -59,7 +60,10 @@ export default function TopNav() {
     const { isDark, toggleTheme } = useTheme();
     const [mobileOpen, setMobileOpen] = useState(false);
 
-    const isActive = (path) => location.pathname === path;
+    const isActive = (path) => {
+        if (path === '/') return location.pathname === '/';
+        return location.pathname === path || location.pathname.startsWith(`${path}/`);
+    };
 
     return (
         <div className="w-full flex flex-col z-50 sticky top-0 dark:bg-card/80 bg-card backdrop-blur-md border-b border-border">

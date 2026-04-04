@@ -55,20 +55,23 @@ Best for: Simple deploy with free tiers.
 ### Backend (Web Service)
 
 1. [Render Dashboard](https://dashboard.render.com) → **New** → **Web Service**
-2. Connect your repo, set **Root Directory**: `MarketFlux`
-3. **Build**:
-   - Build Command: `pip install -r backend/requirements.txt`
-   - Start Command: `uvicorn server:app --host 0.0.0.0 --port $PORT` (run from `backend/`)
-   - Or use a Dockerfile: set **Dockerfile Path** to `MarketFlux/backend/Dockerfile`
+2. Connect your repo
+3. **Option A – Native Python**:
+   - Root Directory: `MarketFlux/backend`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn server:app --host 0.0.0.0 --port $PORT`
+4. **Option B – Docker**:
+   - Root Directory: `MarketFlux/backend`
+   - Dockerfile Path: `Dockerfile` (in that root)
 
-4. **Environment** (Required):
+5. **Environment** (Required):
    - `MONGO_URL`
    - `DB_NAME`
    - `GEMINI_API_KEY`
    - `JWT_SECRET`
    - `ALLOWED_ORIGINS` = `https://your-frontend.onrender.com`
 
-5. Deploy. Note the backend URL (e.g. `https://marketflux-api.onrender.com`).
+6. Deploy. Note the backend URL (e.g. `https://marketflux-api.onrender.com`).
 
 ### Frontend (Static Site)
 

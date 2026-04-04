@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -15,14 +15,16 @@ from .engines import (
     build_ticker_workspace,
     build_watchlist_board,
 )
-from .repository import get_daily_brief, get_saved_theses, save_daily_brief, save_thesis
-from .schemas import MiroFishReportStatusRequest, MiroFishScenarioCreate, StrategyTerminalRequest, ThesisCreate
+from .repository import get_daily_brief, save_daily_brief
+from .schemas import MiroFishReportStatusRequest, MiroFishScenarioCreate, StrategyTerminalRequest
 from .mirofish_bridge import MiroFishBridgeClient
 from .strategy_terminal import run_strategy_terminal
+from .thesis_router import build_thesis_router
 
 
 def build_vnext_router(db, get_current_user: Callable[[Request], Any]) -> APIRouter:
     router = APIRouter(prefix="/api/vnext", tags=["marketflux-vnext"])
+    router.include_router(build_thesis_router(db, get_current_user))
 
     @router.get("/briefing/today")
     async def briefing_today(request: Request, refresh: bool = False):
@@ -122,19 +124,5 @@ def build_vnext_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
-
-    @router.get("/theses")
-    async def list_saved_theses(request: Request, ticker: Optional[str] = None):
-        user = await get_current_user(request)
-        user_id = user.get("user_id") if user else None
-        return {"items": await get_saved_theses(db, user_id, ticker=ticker)}
-
-    @router.post("/theses")
-    async def create_saved_thesis(request: Request, payload: ThesisCreate):
-        user = await get_current_user(request)
-        if not user:
-            raise HTTPException(401, "Login required to save a thesis.")
-        doc = await save_thesis(db, user["user_id"], payload.model_dump())
-        return {"item": doc}
 
     return router

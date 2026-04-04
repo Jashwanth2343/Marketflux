@@ -134,3 +134,48 @@ class StrategyTerminalRequest(BaseModel):
     risk_profile: str = "balanced"
     capital_base: float = 100000.0
     allow_short: bool = True
+
+
+class ThesisWorkspaceCreate(BaseModel):
+    ticker: str
+    time_horizon: str = "medium_term"
+    claim: str
+    why_now: str = ""
+    invalidation_conditions: List[str] = Field(default_factory=list)
+
+
+class ThesisWorkspaceRevision(BaseModel):
+    claim: Optional[str] = None
+    why_now: Optional[str] = None
+    time_horizon: Optional[str] = None
+    status: Optional[str] = None
+    invalidation_conditions: Optional[List[str]] = None
+    change_summary: Optional[str] = None
+    auto_generate_summary: bool = False
+
+
+class MemoRequest(BaseModel):
+    mode: str = Field(default="generate", pattern="^(generate|save)$")
+    summary: Optional[str] = None
+    body: Optional[str] = None
+
+
+class PolicyRuleInput(BaseModel):
+    rule_type: str
+    enabled: bool = True
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PolicyUpsertRequest(BaseModel):
+    items: List[PolicyRuleInput] = Field(default_factory=list)
+
+
+class PaperTradeCreate(BaseModel):
+    side: str = Field(pattern="^(buy|sell)$")
+    size: float = Field(gt=0)
+    notes: Optional[str] = None
+
+
+class PaperTradeUpdate(BaseModel):
+    status: str = Field(pattern="^(open|closed)$")
+    notes: Optional[str] = None

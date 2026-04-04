@@ -16,5 +16,5 @@ COPY . .
 # Default port
 EXPOSE 8001
 
-# Run with uvicorn (production workers)
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+# Run with uvicorn (PORT from Render/Railway, default 8001)
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-8001}"]
