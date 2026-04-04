@@ -10,7 +10,7 @@ import {
   Brain, AlertTriangle, RefreshCw, Target, Lightbulb, ChevronRight,
   Shield, Star, BookOpen, FlaskConical
 } from 'lucide-react';
-import api from '@/lib/api';
+import api, { API_BASE } from '@/lib/api';
 
 // --- Helpers ---
 function signalColor(label) {
@@ -61,6 +61,7 @@ function CategoryScore({ label, data }) {
 function renderMarkdown(text) {
   if (!text) return '';
   return text
+    .replace(/\\(#{1,6}\s)/g, '$1')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/^### (.*$)/gm, '<h3 style="font-size:0.85rem;font-weight:700;margin:0.75rem 0 0.35rem;color:#00FF41;font-family:monospace;">$1</h3>')
@@ -104,7 +105,12 @@ function SignalPanel({ ticker }) {
     </div>
   );
 
-  if (error) return <p className="text-xs text-destructive font-mono">{error}</p>;
+  if (error) return (
+    <div className="rounded-none border border-destructive/30 bg-destructive/10 p-3">
+      <p className="text-xs text-destructive font-mono">{error}</p>
+      <p className="text-[10px] text-muted-foreground font-mono mt-1">Signal engine fallback active — retry in a few seconds.</p>
+    </div>
+  );
   if (!signals) return null;
 
   const cats = signals.categories || {};
@@ -150,7 +156,6 @@ function ResearchMemoPanel({ ticker }) {
     setDone(false);
     setError(null);
 
-    const API_BASE = process.env.REACT_APP_BACKEND_URL;
     const token = localStorage.getItem('mf_token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
