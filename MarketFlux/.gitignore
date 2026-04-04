@@ -22,6 +22,7 @@ node_modules/
 # Next.js
 /.next/
 /out/
+quant-app/.next/
 next-env.d.ts
 *.tsbuildinfo
 
