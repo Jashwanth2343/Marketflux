@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from .fundos_service import (
     build_audit_feed,
@@ -12,6 +13,11 @@ from .fundos_service import (
     fundos_store_configured,
     search_fundos,
 )
+
+# Import quant_agent at module level (backend root is already on sys.path when
+# the FastAPI app starts from the backend directory).
+from quant_agent import run_autonomous_research, run_backtest
+import alpaca_service
 
 
 def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRouter:
@@ -224,5 +230,195 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             raise HTTPException(500, "Failed to update strategy rejection status.")
             
         return {"status": "ok"}
+
+    # -----------------------------------------------------------------------
+    # Quant Agent — autonomous research + backtest endpoints
+    # -----------------------------------------------------------------------
+
+    @router.post("/quant-agent/run")
+    async def quant_agent_run(request: Request):
+        """
+        Stream an autonomous quant research session as Server-Sent Events.
+
+        Request body JSON:
+          ticker        str   required  e.g. "NVDA"
+          capital       float optional  default 100000
+          risk_profile  str   optional  "conservative" | "balanced" | "aggressive"
+        """
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Authentication required")
+
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(422, "Invalid JSON body")
+
+        ticker = (body.get("ticker") or "").strip().upper()
+        if not ticker:
+            raise HTTPException(422, "ticker is required")
+
+        capital = float(body.get("capital") or 100_000)
+        risk_profile = str(body.get("risk_profile") or "balanced")
+        user_id = user.get("user_id")
+
+        return StreamingResponse(
+            run_autonomous_research(
+                ticker=ticker,
+                capital=capital,
+                risk_profile=risk_profile,
+                user_id=user_id,
+                db=db,
+            ),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @router.post("/quant-agent/backtest")
+    async def quant_agent_backtest(request: Request):
+        """
+        Run a single named backtest and return the full result as JSON.
+
+        Request body JSON:
+          ticker    str   required
+          strategy  str   optional  "sma_crossover" | "rsi_mean_reversion" | "momentum"
+          period    str   optional  yfinance period string, default "2y"
+          capital   float optional  default 100000
+          params    dict  optional  strategy-specific parameters
+        """
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Authentication required")
+
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(422, "Invalid JSON body")
+
+        ticker = (body.get("ticker") or "").strip().upper()
+        if not ticker:
+            raise HTTPException(422, "ticker is required")
+
+        strategy = str(body.get("strategy") or "sma_crossover")
+        period = str(body.get("period") or "2y")
+        capital = float(body.get("capital") or 100_000)
+        params = body.get("params") or {}
+
+        import asyncio
+        try:
+            result = await asyncio.to_thread(
+                run_backtest, ticker, strategy, period, capital, params
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(503, f"Backtest execution failed: {exc}") from exc
+
+        if "error" in result:
+            raise HTTPException(400, result["error"])
+        return result
+
+    # -----------------------------------------------------------------------
+    # Alpaca paper-trading connectivity
+    # -----------------------------------------------------------------------
+
+    @router.get("/alpaca/status")
+    async def alpaca_status(request: Request):
+        """Return whether Alpaca credentials are configured and the account summary."""
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Authentication required")
+
+        configured = alpaca_service.is_configured()
+        if not configured:
+            return {"configured": False, "account": None}
+        import asyncio
+        account = await asyncio.to_thread(alpaca_service.get_account_info)
+        if "error" in account:
+            raise HTTPException(503, f"Alpaca account fetch failed: {account['error']}")
+        return {"configured": True, "account": account}
+
+    @router.get("/alpaca/positions")
+    async def alpaca_positions(request: Request):
+        """Return open positions in the Alpaca paper account."""
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Authentication required")
+        import asyncio
+        return await asyncio.to_thread(alpaca_service.get_positions)
+
+    @router.get("/alpaca/orders")
+    async def alpaca_orders(request: Request, status: str = "all", limit: int = 20):
+        """Return recent orders from the Alpaca paper account."""
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Authentication required")
+        if limit < 1 or limit > 100:
+            raise HTTPException(422, "limit must be between 1 and 100")
+        import asyncio
+        return await asyncio.to_thread(alpaca_service.get_orders, status, limit)
+
+    @router.post("/alpaca/order")
+    async def alpaca_submit_order(request: Request):
+        """
+        Submit a paper trade to Alpaca after human approval.
+
+        Request body JSON:
+          symbol          str   required
+          qty             float required
+          side            str   required   "buy" | "sell"
+          order_type      str   optional   "market" | "limit"  (default "market")
+          time_in_force   str   optional   "day" | "gtc"       (default "day")
+          limit_price     float optional   required when order_type == "limit"
+          strategy_id     str   optional   reference tag
+          approved        bool  required   must be true — human approval gate
+        """
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Authentication required")
+
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(422, "Invalid JSON body")
+
+        # Human approval gate — the frontend must send approved=true explicitly
+        if not body.get("approved"):
+            raise HTTPException(403, "Trade not approved: set approved=true to confirm")
+
+        symbol = (body.get("symbol") or "").strip().upper()
+        if not symbol:
+            raise HTTPException(422, "symbol is required")
+
+        try:
+            qty = float(body["qty"])
+        except (KeyError, TypeError, ValueError):
+            raise HTTPException(422, "qty must be a positive number")
+        if qty <= 0:
+            raise HTTPException(422, "qty must be positive")
+
+        side = str(body.get("side") or "").lower()
+        if side not in ("buy", "sell"):
+            raise HTTPException(422, "side must be 'buy' or 'sell'")
+
+        order_type = str(body.get("order_type") or "market").lower()
+        time_in_force = str(body.get("time_in_force") or "day").lower()
+        limit_price = body.get("limit_price")
+        strategy_id = body.get("strategy_id")
+
+        import asyncio
+        try:
+            result = await asyncio.to_thread(
+                alpaca_service.submit_paper_order,
+                symbol, qty, side, order_type, time_in_force, limit_price, strategy_id,
+            )
+        except Exception as exc:
+            raise HTTPException(503, f"Order submission failed: {exc}") from exc
+
+        if "error" in result:
+            raise HTTPException(400, result["error"])
+        return result
 
     return router

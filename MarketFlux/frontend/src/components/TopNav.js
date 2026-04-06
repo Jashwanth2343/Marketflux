@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, TerminalSquare, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield, BookOpenText } from 'lucide-react';
+import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, TerminalSquare, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield, BookOpenText, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -15,6 +15,7 @@ const navItems = [
     { path: '/risk', icon: Shield, label: 'Risk' },
     { path: '/portfolio', icon: Briefcase, label: 'Portfolio' },
     { path: '/theses', icon: BookOpenText, label: 'Theses' },
+    { path: '/quant-agent', icon: FlaskConical, label: 'Quant Agent' },
     { path: '/fund-os', icon: TerminalSquare, label: 'Fund OS' },
 ];
 
