@@ -179,9 +179,6 @@ function MonthlyReturnBars({ data }) {
 
 function DeployDialog({ strategy, bestBacktest, capital, ticker, alpacaConnected, onDeploy, onCancel }) {
   const metrics = bestBacktest?.metrics || {};
-  // Estimate qty from capital and last close price in equity curve
-  const lastEquity = bestBacktest?.equity_curve;
-  const lastPrice = lastEquity?.length ? lastEquity[lastEquity.length - 1]?.buy_hold / (capital / 100) : null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-[24px] border border-primary/30 bg-[#0d1117] p-6 space-y-5 shadow-2xl">
@@ -414,16 +411,12 @@ export default function QuantAgent() {
     setShowDeploy(false);
     setDeployDone(true);
 
-    // If Alpaca is connected, submit a market order to the paper account
+    // If Alpaca is connected, submit a market order to the paper account.
+    // Use qty=1 as a safe, unambiguous default — the user can adjust in Alpaca directly.
     if (alpacaStatus?.configured && report) {
       try {
         const token = localStorage.getItem('mf_token');
         const t = ticker.trim().toUpperCase();
-        const cap = parseFloat(capital) || 100000;
-        // Estimate qty from capital — use 1 share as a safe default if price unknown
-        const lastPt = equityCurve[equityCurve.length - 1];
-        const latestPrice = lastPt?.buy_hold && cap > 0 ? (lastPt.buy_hold / (cap / 100)) / 100 : null;
-        const qty = latestPrice && latestPrice > 0 ? Math.max(1, Math.floor(cap / latestPrice)) : 1;
         await fetch(`${API_BASE}/api/fundos/alpaca/order`, {
           method: 'POST',
           headers: {
@@ -432,7 +425,7 @@ export default function QuantAgent() {
           },
           body: JSON.stringify({
             symbol: t,
-            qty,
+            qty: 1,
             side: 'buy',
             order_type: 'market',
             time_in_force: 'day',

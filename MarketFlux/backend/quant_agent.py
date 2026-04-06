@@ -293,7 +293,9 @@ def _run_rsi_strategy(
         equity[i] = capital
     # Close open position at end of series and log the final trade
     if position == 1 and shares > 0:
-        exit_price = _safe_float(closes[-1], entry_price)
+        exit_price = _safe_float(closes[-1])
+        if exit_price <= 0:
+            exit_price = entry_price  # last resort: close flat if price is unavailable
         cash = shares * exit_price
         pnl_pct = (exit_price / entry_price - 1) * 100 if entry_price > 0 else 0.0
         trade_log.append({

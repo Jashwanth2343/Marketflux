@@ -107,8 +107,8 @@ class TestSMACrossover(unittest.TestCase):
 
     def test_equity_starts_near_capital(self):
         result = _run_sma_crossover(self.dates, self.closes, self.capital)
-        # First data points should be initialised to capital
-        self.assertAlmostEqual(result["equity"][0], self.capital, delta=1.0)
+        # The warmup period is filled with capital; first point must equal capital exactly.
+        self.assertAlmostEqual(result["equity"][0], self.capital, places=2)
 
     def test_open_trade_logged_at_end(self):
         """Any open position must be closed and logged on the last bar."""

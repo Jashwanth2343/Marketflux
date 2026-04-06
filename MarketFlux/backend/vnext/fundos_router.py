@@ -336,6 +336,8 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             return {"configured": False, "account": None}
         import asyncio
         account = await asyncio.to_thread(alpaca_service.get_account_info)
+        if "error" in account:
+            raise HTTPException(503, f"Alpaca account fetch failed: {account['error']}")
         return {"configured": True, "account": account}
 
     @router.get("/alpaca/positions")
