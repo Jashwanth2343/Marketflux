@@ -81,11 +81,14 @@ def _compute_metrics(equity_series: np.ndarray, trade_log: List[Dict]) -> Dict[s
     avg_win = float(np.mean([t["pnl_pct"] for t in wins])) if wins else 0.0
     losses = [t for t in trade_log if t.get("pnl_pct", 0) <= 0]
     avg_loss = float(np.mean([t["pnl_pct"] for t in losses])) if losses else 0.0
-    profit_factor = (
-        abs(sum(t["pnl_pct"] for t in wins) / sum(t["pnl_pct"] for t in losses))
-        if losses and sum(t["pnl_pct"] for t in losses) != 0
-        else 0.0
-    )
+    gross_loss = sum(t["pnl_pct"] for t in losses)
+    gross_win = sum(t["pnl_pct"] for t in wins)
+    if losses and gross_loss != 0:
+        profit_factor = abs(gross_win / gross_loss)
+    elif wins and not losses:
+        profit_factor = 9999.0  # infinite profit factor: all wins, no losses
+    else:
+        profit_factor = 0.0
 
     return {
         "total_return_pct": round(_safe_float(total_return), 2),
@@ -196,9 +199,21 @@ def _run_sma_crossover(
 
         equity[i] = cash + shares * price
 
-    # Close open position
+    # Close open position at end of series and log the final trade
     if position == 1 and shares > 0:
-        equity[-1] = shares * _safe_float(closes[-1])
+        exit_price = _safe_float(closes[-1])
+        cash = shares * exit_price
+        pnl_pct = (exit_price / entry_price - 1) * 100 if entry_price > 0 else 0.0
+        trade_log.append({
+            "entry_date": entry_date,
+            "exit_date": dates[-1],
+            "entry_price": round(entry_price, 4),
+            "exit_price": round(exit_price, 4),
+            "pnl_pct": round(pnl_pct, 3),
+            "direction": "LONG",
+        })
+        shares = 0.0
+        equity[-1] = cash
     if equity[slow - 1] == 0:
         equity[:slow] = capital
     for i in range(1, slow):
@@ -276,8 +291,21 @@ def _run_rsi_strategy(
 
     for i in range(1, period + 1):
         equity[i] = capital
+    # Close open position at end of series and log the final trade
     if position == 1 and shares > 0:
-        equity[-1] = shares * _safe_float(closes[-1])
+        exit_price = _safe_float(closes[-1], entry_price)
+        cash = shares * exit_price
+        pnl_pct = (exit_price / entry_price - 1) * 100 if entry_price > 0 else 0.0
+        trade_log.append({
+            "entry_date": entry_date,
+            "exit_date": dates[-1],
+            "entry_price": round(entry_price, 4),
+            "exit_price": round(exit_price, 4),
+            "pnl_pct": round(pnl_pct, 3),
+            "direction": "LONG",
+        })
+        shares = 0.0
+        equity[-1] = cash
 
     return {"strategy": "RSI Mean Reversion", "equity": equity, "trade_log": trade_log}
 
@@ -340,8 +368,21 @@ def _run_momentum(
 
     for i in range(lookback):
         equity[i] = capital
+    # Close open position at end of series and log the final trade
     if position == 1 and shares > 0:
-        equity[-1] = shares * _safe_float(closes[-1])
+        final_price = _safe_float(closes[-1])
+        cash = shares * final_price
+        pnl_pct = (final_price / entry_price - 1) * 100 if entry_price > 0 else 0.0
+        trade_log.append({
+            "entry_date": entry_date,
+            "exit_date": dates[-1],
+            "entry_price": round(entry_price, 4),
+            "exit_price": round(final_price, 4),
+            "pnl_pct": round(pnl_pct, 3),
+            "direction": "LONG",
+        })
+        shares = 0.0
+        equity[-1] = cash
 
     return {"strategy": "Momentum", "equity": equity, "trade_log": trade_log}
 
@@ -350,53 +391,40 @@ def _run_momentum(
 # Public backtest API
 # ---------------------------------------------------------------------------
 
-def run_backtest(
-    ticker: str,
-    strategy: str = "sma_crossover",
-    period: str = "2y",
-    capital: float = 100_000,
-    params: Optional[Dict[str, Any]] = None,
+def _run_strategy_on_data(
+    strategy: str,
+    dates: List[str],
+    closes: np.ndarray,
+    capital: float,
+    params: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """
-    Fetch historical data for *ticker* and run the requested *strategy*.
-
-    Supported strategies: "sma_crossover", "rsi_mean_reversion", "momentum".
-
-    Returns a dict with: strategy_name, ticker, period, metrics, equity_curve,
-    drawdown_series, monthly_returns, trade_log, and raw chart_data.
-    """
-    params = params or {}
-    tk = yf.Ticker(ticker)
-    hist = tk.history(period=period)
-    if hist.empty or len(hist) < 30:
-        return {"error": f"Insufficient historical data for {ticker}"}
-
-    hist = hist.dropna(subset=["Close"])
-    dates = [str(d.date()) for d in hist.index]
-    closes = hist["Close"].values.astype(float)
-
-    # Build buy-and-hold baseline
-    bh_equity = closes / closes[0] * capital
-
+    """Run one named strategy on pre-fetched dates/closes arrays."""
     if strategy == "sma_crossover":
-        result = _run_sma_crossover(dates, closes, capital,
-                                    fast=params.get("fast", 20),
-                                    slow=params.get("slow", 50))
+        return _run_sma_crossover(dates, closes, capital,
+                                  fast=params.get("fast", 20),
+                                  slow=params.get("slow", 50))
     elif strategy == "rsi_mean_reversion":
-        result = _run_rsi_strategy(dates, closes, capital,
-                                   period=params.get("rsi_period", 14),
-                                   oversold=params.get("oversold", 30),
-                                   overbought=params.get("overbought", 70))
+        return _run_rsi_strategy(dates, closes, capital,
+                                 period=params.get("rsi_period", 14),
+                                 oversold=params.get("oversold", 30),
+                                 overbought=params.get("overbought", 70))
     elif strategy == "momentum":
-        result = _run_momentum(dates, closes, capital,
-                               lookback=params.get("lookback", 60),
-                               hold=params.get("hold", 20))
-    else:
-        return {"error": f"Unknown strategy: {strategy}"}
+        return _run_momentum(dates, closes, capital,
+                             lookback=params.get("lookback", 60),
+                             hold=params.get("hold", 20))
+    return {}
 
-    if not result or "equity" not in result:
-        return {"error": "Backtest produced no data"}
 
+def _build_result(
+    ticker: str,
+    strategy: str,
+    period: str,
+    capital: float,
+    dates: List[str],
+    closes: np.ndarray,
+    result: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Build the standard backtest result dict from a completed strategy run."""
     equity = result["equity"]
     # Forward-fill zeros
     for i in range(1, len(equity)):
@@ -405,6 +433,7 @@ def run_backtest(
     if equity[0] == 0:
         equity[0] = capital
 
+    bh_equity = closes / closes[0] * capital
     trade_log = result["trade_log"]
     metrics = _compute_metrics(equity, trade_log)
     bh_metrics = _compute_metrics(bh_equity, [])
@@ -417,9 +446,6 @@ def run_backtest(
         }
         for i in range(len(dates))
     ]
-
-    drawdown = _build_drawdown_series(equity, dates)
-    monthly = _monthly_returns(equity, dates)
 
     return {
         "ticker": ticker.upper(),
@@ -436,10 +462,51 @@ def run_backtest(
             "sharpe_ratio": bh_metrics.get("sharpe_ratio", 0),
         },
         "equity_curve": equity_curve,
-        "drawdown_series": drawdown,
-        "monthly_returns": monthly,
+        "drawdown_series": _build_drawdown_series(equity, dates),
+        "monthly_returns": _monthly_returns(equity, dates),
         "trade_log": trade_log,
     }
+
+
+def run_backtest(
+    ticker: str,
+    strategy: str = "sma_crossover",
+    period: str = "2y",
+    capital: float = 100_000,
+    params: Optional[Dict[str, Any]] = None,
+    _hist=None,
+) -> Dict[str, Any]:
+    """
+    Fetch historical data for *ticker* and run the requested *strategy*.
+
+    Pass *_hist* (a pandas DataFrame from yf.Ticker.history) to reuse already-
+    fetched data and skip a redundant network call.
+
+    Supported strategies: "sma_crossover", "rsi_mean_reversion", "momentum".
+
+    Returns a dict with: strategy_name, ticker, period, metrics, equity_curve,
+    drawdown_series, monthly_returns, trade_log, and benchmark_metrics.
+    """
+    params = params or {}
+    if _hist is None:
+        hist = yf.Ticker(ticker).history(period=period)
+    else:
+        hist = _hist
+    if hist is None or hist.empty or len(hist) < 30:
+        return {"error": f"Insufficient historical data for {ticker}"}
+
+    hist = hist.dropna(subset=["Close"])
+    dates = [str(d.date()) for d in hist.index]
+    closes = hist["Close"].values.astype(float)
+
+    if strategy not in ("sma_crossover", "rsi_mean_reversion", "momentum"):
+        return {"error": f"Unknown strategy: {strategy}"}
+
+    result = _run_strategy_on_data(strategy, dates, closes, capital, params)
+    if not result or "equity" not in result:
+        return {"error": "Backtest produced no data"}
+
+    return _build_result(ticker, strategy, period, capital, dates, closes, result)
 
 
 # ---------------------------------------------------------------------------
@@ -462,7 +529,7 @@ async def run_autonomous_research(
     """
     ticker = ticker.upper().strip()
 
-    yield _step("init", f"Initializing autonomous quant research for **{ticker}**...")
+    yield _step("init", f"Initializing autonomous quant research for {ticker}...")
     await asyncio.sleep(0.1)
 
     # 1. Fetch macro regime
@@ -482,7 +549,7 @@ async def run_autonomous_research(
     await asyncio.sleep(0.05)
 
     # 2. Fetch live ticker data
-    yield _step("market_data", f"Fetching live price data and fundamentals for **{ticker}**...")
+    yield _step("market_data", f"Fetching live price data and fundamentals for {ticker}...")
     try:
         from vnext.engines import build_ticker_workspace
         workspace = await build_ticker_workspace(ticker)
@@ -530,7 +597,7 @@ async def run_autonomous_research(
         yield _sse("data", {"section": "swarm", "swarm_summary": f"Strategy swarm unavailable: {e}"})
     await asyncio.sleep(0.05)
 
-    # 4. Run backtests
+    # 4. Run backtests — fetch history once and share across all strategy variants
     yield _step("backtest", "Running historical backtests across three strategy families...")
     strategies = ["sma_crossover", "rsi_mean_reversion", "momentum"]
     strategy_labels = {
@@ -538,12 +605,24 @@ async def run_autonomous_research(
         "rsi_mean_reversion": "RSI Mean Reversion (14)",
         "momentum": "Price Momentum (60-day)",
     }
+    backtest_period = "2y"
     backtest_results: Dict[str, Dict] = {}
 
+    # Single yfinance fetch shared by all three strategies
+    shared_hist = None
+    try:
+        shared_hist = await asyncio.to_thread(
+            lambda: yf.Ticker(ticker).history(period=backtest_period)
+        )
+    except Exception:
+        _log.warning("Shared history fetch failed for %s; each strategy will fetch independently", ticker, exc_info=True)
+
     for strat in strategies:
-        yield _step("backtest", f"Backtesting **{strategy_labels[strat]}**...")
+        yield _step("backtest", f"Backtesting {strategy_labels[strat]}...")
         try:
-            bt = await asyncio.to_thread(run_backtest, ticker, strat, "2y", capital)
+            bt = await asyncio.to_thread(
+                run_backtest, ticker, strat, backtest_period, capital, None, shared_hist
+            )
             if "error" not in bt:
                 backtest_results[strat] = bt
                 yield _sse("backtest", {
@@ -556,6 +635,7 @@ async def run_autonomous_research(
                     "trade_log": bt["trade_log"][-10:],
                 })
         except Exception as ex:
+            _log.warning("Backtest %s failed for %s", strat, ticker, exc_info=True)
             yield _sse("data", {"section": "backtest_error", "strategy": strat, "error": str(ex)})
         await asyncio.sleep(0.1)
 
@@ -568,8 +648,6 @@ async def run_autonomous_research(
         if sharpe > best_sharpe:
             best_sharpe = sharpe
             best_strat_id = strat_id
-
-    best_backtest = backtest_results.get(best_strat_id) if best_strat_id else None
 
     yield _sse("data", {"section": "best_strategy", "best_strategy_id": best_strat_id,
                         "best_strategy_name": strategy_labels.get(best_strat_id, "N/A"),

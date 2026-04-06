@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, LineChart, Line, BarChart, Bar,
@@ -177,8 +177,11 @@ function MonthlyReturnBars({ data }) {
 
 // ─── Paper trading deploy dialog ─────────────────────────────────────────────
 
-function DeployDialog({ strategy, bestBacktest, capital, ticker, onDeploy, onCancel }) {
+function DeployDialog({ strategy, bestBacktest, capital, ticker, alpacaConnected, onDeploy, onCancel }) {
   const metrics = bestBacktest?.metrics || {};
+  // Estimate qty from capital and last close price in equity curve
+  const lastEquity = bestBacktest?.equity_curve;
+  const lastPrice = lastEquity?.length ? lastEquity[lastEquity.length - 1]?.buy_hold / (capital / 100) : null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-[24px] border border-primary/30 bg-[#0d1117] p-6 space-y-5 shadow-2xl">
@@ -211,10 +214,18 @@ function DeployDialog({ strategy, bestBacktest, capital, ticker, onDeploy, onCan
               {fmtPct(metrics.total_return_pct)}
             </span>
           </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Alpaca Connection</span>
+            <span className={`font-mono text-[11px] ${alpacaConnected ? 'text-[#00ff88]' : 'text-amber-400'}`}>
+              {alpacaConnected ? '● Connected (paper)' : '○ Not configured'}
+            </span>
+          </div>
         </div>
 
         <div className="rounded-[12px] bg-amber-400/10 border border-amber-400/20 px-4 py-3 text-xs text-amber-300 leading-relaxed">
-          This will queue the strategy for paper trading only. No real capital will be deployed. You can review and approve/reject each individual trade in Fund OS.
+          {alpacaConnected
+            ? 'A market order will be submitted to your Alpaca paper account. No real capital will be used.'
+            : 'Alpaca credentials not configured — the strategy will be queued in Fund OS only. To enable live paper orders, add ALPACA_API_KEY and ALPACA_SECRET_KEY to the backend environment.'}
         </div>
 
         <div className="flex gap-3">
@@ -263,7 +274,29 @@ export default function QuantAgent() {
   const [showDeploy, setShowDeploy] = useState(false);
   const [deployDone, setDeployDone] = useState(false);
 
+  // ── Alpaca status ──
+  const [alpacaStatus, setAlpacaStatus] = useState(null); // null = unknown
+
   const abortRef = useRef(null);
+
+  // Abort any in-flight SSE stream when the component unmounts
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  // Fetch Alpaca connectivity status once on mount
+  useEffect(() => {
+    const token = localStorage.getItem('mf_token');
+    if (!token) return;
+    fetch(`${API_BASE}/api/fundos/alpaca/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setAlpacaStatus(data); })
+      .catch(() => {});
+  }, []);
 
   const handleEvent = useCallback((evt) => {
     const { type } = evt;
@@ -273,11 +306,8 @@ export default function QuantAgent() {
       setCurrentStepIdx(idx);
       setStepMessages(prev => ({ ...prev, [evt.step]: evt.message }));
     } else if (type === 'backtest') {
-      setBacktests(prev => {
-        const updated = { ...prev, [evt.strategy_id]: evt };
-        setActiveBacktest(aid => aid || evt.strategy_id);
-        return updated;
-      });
+      setBacktests(prev => ({ ...prev, [evt.strategy_id]: evt }));
+      setActiveBacktest(aid => aid || evt.strategy_id);
     } else if (type === 'done') {
       setCurrentStepIdx(PIPELINE_STEPS.length);
       if (evt.report) {
@@ -383,7 +413,38 @@ export default function QuantAgent() {
   const handleDeploy = async () => {
     setShowDeploy(false);
     setDeployDone(true);
-    // Navigate to Fund OS to see the queued strategy
+
+    // If Alpaca is connected, submit a market order to the paper account
+    if (alpacaStatus?.configured && report) {
+      try {
+        const token = localStorage.getItem('mf_token');
+        const t = ticker.trim().toUpperCase();
+        const cap = parseFloat(capital) || 100000;
+        // Estimate qty from capital — use 1 share as a safe default if price unknown
+        const lastPt = equityCurve[equityCurve.length - 1];
+        const latestPrice = lastPt?.buy_hold && cap > 0 ? (lastPt.buy_hold / (cap / 100)) / 100 : null;
+        const qty = latestPrice && latestPrice > 0 ? Math.max(1, Math.floor(cap / latestPrice)) : 1;
+        await fetch(`${API_BASE}/api/fundos/alpaca/order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            symbol: t,
+            qty,
+            side: 'buy',
+            order_type: 'market',
+            time_in_force: 'day',
+            strategy_id: report.best_strategy_id || 'quant-agent',
+            approved: true,
+          }),
+        });
+      } catch (_) {
+        // Non-blocking — order attempt failure should not block navigation
+      }
+    }
+
     navigate('/fund-os');
   };
 
@@ -407,7 +468,7 @@ export default function QuantAgent() {
 
         {/* ── Header ── */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="rounded-full bg-primary/10 border border-primary/20 px-3 py-1 flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-primary">
               <FlaskConical className="w-3.5 h-3.5" />
               Quant Agent
@@ -415,6 +476,17 @@ export default function QuantAgent() {
             <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-muted-foreground border border-white/8 rounded-full px-3 py-1">
               Autonomous Research Engine
             </div>
+            {/* Alpaca connection badge */}
+            {alpacaStatus !== null && (
+              <div className={`text-[11px] font-mono uppercase tracking-[0.14em] border rounded-full px-3 py-1 flex items-center gap-1.5 ${
+                alpacaStatus.configured
+                  ? 'border-[#00ff88]/30 text-[#00ff88] bg-[#00ff88]/5'
+                  : 'border-amber-400/30 text-amber-400 bg-amber-400/5'
+              }`}>
+                <span className="text-[8px]">{alpacaStatus.configured ? '●' : '○'}</span>
+                Alpaca {alpacaStatus.configured ? 'Connected' : 'Not configured'}
+              </div>
+            )}
           </div>
           <h1 className="text-3xl md:text-4xl font-semibold text-foreground leading-tight">
             Autonomous Quant Research
@@ -753,6 +825,27 @@ export default function QuantAgent() {
           </div>
         )}
 
+        {/* Alpaca account summary */}
+        {alpacaStatus?.configured && alpacaStatus?.account && (
+          <Card className="rounded-[24px] border-[#00ff88]/15 bg-card/60 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Activity className="w-4 h-4 text-[#00ff88]" />
+                Alpaca Paper Account
+                <span className="text-[11px] font-mono text-[#00ff88] ml-1 border border-[#00ff88]/20 rounded-full px-2 py-0.5">PAPER</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+                <MetricCard label="Portfolio Value" value={fmtCurrency(alpacaStatus.account.portfolio_value)} />
+                <MetricCard label="Cash" value={fmtCurrency(alpacaStatus.account.cash)} />
+                <MetricCard label="Buying Power" value={fmtCurrency(alpacaStatus.account.buying_power)} />
+                <MetricCard label="Account Status" value={alpacaStatus.account.status} />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
       </div>
 
       {/* Deploy dialog */}
@@ -762,6 +855,7 @@ export default function QuantAgent() {
           capital={parseFloat(capital) || 100000}
           strategy={report?.best_strategy_name}
           bestBacktest={report ? backtests[report.best_strategy_id] : null}
+          alpacaConnected={alpacaStatus?.configured === true}
           onDeploy={handleDeploy}
           onCancel={() => setShowDeploy(false)}
         />
