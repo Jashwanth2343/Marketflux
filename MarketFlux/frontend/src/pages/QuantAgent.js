@@ -7,7 +7,7 @@ import {
 import {
   Activity, AlertTriangle, BrainCircuit, CheckCircle2,
   ChevronRight, Download, Loader2, Play, ShieldAlert,
-  Sparkles, TrendingUp, BarChart2, List, RefreshCw,
+  Sparkles, BarChart2, List, RefreshCw,
   ArrowRight, FlaskConical
 } from 'lucide-react';
 
