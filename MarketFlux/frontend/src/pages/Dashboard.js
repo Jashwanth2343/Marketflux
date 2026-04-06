@@ -31,16 +31,17 @@ function ChangeDisplay({ change, percent, isVolatility = false }) {
 
 
 function SpeedometerGauge({ score, mood }) {
+  const normalizedScore = Math.max(0, Math.min(100, Number(score ?? 50)));
   // Determine label and color based on score
   let label = 'NEUTRAL';
   let color = '#eab308'; // yellow
-  if (score < 25) { label = 'EXTREME FEAR'; color = '#ef4444'; }
-  else if (score < 45) { label = 'FEAR'; color = '#f97316'; }
-  else if (score > 75) { label = 'EXTREME GREED'; color = '#22c55e'; }
-  else if (score > 55) { label = 'GREED'; color = '#84cc16'; }
+  if (normalizedScore < 25) { label = 'EXTREME FEAR'; color = '#ef4444'; }
+  else if (normalizedScore < 45) { label = 'FEAR'; color = '#f97316'; }
+  else if (normalizedScore > 75) { label = 'EXTREME GREED'; color = '#22c55e'; }
+  else if (normalizedScore > 55) { label = 'GREED'; color = '#84cc16'; }
 
   // Needle rotation (-90 is left/0, +90 is right/100)
-  const angle = -90 + (score / 100) * 180;
+  const angle = -90 + (normalizedScore / 100) * 180;
 
   return (
     <div className="flex flex-col items-center justify-center w-full relative pt-2">
@@ -62,7 +63,7 @@ function SpeedometerGauge({ score, mood }) {
         <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#speedGradient)" strokeWidth="12" strokeLinecap="round" />
 
         {/* Needle */}
-        <g style={{ transform: `rotate(${angle}deg)`, transformOrigin: `100px 100px` }} className="transition-transform duration-1000 ease-out">
+        <g transform={`rotate(${angle} 100 100)`} className="transition-transform duration-1000 ease-out">
           <line x1="100" y1="100" x2="100" y2="25" stroke="var(--color-accent, #00ff88)" strokeWidth="3" strokeLinecap="round" />
           <circle cx="100" cy="100" r="4" fill="var(--color-accent, #00ff88)" />
         </g>
@@ -73,7 +74,7 @@ function SpeedometerGauge({ score, mood }) {
         <text x="180" y="115" fontSize="9" fill="#22c55e" textAnchor="middle" className="font-mono font-bold tracking-wider">GREED</text>
 
         {/* Score Text inside arc */}
-        <text x="100" y="80" fontSize="36" fontWeight="800" fill={color} textAnchor="middle" className="font-sans drop-shadow-sm">{score}</text>
+        <text x="100" y="80" fontSize="36" fontWeight="800" fill={color} textAnchor="middle" className="font-sans drop-shadow-sm">{normalizedScore}</text>
         <text x="100" y="95" fontSize="11" fill={color} textAnchor="middle" letterSpacing="0.1em" className="font-mono font-bold">{label}</text>
       </svg>
 
