@@ -142,19 +142,16 @@ async def search_fundos(db, user: Optional[Dict[str, Any]], query: str, limit: i
 
 
 async def build_paper_portfolio(user: Optional[Dict[str, Any]], db=None) -> Dict[str, Any]:
-    from .alpaca_client import get_positions, get_account
+    from .alpaca_client import get_all_positions, get_account
     from .alpaca_config import is_alpaca_configured
 
     user_id = user.get("user_id") if user else None
     alpaca_positions = []
     alpaca_account_info = None
 
-    if is_alpaca_configured() and user_id and db is not None:
-        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-        if alpaca_account_id:
-            alpaca_positions = get_positions(alpaca_account_id)
-            alpaca_account_info = get_account(alpaca_account_id)
+    if is_alpaca_configured():
+        alpaca_positions = get_all_positions()
+        alpaca_account_info = get_account()
 
     positions = [
         {

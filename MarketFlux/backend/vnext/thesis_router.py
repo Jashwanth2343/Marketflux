@@ -198,23 +198,19 @@ def build_thesis_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         alpaca_order = None
         config = get_alpaca_config()
         if config and config.sync_thesis_trades:
-            user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-            alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-            if alpaca_account_id:
-                alpaca_order = submit_market_order(
-                    account_id=alpaca_account_id,
-                    symbol=ticker,
-                    qty=payload.size,
-                    side=payload.side,
+            alpaca_order = submit_market_order(
+                symbol=ticker,
+                qty=payload.size,
+                side=payload.side,
+            )
+            if alpaca_order:
+                from .thesis_repository import set_paper_trade_alpaca_order
+                await set_paper_trade_alpaca_order(
+                    trade["id"],
+                    alpaca_order["order_id"],
+                    alpaca_order["status"],
                 )
-                if alpaca_order:
-                    from .thesis_repository import set_paper_trade_alpaca_order
-                    await set_paper_trade_alpaca_order(
-                        trade["id"],
-                        alpaca_order["order_id"],
-                        alpaca_order["status"],
-                    )
-                    _logger.info(f"Paper trade {trade['id']} synced to Alpaca order {alpaca_order['order_id']}")
+                _logger.info(f"Paper trade {trade['id']} synced to Alpaca order {alpaca_order['order_id']}")
 
         return {"item": trade, "policy_result": policy_result, "alpaca_order": alpaca_order}
 
@@ -243,13 +239,10 @@ def build_thesis_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         alpaca_close_order = None
         config = get_alpaca_config()
         if payload.status == "closed" and config and config.sync_thesis_trades:
-            user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-            alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-            if alpaca_account_id:
-                from .alpaca_client import close_position
-                alpaca_close_order = close_position(alpaca_account_id, trade["ticker"])
-                if alpaca_close_order:
-                    _logger.info(f"Paper trade {trade_id} closed on Alpaca for {trade['ticker']}")
+            from .alpaca_client import close_position
+            alpaca_close_order = close_position(trade["ticker"])
+            if alpaca_close_order:
+                _logger.info(f"Paper trade {trade_id} closed on Alpaca for {trade['ticker']}")
 
         return {"item": updated, "alpaca_close_order": alpaca_close_order}
 

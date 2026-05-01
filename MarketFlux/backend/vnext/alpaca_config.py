@@ -1,29 +1,28 @@
 """Alpaca integration configuration.
 
-Centralised, environment-aware config that supports sandbox (paper) and
-production (live) modes with feature flags, rate limiting, and validation.
+Centralised, environment-aware config that supports paper trading and
+live trading modes with feature flags, rate limiting, and validation.
 """
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
 
 class AlpacaEnvironment(str, Enum):
-    SANDBOX = "sandbox"
-    PRODUCTION = "production"
+    PAPER = "paper"
+    LIVE = "live"
 
 
 @dataclass(frozen=True)
 class AlpacaConfig:
     api_key: str
     api_secret: str
-    environment: AlpacaEnvironment = AlpacaEnvironment.SANDBOX
+    environment: AlpacaEnvironment = AlpacaEnvironment.PAPER
 
     # Feature flags
-    auto_create_accounts: bool = True
     sync_thesis_trades: bool = True
     enable_webhooks: bool = True
     enable_fractional_shares: bool = True
@@ -47,17 +46,17 @@ class AlpacaConfig:
 
     @property
     def base_url(self) -> str:
-        if self.environment == AlpacaEnvironment.PRODUCTION:
-            return "https://broker-api.alpaca.markets"
-        return "https://broker-api.sandbox.alpaca.markets"
+        if self.environment == AlpacaEnvironment.LIVE:
+            return "https://api.alpaca.markets"
+        return "https://paper-api.alpaca.markets"
 
     @property
-    def is_sandbox(self) -> bool:
-        return self.environment == AlpacaEnvironment.SANDBOX
+    def is_paper(self) -> bool:
+        return self.environment == AlpacaEnvironment.PAPER
 
     @property
     def is_live(self) -> bool:
-        return self.environment == AlpacaEnvironment.PRODUCTION
+        return self.environment == AlpacaEnvironment.LIVE
 
 
 _config: Optional[AlpacaConfig] = None
@@ -69,20 +68,19 @@ def get_alpaca_config() -> Optional[AlpacaConfig]:
     if _config is not None:
         return _config
 
-    api_key = os.getenv("ALPACA_BROKER_API_KEY", "").strip()
-    api_secret = os.getenv("ALPACA_BROKER_API_SECRET", "").strip()
+    api_key = os.getenv("APCA_API_KEY_ID", "").strip()
+    api_secret = os.getenv("APCA_API_SECRET_KEY", "").strip()
 
     if not api_key or not api_secret:
         return None
 
-    env_str = os.getenv("ALPACA_ENVIRONMENT", "sandbox").strip().lower()
-    environment = AlpacaEnvironment.PRODUCTION if env_str == "production" else AlpacaEnvironment.SANDBOX
+    env_str = os.getenv("ALPACA_ENVIRONMENT", "paper").strip().lower()
+    environment = AlpacaEnvironment.LIVE if env_str == "live" else AlpacaEnvironment.PAPER
 
     _config = AlpacaConfig(
         api_key=api_key,
         api_secret=api_secret,
         environment=environment,
-        auto_create_accounts=os.getenv("ALPACA_AUTO_CREATE_ACCOUNTS", "true").lower() == "true",
         sync_thesis_trades=os.getenv("ALPACA_SYNC_THESIS_TRADES", "true").lower() == "true",
         enable_webhooks=os.getenv("ALPACA_ENABLE_WEBHOOKS", "true").lower() == "true",
         enable_fractional_shares=os.getenv("ALPACA_ENABLE_FRACTIONAL", "true").lower() == "true",
