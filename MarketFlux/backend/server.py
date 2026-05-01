@@ -1593,7 +1593,9 @@ app.include_router(api_router)
 from vnext.router import build_vnext_router
 from vnext.adapter import build_adapter_router
 from vnext.fundos_router import build_fundos_router
+from vnext.alpaca_router import build_alpaca_router
 
 app.include_router(build_vnext_router(db, get_current_user))
 app.include_router(build_adapter_router(db, get_current_user))
 app.include_router(build_fundos_router(db, get_current_user))
+app.include_router(build_alpaca_router(db, get_current_user))

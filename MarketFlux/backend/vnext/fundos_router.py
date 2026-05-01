@@ -35,7 +35,7 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.get("/portfolio/paper")
     async def paper_portfolio(request: Request):
         user = await get_current_user(request)
-        return await build_paper_portfolio(user)
+        return await build_paper_portfolio(user, db=db)
 
     @router.get("/audit-feed")
     async def audit_feed(request: Request, limit: int = 20):

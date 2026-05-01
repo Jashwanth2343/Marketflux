@@ -304,6 +304,12 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     CHECK (status IN ('open', 'closed', 'blocked'))
 );
 
+-- Alpaca Broker integration columns
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS alpaca_order_id TEXT;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS alpaca_status TEXT;
+ALTER TABLE paper_orders ADD COLUMN IF NOT EXISTS alpaca_order_id TEXT;
+ALTER TABLE paper_orders ADD COLUMN IF NOT EXISTS alpaca_status TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_daily_briefs_date ON daily_briefs (brief_date DESC);
 CREATE INDEX IF NOT EXISTS idx_research_runs_owner_created ON research_runs (owner_user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_signal_events_created ON signal_events (created_at DESC);
