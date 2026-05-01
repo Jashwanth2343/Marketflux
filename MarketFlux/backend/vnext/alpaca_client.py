@@ -34,6 +34,8 @@ def _get_broker_client():
         secret_key=secret_key,
         sandbox=True,
     )
+    # Broker API sandbox requires Basic Auth header format
+    _broker_client._use_basic_auth = True
     return _broker_client
 
 
