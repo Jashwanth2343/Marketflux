@@ -614,6 +614,27 @@ async def update_paper_trade(
         await conn.close()
 
 
+async def set_paper_trade_alpaca_order(trade_id: str, alpaca_order_id: str, alpaca_status: str) -> None:
+    """Attach the Alpaca order ID and status to a paper trade record."""
+    conn = await get_pg_connection()
+    try:
+        await conn.execute(
+            """
+            UPDATE paper_trades
+            SET
+                alpaca_order_id = $2,
+                alpaca_status = $3,
+                updated_at = NOW()
+            WHERE id = $1::uuid
+            """,
+            trade_id,
+            alpaca_order_id,
+            alpaca_status,
+        )
+    finally:
+        await conn.close()
+
+
 async def backfill_legacy_saved_theses(mongo_db) -> int:
     inserted = 0
     cursor = mongo_db.saved_theses.find({}, {"_id": 1, "owner_user_id": 1, "ticker": 1, "thesis_text": 1})

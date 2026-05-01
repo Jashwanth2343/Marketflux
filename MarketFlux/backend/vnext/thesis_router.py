@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from market_data import get_stock_info
 
+from .alpaca_client import is_alpaca_configured, submit_market_order
 from .evidence_service import collect_evidence_background
 from .memo_service import generate_change_summary, generate_memo_from_workspace
 from .policy_engine import evaluate_paper_trade, get_next_earnings_event
@@ -31,6 +33,8 @@ from .thesis_repository import (
     update_paper_trade,
     upsert_policies,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def build_thesis_router(db, get_current_user: Callable[[Request], Any]) -> APIRouter:
@@ -189,7 +193,28 @@ def build_thesis_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             payload.notes,
             policy_result,
         )
-        return {"item": trade, "policy_result": policy_result}
+
+        alpaca_order = None
+        if is_alpaca_configured():
+            user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+            alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+            if alpaca_account_id:
+                alpaca_order = submit_market_order(
+                    account_id=alpaca_account_id,
+                    symbol=ticker,
+                    qty=payload.size,
+                    side=payload.side,
+                )
+                if alpaca_order:
+                    from .thesis_repository import set_paper_trade_alpaca_order
+                    await set_paper_trade_alpaca_order(
+                        trade["id"],
+                        alpaca_order["order_id"],
+                        alpaca_order["status"],
+                    )
+                    _logger.info(f"Paper trade {trade['id']} synced to Alpaca order {alpaca_order['order_id']}")
+
+        return {"item": trade, "policy_result": policy_result, "alpaca_order": alpaca_order}
 
     @router.patch("/paper-trades/{trade_id}")
     async def paper_trade_patch(trade_id: str, request: Request, payload: PaperTradeUpdate):
@@ -212,6 +237,17 @@ def build_thesis_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         )
         if not updated:
             raise HTTPException(404, "Paper trade not found.")
-        return {"item": updated}
+
+        alpaca_close_order = None
+        if payload.status == "closed" and is_alpaca_configured():
+            user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+            alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+            if alpaca_account_id:
+                from .alpaca_client import close_position
+                alpaca_close_order = close_position(alpaca_account_id, trade["ticker"])
+                if alpaca_close_order:
+                    _logger.info(f"Paper trade {trade_id} closed on Alpaca for {trade['ticker']}")
+
+        return {"item": updated, "alpaca_close_order": alpaca_close_order}
 
     return router

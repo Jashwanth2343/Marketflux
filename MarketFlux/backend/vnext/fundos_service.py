@@ -141,15 +141,52 @@ async def search_fundos(db, user: Optional[Dict[str, Any]], query: str, limit: i
     }
 
 
-async def build_paper_portfolio(user: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+async def build_paper_portfolio(user: Optional[Dict[str, Any]], db=None) -> Dict[str, Any]:
+    from .alpaca_client import is_alpaca_configured, get_positions, get_account
+
+    user_id = user.get("user_id") if user else None
+    alpaca_positions = []
+    alpaca_account_info = None
+
+    if is_alpaca_configured() and user_id and db is not None:
+        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+        if alpaca_account_id:
+            alpaca_positions = get_positions(alpaca_account_id)
+            alpaca_account_info = get_account(alpaca_account_id)
+
+    positions = [
+        {
+            "symbol": p["symbol"],
+            "qty": float(p["qty"]),
+            "side": p["side"],
+            "avg_entry_price": float(p["avg_entry_price"]),
+            "market_value": float(p["market_value"]),
+            "unrealized_pl": float(p["unrealized_pl"]),
+            "unrealized_plpc": float(p["unrealized_plpc"]),
+            "current_price": float(p["current_price"]),
+            "change_today": float(p["change_today"]),
+            "source": "alpaca",
+        }
+        for p in alpaca_positions
+    ]
+
     return {
         "as_of": _utcnow_iso(),
-        "configured": fundos_store_configured(),
-        "positions": [],
-        "message": "Paper portfolio will become active once the isolated Fund OS store is configured."
-        if not fundos_store_configured()
-        else None,
-        "owner_user_id": user.get("user_id") if user else None,
+        "configured": fundos_store_configured() or is_alpaca_configured(),
+        "alpaca_configured": is_alpaca_configured(),
+        "positions": positions,
+        "account": {
+            "equity": float(alpaca_account_info["equity"]) if alpaca_account_info else 0,
+            "cash": float(alpaca_account_info["cash"]) if alpaca_account_info else 0,
+            "buying_power": float(alpaca_account_info["buying_power"]) if alpaca_account_info else 0,
+        } if alpaca_account_info else None,
+        "message": None if positions else (
+            "Paper portfolio will become active once you make your first trade via Alpaca."
+            if is_alpaca_configured()
+            else "Paper portfolio will become active once the isolated Fund OS store is configured."
+        ),
+        "owner_user_id": user_id,
     }
 
 
