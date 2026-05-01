@@ -7,7 +7,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from market_data import get_stock_info
 
-from .alpaca_client import is_alpaca_configured, submit_market_order
+from .alpaca_client import submit_market_order
+from .alpaca_config import get_alpaca_config, is_alpaca_configured
 from .evidence_service import collect_evidence_background
 from .memo_service import generate_change_summary, generate_memo_from_workspace
 from .policy_engine import evaluate_paper_trade, get_next_earnings_event
@@ -195,7 +196,8 @@ def build_thesis_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         )
 
         alpaca_order = None
-        if is_alpaca_configured():
+        config = get_alpaca_config()
+        if config and config.sync_thesis_trades:
             user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
             alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
             if alpaca_account_id:
@@ -239,7 +241,8 @@ def build_thesis_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             raise HTTPException(404, "Paper trade not found.")
 
         alpaca_close_order = None
-        if payload.status == "closed" and is_alpaca_configured():
+        config = get_alpaca_config()
+        if payload.status == "closed" and config and config.sync_thesis_trades:
             user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
             alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
             if alpaca_account_id:

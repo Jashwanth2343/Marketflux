@@ -142,7 +142,8 @@ async def search_fundos(db, user: Optional[Dict[str, Any]], query: str, limit: i
 
 
 async def build_paper_portfolio(user: Optional[Dict[str, Any]], db=None) -> Dict[str, Any]:
-    from .alpaca_client import is_alpaca_configured, get_positions, get_account
+    from .alpaca_client import get_positions, get_account
+    from .alpaca_config import is_alpaca_configured
 
     user_id = user.get("user_id") if user else None
     alpaca_positions = []

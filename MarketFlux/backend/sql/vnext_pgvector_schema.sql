@@ -310,6 +310,33 @@ ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS alpaca_status TEXT;
 ALTER TABLE paper_orders ADD COLUMN IF NOT EXISTS alpaca_order_id TEXT;
 ALTER TABLE paper_orders ADD COLUMN IF NOT EXISTS alpaca_status TEXT;
 
+-- Alpaca trade audit log for compliance and debugging
+CREATE TABLE IF NOT EXISTS alpaca_audit_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type TEXT NOT NULL,
+    user_id TEXT,
+    account_id TEXT,
+    order_id TEXT,
+    symbol TEXT,
+    side TEXT,
+    qty NUMERIC(18, 4),
+    notional NUMERIC(18, 4),
+    order_type TEXT,
+    status TEXT,
+    filled_avg_price NUMERIC(18, 4),
+    filled_qty NUMERIC(18, 4),
+    error_message TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_alpaca_audit_user_created ON alpaca_audit_log (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alpaca_audit_order ON alpaca_audit_log (order_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alpaca_audit_account ON alpaca_audit_log (account_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alpaca_audit_event_type ON alpaca_audit_log (event_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_alpaca_order ON paper_trades (alpaca_order_id) WHERE alpaca_order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_paper_orders_alpaca_order ON paper_orders (alpaca_order_id) WHERE alpaca_order_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_daily_briefs_date ON daily_briefs (brief_date DESC);
 CREATE INDEX IF NOT EXISTS idx_research_runs_owner_created ON research_runs (owner_user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_signal_events_created ON signal_events (created_at DESC);
