@@ -200,7 +200,8 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
                 strategy_id,
             )
             await conn.close()
-            if result.endswith(" 0"):
+            affected_rows = int(result.split()[-1]) if result else 0
+            if affected_rows == 0:
                 raise HTTPException(404, "Strategy not found")
         except Exception as e:
             if isinstance(e, HTTPException):
@@ -230,7 +231,8 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
                 strategy_id,
             )
             await conn.close()
-            if result.endswith(" 0"):
+            affected_rows = int(result.split()[-1]) if result else 0
+            if affected_rows == 0:
                 raise HTTPException(404, "Strategy not found")
         except Exception as e:
             if isinstance(e, HTTPException):
