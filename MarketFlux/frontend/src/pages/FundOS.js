@@ -271,11 +271,11 @@ export default function FundOS() {
                           {portfolio.positions.map((pos) => (
                             <TableRow key={pos.symbol} className="border-white/10">
                               <TableCell className="font-bold text-foreground">{pos.symbol}</TableCell>
-                              <TableCell className="text-foreground/90">{pos.quantity}</TableCell>
-                              <TableCell className="text-foreground/90">${pos.avg_price}</TableCell>
-                              <TableCell className="text-foreground/90">${pos.mark_price}</TableCell>
-                              <TableCell className={`text-right font-mono text-sm ${pos.unrealized_pnl >= 0 ? 'text-[#00ff88]' : 'text-destructive'}`}>
-                                ${pos.unrealized_pnl}
+                              <TableCell className="text-foreground/90">{pos.qty}</TableCell>
+                              <TableCell className="text-foreground/90">${pos.avg_entry_price}</TableCell>
+                              <TableCell className="text-foreground/90">${pos.current_price}</TableCell>
+                              <TableCell className={`text-right font-mono text-sm ${pos.unrealized_pl >= 0 ? 'text-[#00ff88]' : 'text-destructive'}`}>
+                                ${pos.unrealized_pl}
                               </TableCell>
                             </TableRow>
                           ))}

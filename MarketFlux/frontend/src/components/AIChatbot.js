@@ -493,9 +493,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
         detectedTicker = getCurrentTicker();
       }
 
-      const token = localStorage.getItem('mf_token');
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers.Authorization = `Bearer ${token}`;
 
       const base = API_BASE || '';
       const res = await fetch(`${base}/api/ai/chat/stream`, {

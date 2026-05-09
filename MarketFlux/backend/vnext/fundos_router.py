@@ -190,14 +190,21 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         from .fundos_pg_client import get_pg_connection
         try:
             conn = await get_pg_connection()
-            # Update strategy proposals table
-            # Since id is a UUID, we must parse or cast strategy_id
-            await conn.execute(
-                "UPDATE strategy_proposals SET execution_status = 'approved', approved_by = $1, approved_at = NOW() WHERE id = $2::uuid", 
-                user["user_id"], strategy_id
+            result = await conn.execute(
+                """
+                UPDATE strategy_proposals
+                SET execution_status = 'approved', approved_by = $1, approved_at = NOW()
+                WHERE id = $2::uuid AND owner_user_id = $1
+                """,
+                user["user_id"],
+                strategy_id,
             )
             await conn.close()
+            if result.endswith(" 0"):
+                raise HTTPException(404, "Strategy not found")
         except Exception as e:
+            if isinstance(e, HTTPException):
+                raise
             import logging
             logging.getLogger(__name__).error(f"Approval failed: {e}")
             raise HTTPException(500, "Failed to update strategy approval status.")
@@ -213,12 +220,21 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         from .fundos_pg_client import get_pg_connection
         try:
             conn = await get_pg_connection()
-            await conn.execute(
-                "UPDATE strategy_proposals SET execution_status = 'rejected' WHERE id = $2::uuid", 
-                user["user_id"], strategy_id
+            result = await conn.execute(
+                """
+                UPDATE strategy_proposals
+                SET execution_status = 'rejected'
+                WHERE id = $2::uuid AND owner_user_id = $1
+                """,
+                user["user_id"],
+                strategy_id,
             )
             await conn.close()
+            if result.endswith(" 0"):
+                raise HTTPException(404, "Strategy not found")
         except Exception as e:
+            if isinstance(e, HTTPException):
+                raise
             import logging
             logging.getLogger(__name__).error(f"Rejection failed: {e}")
             raise HTTPException(500, "Failed to update strategy rejection status.")

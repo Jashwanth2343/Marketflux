@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -103,37 +104,79 @@ async def search_fundos(db, user: Optional[Dict[str, Any]], query: str, limit: i
     strategy_results: List[Dict[str, Any]] = []
     user_id = user.get("user_id") if user else None
     if user_id:
-        regex = re.compile(re.escape(cleaned), re.IGNORECASE)
-        cursor = (
-            db.strategy_runs.find(
-                {
-                    "owner_user_id": user_id,
-                    "$or": [
-                        {"strategy.title": regex},
-                        {"prompt": regex},
-                        {"tickers": {"$in": [cleaned.upper()]}},
-                        {"strategy.tickers": {"$in": [cleaned.upper()]}},
-                    ],
-                },
-                {"_id": 0},
+        from .fundos_pg_client import get_pg_connection
+
+        like_query = f"%{cleaned}%"
+        upper_query = cleaned.upper()
+        try:
+            conn = await get_pg_connection()
+            rows = await conn.fetch(
+                """
+                SELECT id, title, ticker, tickers, execution_status, created_at, confidence
+                FROM strategy_proposals
+                WHERE owner_user_id = $1
+                  AND (
+                    title ILIKE $2
+                    OR ticker ILIKE $3
+                    OR EXISTS (
+                      SELECT 1 FROM unnest(tickers) AS t WHERE t ILIKE $3
+                    )
+                  )
+                ORDER BY created_at DESC
+                LIMIT $4
+                """,
+                user_id,
+                like_query,
+                upper_query,
+                limit,
             )
-            .sort("created_at", -1)
-            .limit(limit)
-        )
-        for run in await cursor.to_list(limit):
-            row = _strategy_row_from_run(run)
-            strategy_results.append(
-                {
-                    "id": row["strategy_id"],
-                    "kind": "strategy",
-                    "title": row["title"],
-                    "ticker": row["ticker"],
-                    "tickers": row["tickers"],
-                    "status": row["status"],
-                    "created_at": row["created_at"],
-                    "confidence": row["confidence"],
-                }
+            await conn.close()
+            for row in rows:
+                strategy_results.append(
+                    {
+                        "id": str(row["id"]),
+                        "kind": "strategy",
+                        "title": row["title"],
+                        "ticker": row["ticker"] or "--",
+                        "tickers": row["tickers"] or [],
+                        "status": row["execution_status"] or "generated",
+                        "created_at": row["created_at"].isoformat() if row["created_at"] else _utcnow_iso(),
+                        "confidence": row["confidence"] or 0,
+                    }
+                )
+        except Exception:
+            # Fallback to legacy Mongo source if Postgres is unavailable.
+            regex = re.compile(re.escape(cleaned), re.IGNORECASE)
+            cursor = (
+                db.strategy_runs.find(
+                    {
+                        "owner_user_id": user_id,
+                        "$or": [
+                            {"strategy.title": regex},
+                            {"prompt": regex},
+                            {"tickers": {"$in": [cleaned.upper()]}},
+                            {"strategy.tickers": {"$in": [cleaned.upper()]}},
+                        ],
+                    },
+                    {"_id": 0},
+                )
+                .sort("created_at", -1)
+                .limit(limit)
             )
+            for run in await cursor.to_list(limit):
+                row = _strategy_row_from_run(run)
+                strategy_results.append(
+                    {
+                        "id": row["strategy_id"],
+                        "kind": "strategy",
+                        "title": row["title"],
+                        "ticker": row["ticker"],
+                        "tickers": row["tickers"],
+                        "status": row["status"],
+                        "created_at": row["created_at"],
+                        "confidence": row["confidence"],
+                    }
+                )
 
     return {
         "query": cleaned,
@@ -152,8 +195,10 @@ async def build_paper_portfolio(user: Optional[Dict[str, Any]], db=None) -> Dict
         user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
         alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
         if alpaca_account_id:
-            alpaca_positions = get_positions(alpaca_account_id)
-            alpaca_account_info = get_account(alpaca_account_id)
+            alpaca_positions, alpaca_account_info = await asyncio.gather(
+                asyncio.to_thread(get_positions, alpaca_account_id),
+                asyncio.to_thread(get_account, alpaca_account_id),
+            )
 
     positions = [
         {

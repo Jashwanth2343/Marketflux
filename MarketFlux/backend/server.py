@@ -1561,8 +1561,8 @@ async def startup():
     # Ensure TTL index on auth_rate_limit so old keys auto-expire after 5 minutes
     try:
         await db.auth_rate_limit.create_index("last_attempt", expireAfterSeconds=300)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(f"Failed creating auth_rate_limit TTL index: {exc}")
 
     try:
         from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
@@ -1584,8 +1584,8 @@ async def shutdown():
         from vnext.fundos_pg_client import close_pg_pool
 
         await close_pg_pool()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(f"Failed to close shared vNext Postgres pool cleanly: {exc}")
     client.close()
 
 app.include_router(api_router)

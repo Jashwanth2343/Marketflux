@@ -19,7 +19,6 @@ export default function AuthCallback() {
     if (sessionId) {
       api.post('/auth/google-session', { session_id: sessionId })
         .then(res => {
-          localStorage.setItem('mf_token', res.data.token);
           setUser(res.data.user);
           navigate('/', { replace: true, state: { user: res.data.user } });
         })

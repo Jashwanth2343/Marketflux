@@ -57,9 +57,7 @@ export default function StrategyTerminal() {
       setLoading(true);
       setError(null);
       const res = await fetch(`${API_BASE}/api/fundos/strategies/${id}`, {
-        headers: {
-          Authorization: localStorage.getItem('mf_token') ? `Bearer ${localStorage.getItem('mf_token')}` : '',
-        }
+        credentials: 'include',
       });
       if (!res.ok) throw new Error("Failed to load historical strategy.");
       const data = await res.json();
@@ -104,8 +102,8 @@ export default function StrategyTerminal() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: localStorage.getItem('mf_token') ? `Bearer ${localStorage.getItem('mf_token')}` : '',
         },
+        credentials: 'include',
         body: JSON.stringify({
           prompt,
           mode,
