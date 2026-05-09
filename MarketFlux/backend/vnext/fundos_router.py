@@ -193,11 +193,11 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             result = await conn.execute(
                 """
                 UPDATE strategy_proposals
-                SET execution_status = 'approved', approved_by = $1, approved_at = NOW()
-                WHERE id = $2::uuid AND owner_user_id = $1
+                SET execution_status = 'approved', approved_by = $2, approved_at = NOW()
+                WHERE id = $1::uuid AND owner_user_id = $2
                 """,
-                user["user_id"],
                 strategy_id,
+                user["user_id"],
             )
             await conn.close()
             affected_rows = int(result.split()[-1]) if result else 0
@@ -225,10 +225,10 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
                 """
                 UPDATE strategy_proposals
                 SET execution_status = 'rejected'
-                WHERE id = $2::uuid AND owner_user_id = $1
+                WHERE id = $1::uuid AND owner_user_id = $2
                 """,
-                user["user_id"],
                 strategy_id,
+                user["user_id"],
             )
             await conn.close()
             affected_rows = int(result.split()[-1]) if result else 0

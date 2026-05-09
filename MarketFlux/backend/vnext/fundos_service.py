@@ -203,7 +203,9 @@ async def build_paper_portfolio(user: Optional[Dict[str, Any]], db=None) -> Dict
             except Exception as exc:
                 import logging
 
-                logging.getLogger(__name__).error(f"Failed loading Alpaca portfolio data: {exc}")
+                logging.getLogger(__name__).error(
+                    f"Failed loading Alpaca portfolio data for account {alpaca_account_id}: {exc}"
+                )
 
     positions = [
         {
