@@ -128,6 +128,14 @@ class UserLogin(BaseModel):
     email: str
     password: str = Field(min_length=1, max_length=128)
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', v):
+            raise ValueError("Invalid email address")
+        return v
+
 class ChatMessage(BaseModel):
     message: str
     session_id: Optional[str] = None
