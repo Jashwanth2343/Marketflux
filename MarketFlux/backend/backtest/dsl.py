@@ -223,11 +223,11 @@ def evaluate(
     if op == "neq":
         return (not _is_nan(lhs)) and (not _is_nan(rhs)) and lhs != rhs
     if op == "crosses_above":
-        if any(_is_nan(x) for x in (lhs, rhs, lhs_prev or float("nan"), rhs_prev or float("nan"))):
+        if any(_is_nan(x) for x in (lhs, rhs, lhs_prev, rhs_prev)):
             return False
         return lhs_prev <= rhs_prev and lhs > rhs  # type: ignore[operator]
     if op == "crosses_below":
-        if any(_is_nan(x) for x in (lhs, rhs, lhs_prev or float("nan"), rhs_prev or float("nan"))):
+        if any(_is_nan(x) for x in (lhs, rhs, lhs_prev, rhs_prev)):
             return False
         return lhs_prev >= rhs_prev and lhs < rhs  # type: ignore[operator]
 
