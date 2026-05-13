@@ -9,7 +9,7 @@ import logging
 import uuid
 import asyncio
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict
 from datetime import datetime, timezone, timedelta
 import bcrypt
@@ -25,10 +25,11 @@ from market_data import (
     get_stock_chart, search_tickers, get_ticker_news,
     get_rich_stock_data, get_price_analysis,
     filter_stocks_from_universe, search_all_stocks,
-    get_heatmap_data
+    get_heatmap_data, sanitize_for_json
 )
 from ai_service import (
-    generate_summary, ai_chat, ai_screen_stocks, generate_screener_summary, rebalance_portfolio
+    generate_summary, ai_chat, ai_screen_stocks, generate_screener_summary, rebalance_portfolio,
+    get_gemini_model
 )
 from agent_router import run_agent_pipeline
 
@@ -84,18 +85,14 @@ app = FastAPI()
 app.add_middleware(LimitRequestSizeMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000').split(','),
+    allow_origins=[o.strip() for o in os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def warmup_models():
-    asyncio.create_task(_warmup_finbert())
-
 async def _warmup_finbert():
-    await asyncio.sleep(5)  # Let server finish starting first
+    await asyncio.sleep(5)
     from ai_service import _get_sentiment_pipeline
     await asyncio.to_thread(_get_sentiment_pipeline)
     logger.info("FinBERT pre-warmed and ready")
@@ -116,12 +113,20 @@ logger = logging.getLogger(__name__)
 # ===== Models =====
 class UserRegister(BaseModel):
     email: str
-    password: str
-    name: str
+    password: str = Field(min_length=8, max_length=128)
+    name: str = Field(min_length=1, max_length=100)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', v):
+            raise ValueError("Invalid email address")
+        return v
 
 class UserLogin(BaseModel):
     email: str
-    password: str
+    password: str = Field(min_length=1, max_length=128)
 
 class ChatMessage(BaseModel):
     message: str
@@ -220,8 +225,9 @@ async def check_and_increment_ai_usage(request: Request) -> bool:
     if minute_doc and minute_doc.get("count", 0) > 30:
         return False
 
-    # 2. Daily limit
-    daily_key = client_ip
+    # 2. Daily limit — key includes today's date so the counter resets each day
+    current_day = now_utc.strftime("%Y-%m-%d")
+    daily_key = f"{client_ip}_day_{current_day}"
     daily_doc = await db.ai_usage.find_one_and_update(
         {"ip": daily_key},
         {
@@ -461,6 +467,7 @@ async def stock_rich(ticker: str, response: Response):
         stock_data["period_high"] = analysis.get("period_high", 0)
         stock_data["period_low"] = analysis.get("period_low", 0)
         stock_data["current_vs_high_pct"] = analysis.get("current_vs_high_pct", 0)
+        stock_data = sanitize_for_json(stock_data)
         redis_cache_set(cache_key, stock_data, ttl=60)
         response.headers["X-Cache"] = "MISS"
         return stock_data
@@ -469,11 +476,6 @@ async def stock_rich(ticker: str, response: Response):
     except Exception as e:
         logger.error(f"Rich stock error for {ticker}: {e}", exc_info=True)
         raise HTTPException(500, f"Error processing request for {ticker}")
-    finally:
-        # Final safety cleanup for any non-serializable numbers
-        from market_data import sanitize_for_json
-        if 'stock_data' in locals():
-            return sanitize_for_json(stock_data)
 
 @api_router.get("/market/stock/{ticker}/analysis")
 async def stock_analysis(ticker: str, days: int = 90):
@@ -825,9 +827,10 @@ async def ai_usage(request: Request):
         return {"remaining": -1, "unlimited": True}
     client_ip = request.client.host if request.client else "unknown"
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    usage = await db.ai_usage.find_one({"ip": client_ip, "date": today}, {"_id": 0})
+    daily_key = f"{client_ip}_day_{today}"
+    usage = await db.ai_usage.find_one({"ip": daily_key}, {"_id": 0})
     count = usage.get("count", 0) if usage else 0
-    return {"remaining": max(0, 3 - count), "unlimited": False}
+    return {"remaining": max(0, 50 - count), "unlimited": False}
 
 @api_router.post("/ai/summarize")
 async def ai_summarize(request: Request):
@@ -917,17 +920,19 @@ async def portfolio_prices(tickers: str = "", response: Response = None):
             response.headers["X-Cache"] = "HIT"
         return cached
 
-    prices = {}
-    for t in ticker_list:
+    async def _fetch_price(t):
         try:
             info = await get_stock_info(t)
-            prices[t] = {
+            return t, {
                 "price": info.get("price", 0),
                 "change": info.get("change", 0),
                 "change_percent": info.get("change_percent", 0),
             }
         except Exception:
-            prices[t] = {"price": 0, "change": 0, "change_percent": 0}
+            return t, {"price": 0, "change": 0, "change_percent": 0}
+
+    results = await asyncio.gather(*[_fetch_price(t) for t in ticker_list])
+    prices = dict(results)
 
     redis_cache_set(cache_key, prices, ttl=60)
     if response:
@@ -982,9 +987,7 @@ Data:
 - Recent Headlines: {'; '.join(headlines) if headlines else 'No recent news'}
 """
 
-        import google.generativeai as genai
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = get_gemini_model()
         ai_response = model.generate_content(prompt)
         digest_text = ai_response.text
 
@@ -1019,16 +1022,13 @@ async def parse_portfolio_image(file: UploadFile = File(...)):
     if len(contents) > 5 * 1024 * 1024:
         raise HTTPException(413, "Image must be under 5MB")
 
-    import google.generativeai as genai
     import base64
     import json
-    import os
     try:
         b64_image = base64.b64encode(contents).decode("utf-8")
         mime_type = file.content_type  # e.g. "image/png"
-        
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        model = get_gemini_model()
         response = model.generate_content([
             {
                 "mime_type": mime_type,
@@ -1067,9 +1067,7 @@ async def ai_follow_up(request: Request):
         return {"questions": []}
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = get_gemini_model()
 
         prompt = f"""Given this conversation context and the last response about {topic}, suggest 3 short follow-up questions a retail investor would ask. Return ONLY a JSON array of 3 strings, no explanation. Example: ["What is the earnings date?", "How does this compare to last year?", "What are the main risks?"]
 
@@ -1098,14 +1096,15 @@ async def get_watchlist(request: Request):
         raise HTTPException(401, "Login required")
     watchlist = await db.watchlists.find_one({"user_id": user["user_id"]}, {"_id": 0})
     tickers = (watchlist or {}).get("tickers", [])
-    stocks = []
-    for ticker in tickers:
+
+    async def _safe_stock_info(t):
         try:
-            info = await get_stock_info(ticker)
-            stocks.append(info)
+            return await get_stock_info(t)
         except Exception:
-            stocks.append({"symbol": ticker, "price": 0, "change_percent": 0})
-    return {"tickers": tickers, "stocks": stocks}
+            return {"symbol": t, "price": 0, "change_percent": 0}
+
+    stocks = await asyncio.gather(*[_safe_stock_info(t) for t in tickers])
+    return {"tickers": tickers, "stocks": list(stocks)}
 
 @api_router.post("/watchlist")
 async def add_to_watchlist(data: WatchlistAdd, request: Request):
@@ -1285,6 +1284,9 @@ async def stream_research_memo(ticker: str, request: Request):
 @api_router.get("/research/memo/history")
 async def get_research_history(request: Request):
     """Get list of previously generated research memos."""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Login required to view research history")
     memos = await db.research_memos.find(
         {}, {"_id": 0, "symbol": 1, "name": 1, "signal_score": 1, "signal_label": 1, "created_at": 1}
     ).sort("created_at", -1).limit(20).to_list(20)
@@ -1564,6 +1566,12 @@ async def startup():
     except Exception:
         pass
 
+    # TTL index on ai_usage so daily/minute counters auto-expire after 48 hours
+    try:
+        await db.ai_usage.create_index("date", expireAfterSeconds=172800)
+    except Exception:
+        pass
+
     try:
         from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
 
@@ -1576,6 +1584,7 @@ async def startup():
         logger.warning(f"Postgres pool initialization failed: {exc}")
 
     asyncio.create_task(periodic_news_fetch())
+    asyncio.create_task(_warmup_finbert())
     logger.info("MarketFlux backend started")
 
 @app.on_event("shutdown")
