@@ -1096,12 +1096,14 @@ async def get_watchlist(request: Request):
         raise HTTPException(401, "Login required")
     watchlist = await db.watchlists.find_one({"user_id": user["user_id"]}, {"_id": 0})
     tickers = (watchlist or {}).get("tickers", [])
+    semaphore = asyncio.Semaphore(10)
 
     async def _safe_stock_info(t):
-        try:
-            return await get_stock_info(t)
-        except Exception:
-            return {"symbol": t, "price": 0, "change_percent": 0}
+        async with semaphore:
+            try:
+                return await get_stock_info(t)
+            except Exception:
+                return {"symbol": t, "price": 0, "change_percent": 0}
 
     stocks = await asyncio.gather(*[_safe_stock_info(t) for t in tickers])
     return {"tickers": tickers, "stocks": list(stocks)}
