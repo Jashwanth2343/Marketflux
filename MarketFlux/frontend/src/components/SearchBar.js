@@ -108,7 +108,7 @@ export default function SearchBar({ variant = 'default', className = '' }) {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (selectedIdx >= 0 && results[selectedIdx]) {
-        handleSelect(results[selectedIdx].symbol);
+        handleSelect(results[selectedIdx]);
       } else if (query.trim()) {
         handleSelect(query.trim().toUpperCase());
       }

@@ -30,14 +30,12 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
-    localStorage.setItem('mf_token', res.data.token);
     setUser(res.data.user);
     return res.data;
   };
 
   const register = async (email, password, name) => {
     const res = await api.post('/auth/register', { email, password, name });
-    localStorage.setItem('mf_token', res.data.token);
     setUser(res.data.user);
     return res.data;
   };
@@ -46,7 +44,6 @@ export function AuthProvider({ children }) {
     try {
       await api.post('/auth/logout');
     } catch {}
-    localStorage.removeItem('mf_token');
     setUser(null);
   };
 

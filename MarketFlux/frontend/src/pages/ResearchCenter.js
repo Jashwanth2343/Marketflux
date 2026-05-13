@@ -156,11 +156,8 @@ function ResearchMemoPanel({ ticker }) {
     setDone(false);
     setError(null);
 
-    const token = localStorage.getItem('mf_token');
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-
     try {
-      const response = await fetch(`${API_BASE}/api/research/memo/${ticker}/stream`, { headers, credentials: 'include' });
+      const response = await fetch(`${API_BASE}/api/research/memo/${ticker}/stream`, { credentials: 'include' });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         setError(errData.detail || 'Failed to start memo stream');
