@@ -88,12 +88,9 @@ def build_backtest_router(get_current_user: Callable[[Request], Any]) -> APIRout
 
     @router.post("/run")
     async def run(payload: BacktestRequest, request: Request):
-        # Auth is best-effort: if a user is signed in we attribute the run; if not,
-        # the endpoint is still callable for local research / agent use.
-        try:
-            await get_current_user(request)
-        except Exception:
-            pass
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to run backtests")
 
         try:
             result = await asyncio.to_thread(
@@ -113,10 +110,9 @@ def build_backtest_router(get_current_user: Callable[[Request], Any]) -> APIRout
 
     @router.post("/walk-forward")
     async def walk_forward(payload: WalkForwardRequest, request: Request):
-        try:
-            await get_current_user(request)
-        except Exception:
-            pass
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to run walk-forward analysis")
 
         try:
             return await asyncio.to_thread(

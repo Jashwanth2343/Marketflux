@@ -128,15 +128,28 @@ def run_walk_forward(
     oos_equity_segments: List[pd.Series] = []
     oos_trades: List[dict] = []
 
+    # Compute max indicator lookback so OOS folds get warm indicators
+    max_lookback = max((ind.get("period", 20) for ind in strat.indicators.values()), default=0)
+    warmup_days = int(max_lookback * 1.5) + 10  # pad for weekends/holidays
+
     for w in windows:
         train_data = _slice_window(data, w.train_start, w.train_end)
-        test_data = _slice_window(data, w.test_start, w.test_end)
+
+        # Include warmup bars before the test window so indicators are primed
+        warmup_start = (pd.Timestamp(w.test_start) - pd.Timedelta(days=warmup_days)).strftime("%Y-%m-%d")
+        test_data_extended = _slice_window(data, warmup_start, w.test_end)
+        test_result_extended = run_engine(strat, data=test_data_extended, initial_capital=initial_capital, costs=cost_model)
+
+        # Trim results to only the OOS period
+        test_start_ts = pd.Timestamp(w.test_start)
+        oos_equity = test_result_extended.equity_curve.loc[test_result_extended.equity_curve.index >= test_start_ts]
+        oos_fold_trades = [t for t in test_result_extended.trades if pd.Timestamp(t.exit_date) >= test_start_ts]
 
         train_result = run_engine(strat, data=train_data, initial_capital=initial_capital, costs=cost_model)
-        test_result = run_engine(strat, data=test_data, initial_capital=initial_capital, costs=cost_model)
+        test_result = test_result_extended
 
         train_metrics = compute_metrics(train_result.equity_curve, [t.as_dict() for t in train_result.trades])
-        test_metrics = compute_metrics(test_result.equity_curve, [t.as_dict() for t in test_result.trades])
+        test_metrics = compute_metrics(oos_equity, [t.as_dict() for t in oos_fold_trades])
 
         fold_results.append(
             {
@@ -147,15 +160,15 @@ def run_walk_forward(
                 },
                 "test": {
                     "metrics": test_metrics.as_dict(),
-                    "num_trades": len(test_result.trades),
-                    "trades": [t.as_dict() for t in test_result.trades],
+                    "num_trades": len(oos_fold_trades),
+                    "trades": [t.as_dict() for t in oos_fold_trades],
                 },
             }
         )
 
-        if not test_result.equity_curve.empty:
-            oos_equity_segments.append(test_result.equity_curve)
-        for t in test_result.trades:
+        if not oos_equity.empty:
+            oos_equity_segments.append(oos_equity)
+        for t in oos_fold_trades:
             oos_trades.append(t.as_dict())
 
     aggregate_metrics = _stitch_oos_metrics(oos_equity_segments, oos_trades, initial_capital)
@@ -201,7 +214,9 @@ def _stitch_oos_metrics(
     for seg in segments:
         if seg.empty:
             continue
-        seg_returns = seg.pct_change().fillna(seg.iloc[0] / initial_capital - 1.0)
+        seg_returns = seg.pct_change()
+        # First bar of each segment: compute return relative to running equity
+        seg_returns.iloc[0] = seg.iloc[0] / running - 1.0
         for ts, ret in seg_returns.items():
             running = running * (1.0 + float(ret))
             stitched_values.append(running)

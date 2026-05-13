@@ -198,6 +198,7 @@ def run_engine(
                     continue
                 ref_open = float(row.get("open", float("nan")))
                 if ref_open != ref_open or ref_open <= 0:  # NaN or non-positive
+                    still_pending.append(order)
                     continue
                 if order["side"] == "buy":
                     fill = costs.fill_price(ref_open, "buy")
