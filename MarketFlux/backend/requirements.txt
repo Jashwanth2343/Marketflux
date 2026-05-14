@@ -14,6 +14,7 @@ pydantic>=2.9.0
 feedparser>=6.0.11
 sentence-transformers>=3.3.0
 numpy>=2.1.0
+pandas>=2.2.0
 duckduckgo-search>=6.3.0
 redis>=5.2.0
 python-multipart>=0.0.12

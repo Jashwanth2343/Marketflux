@@ -24,6 +24,25 @@ async def initialize_indexes(db):
         await db.research_runs.create_index([("owner_user_id", 1), ("created_at", -1)], background=True)
         await db.strategy_runs.create_index([("owner_user_id", 1), ("created_at", -1)], background=True)
 
+        # Pilot subsystem indexes
+        await db.pilot_personalities.create_index("id", unique=True, background=True)
+        await db.pilot_personalities.create_index("user_id", background=True)
+        await db.pilot_trade_proposals.create_index("id", unique=True, background=True)
+        await db.pilot_trade_proposals.create_index(
+            [("user_id", 1), ("status", 1), ("created_at", -1)], background=True
+        )
+        await db.pilot_audit_events.create_index(
+            [("proposal_id", 1), ("timestamp", 1)], background=True
+        )
+        await db.pilot_activity_events.create_index(
+            [("personality_id", 1), ("timestamp", -1)], background=True
+        )
+        # 30-day TTL on activity feed so it doesn't grow unbounded
+        await db.pilot_activity_events.create_index(
+            "timestamp", expireAfterSeconds=2592000, background=True
+        )
+        await db.pilot_user_consent.create_index("user_id", unique=True, background=True)
+
         logger.info("All MongoDB indexes initialized successfully.")
     except Exception as e:
         logger.warning(f"Error initializing indexes: {e}")
