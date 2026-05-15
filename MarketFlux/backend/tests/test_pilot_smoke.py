@@ -45,6 +45,13 @@ from vnext.pilot.trade_proposals import (
     TradeProposal,
     default_expiry_iso,
 )
+from vnext.pilot.reflection import (
+    _parse_journal_output,
+    _template_summary,
+    _template_lessons,
+    JOURNAL_COLLECTION,
+    DRIFT_COLLECTION,
+)
 
 
 # ===========================================================================
@@ -258,6 +265,69 @@ def test_default_expiry_is_in_the_future():
 
 
 # ===========================================================================
+# reflection tests (pure functions only — no Mongo, no LLM, no network)
+# ===========================================================================
+def test_reflection_collections_are_named():
+    assert JOURNAL_COLLECTION == "pilot_journal"
+    assert DRIFT_COLLECTION == "pilot_drift_flags"
+
+
+def test_journal_parser_extracts_three_sections():
+    raw = (
+        "SUMMARY: Bought 3 names today and rejected 2.\n"
+        "Was wrong on AMD by 30 minutes.\n"
+        "LESSONS: Wait for the 50d break, not the pre-break.\n"
+        "WATCHLIST: NVDA, MSFT, AAPL, tsla"
+    )
+    summary, lessons, watch = _parse_journal_output(raw)
+    assert "Bought 3 names today" in summary
+    assert "wrong on AMD" in summary
+    assert "50d break" in lessons
+    assert watch == ["NVDA", "MSFT", "AAPL", "TSLA"]
+
+
+def test_journal_parser_handles_no_labels():
+    # If the LLM ignores the format, we still return *something* useful.
+    raw = "Today was quiet. Held positions and watched for setups."
+    summary, lessons, watch = _parse_journal_output(raw)
+    assert "Today was quiet" in summary
+    assert lessons == ""
+    assert watch == []
+
+
+def test_journal_parser_rejects_empty():
+    raised = False
+    try:
+        _parse_journal_output("")
+    except ValueError:
+        raised = True
+    assert raised, "Empty LLM output must raise ValueError so the caller falls back to the template."
+
+
+def test_template_summary_mentions_name_and_tickers():
+    stats = {
+        "proposals_today": 4,
+        "executed": 2,
+        "rejected": 1,
+        "expired": 1,
+        "tickers_traded": ["NVDA", "AAPL"],
+    }
+    out = _template_summary("Atlas", stats, {"momentum": 42.0, "value": -5.0})
+    assert "Atlas" in out and "NVDA" in out and "AAPL" in out
+
+
+def test_template_lessons_calls_out_weakest_category():
+    stats = {"proposals_today": 1, "executed": 1, "rejected": 0, "expired": 0}
+    out = _template_lessons(stats, {"momentum": 30, "sentiment": -25})
+    assert "sentiment" in out
+
+
+def test_template_lessons_handles_no_attribution():
+    out = _template_lessons({"executed": 0}, {})
+    assert "No fills" in out
+
+
+# ===========================================================================
 # Minimal test runner so this works without pytest
 # ===========================================================================
 def pytest_approx(value, tol=1e-3):
@@ -281,6 +351,13 @@ def _run_all():
         test_proposal_construction_and_defaults,
         test_proposal_rejects_bad_side_and_qty,
         test_default_expiry_is_in_the_future,
+        test_reflection_collections_are_named,
+        test_journal_parser_extracts_three_sections,
+        test_journal_parser_handles_no_labels,
+        test_journal_parser_rejects_empty,
+        test_template_summary_mentions_name_and_tickers,
+        test_template_lessons_calls_out_weakest_category,
+        test_template_lessons_handles_no_attribution,
     ]
     passed = 0
     failed = []

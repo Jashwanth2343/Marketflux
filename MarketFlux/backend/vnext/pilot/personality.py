@@ -109,6 +109,8 @@ class Personality:
     user_notes: List[str] = field(default_factory=list)
     avatar_glyph: str = "circle"          # UI hint
     accent_color: str = "#22c55e"         # UI hint (tailwind green-500)
+    public_visibility: bool = False       # opt-in to public leaderboard / profile
+    public_slug: Optional[str] = None     # url-friendly slug; auto-derived on opt-in
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     is_seed: bool = False
@@ -147,6 +149,8 @@ class Personality:
             user_notes=list(data.get("user_notes") or []),
             avatar_glyph=str(data.get("avatar_glyph", "circle")),
             accent_color=str(data.get("accent_color", "#22c55e")),
+            public_visibility=bool(data.get("public_visibility", False)),
+            public_slug=data.get("public_slug"),
             created_at=str(data.get("created_at") or datetime.now(timezone.utc).isoformat()),
             updated_at=str(data.get("updated_at") or datetime.now(timezone.utc).isoformat()),
             is_seed=bool(data.get("is_seed", False)),
@@ -416,6 +420,34 @@ async def apply_user_override(
         personality.user_notes.append(f"{datetime.now(timezone.utc).isoformat()} | {user_note}")
         personality.user_notes = personality.user_notes[-50:]  # cap to last 50
     return await upsert_personality(db, personality)
+
+
+async def set_visibility(
+    db: Any,
+    personality_id: str,
+    public: bool,
+) -> Optional[Personality]:
+    """Toggle whether this personality is visible on the public leaderboard.
+    Generates a slug on the first opt-in; preserves it across toggles."""
+    personality = await get_personality(db, personality_id)
+    if personality is None:
+        return None
+    personality.public_visibility = bool(public)
+    if public and not personality.public_slug:
+        base = "".join(c.lower() if c.isalnum() else "-" for c in personality.name).strip("-")
+        if not base:
+            base = "pilot"
+        personality.public_slug = f"{base}-{personality.id[:6]}"
+    return await upsert_personality(db, personality)
+
+
+async def get_personality_by_slug(db: Any, slug: str) -> Optional[Personality]:
+    coll = db[PERSONALITY_COLLECTION]
+    doc = await coll.find_one({"public_slug": slug, "public_visibility": True})
+    if not doc:
+        return None
+    doc.pop("_id", None)
+    return Personality.from_dict(doc)
 
 
 async def clone_seed_for_user(db: Any, seed_id: str, user_id: str, new_name: Optional[str] = None) -> Optional[Personality]:

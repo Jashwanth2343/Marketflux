@@ -9,6 +9,7 @@ Exposes:
   with full audit log.
 - pilot_engine: orchestrator that wires signals, risk, policy, swarm debate,
   NemoClaw sandbox transport, and Alpaca paper execution.
+- reflection: nightly journal + thesis drift detector + leaderboard ranking.
 """
 
 from .strategy_dsl import (
@@ -22,10 +23,12 @@ from .personality import (
     PersonalityRiskPolicy,
     SEED_PERSONALITIES,
     get_personality,
+    get_personality_by_slug,
     list_personalities,
     upsert_personality,
     delete_personality,
     set_paused,
+    set_visibility,
     apply_user_override,
 )
 from .trade_proposals import (
@@ -37,6 +40,16 @@ from .trade_proposals import (
     update_proposal_status,
     expire_overdue_proposals,
 )
+from .reflection import (
+    JOURNAL_COLLECTION,
+    DRIFT_COLLECTION,
+    generate_journal_entry,
+    list_journal_entries,
+    detect_thesis_drift,
+    list_drift_flags,
+    compute_leaderboard,
+    run_nightly_reflection,
+)
 
 __all__ = [
     "StrategySpec",
@@ -47,10 +60,12 @@ __all__ = [
     "PersonalityRiskPolicy",
     "SEED_PERSONALITIES",
     "get_personality",
+    "get_personality_by_slug",
     "list_personalities",
     "upsert_personality",
     "delete_personality",
     "set_paused",
+    "set_visibility",
     "apply_user_override",
     "TradeProposal",
     "ProposalStatus",
@@ -59,4 +74,12 @@ __all__ = [
     "list_proposals",
     "update_proposal_status",
     "expire_overdue_proposals",
+    "JOURNAL_COLLECTION",
+    "DRIFT_COLLECTION",
+    "generate_journal_entry",
+    "list_journal_entries",
+    "detect_thesis_drift",
+    "list_drift_flags",
+    "compute_leaderboard",
+    "run_nightly_reflection",
 ]

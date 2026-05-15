@@ -8,22 +8,34 @@ no live-trading switch in this release. Do not add one.
 
 **Backend** (Python / FastAPI):
 - `backend/vnext/pilot/strategy_dsl.py` — JSON DSL + deterministic compiler.
-- `backend/vnext/pilot/personality.py` — Atlas / Sage / Vega + Mongo CRUD.
+- `backend/vnext/pilot/personality.py` — Atlas / Sage / Vega + Mongo CRUD +
+  public visibility + slug-keyed lookups.
 - `backend/vnext/pilot/trade_proposals.py` — proposal lifecycle + audit log.
 - `backend/vnext/pilot/pilot_engine.py` — orchestrator wiring signal_engine,
   risk_engine, strategy_swarm, policy_engine, mirofish_bridge, nemoclaw_bridge,
   alpaca_client.
-- `backend/vnext/pilot_router.py` — 20 endpoints under `/api/pilot`.
-- `backend/tests/test_pilot_smoke.py` — 12 unit tests, all passing on a
+- `backend/vnext/pilot/reflection.py` — nightly journal generator + thesis
+  drift detector + leaderboard ranking. LLM-backed via StrategyLLMRouter when
+  NIM/OpenRouter are configured; deterministic template fallback otherwise.
+- `backend/vnext/pilot_router.py` — 23 endpoints under `/api/pilot` (including
+  `/journal`, `/drift`, `/visibility`, `/leaderboard`, `/public/{slug}`).
+- Background tasks in `server.py`: `pilot_expire_sweep` (every 5 min) and
+  `pilot_nightly_reflection_loop` (once daily after 22:00 UTC).
+- `backend/tests/test_pilot_smoke.py` — 19 unit tests, all passing on a
   no-network / no-Mongo env.
 
 **Frontend** (React 19 / shadcn / Tailwind):
 - `frontend/src/pages/Pilot.js` — 3-column page (personalities · live activity · approval queue).
-- `frontend/src/components/pilot/*` — debate transcript, glass-box trade, kill switch, onboarding.
+- `frontend/src/pages/PilotLeaderboard.js` — public leaderboard at `/pilot/leaderboard`.
+- `frontend/src/pages/PilotPublicProfile.js` — public personality profile at
+  `/pilot/p/:slug` (anonymous-readable).
+- `frontend/src/components/pilot/*` — debate transcript, glass-box trade,
+  kill switch, onboarding, journal panel, drift badge.
 
 **Mongo collections** (created on first use):
 - `pilot_personalities`, `pilot_trade_proposals`, `pilot_audit_events`,
-  `pilot_activity_events`, `pilot_user_consent`.
+  `pilot_activity_events`, `pilot_user_consent`, `pilot_journal`,
+  `pilot_drift_flags`.
 
 ## 1. Environment variables
 

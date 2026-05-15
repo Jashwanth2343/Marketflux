@@ -40,6 +40,8 @@ from .pilot.personality import (
     SYSTEM_USER_ID,
     clone_seed_for_user,
     ensure_seed_personalities,
+    get_personality_by_slug,
+    set_visibility,
 )
 from .pilot.trade_proposals import (
     AUDIT_COLLECTION,
@@ -47,6 +49,13 @@ from .pilot.trade_proposals import (
     list_audit_events_for_proposal,
     list_proposals,
     update_proposal_status,
+)
+from .pilot.reflection import (
+    compute_leaderboard,
+    detect_thesis_drift,
+    generate_journal_entry,
+    list_drift_flags,
+    list_journal_entries,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +111,10 @@ class ConsentRequest(BaseModel):
 class ProposeRequest(BaseModel):
     max_candidates: int = Field(default=5, ge=1, le=20)
     dry_run: bool = Field(default=False)
+
+
+class VisibilityRequest(BaseModel):
+    public: bool
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +459,88 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
         await require_user(request)
         items = await list_activity_events(db, personality_id=personality_id, limit=min(limit, 200))
         return {"items": items}
+
+    # ------------------------------------------------------------------
+    # Reflection: journal + drift
+    # ------------------------------------------------------------------
+    @router.get("/personalities/{personality_id}/journal")
+    async def journal_list(personality_id: str, request: Request, limit: int = 30):
+        await require_user(request)
+        items = await list_journal_entries(db, personality_id=personality_id, limit=min(limit, 90))
+        return {"items": items}
+
+    @router.post("/personalities/{personality_id}/journal/generate")
+    async def journal_generate(personality_id: str, request: Request):
+        """On-demand journal generation (admin / debug). Idempotent per UTC date."""
+        user = await require_user(request)
+        await _require_consent(user["user_id"])
+        entry = await generate_journal_entry(db, personality_id)
+        if entry is None:
+            raise HTTPException(404, "Personality not found.")
+        return {"item": entry}
+
+    @router.get("/personalities/{personality_id}/drift")
+    async def drift_list(personality_id: str, request: Request):
+        await require_user(request)
+        items = await list_drift_flags(db, personality_id=personality_id)
+        return {"items": items}
+
+    @router.post("/personalities/{personality_id}/drift/check")
+    async def drift_check_now(personality_id: str, request: Request):
+        user = await require_user(request)
+        await _require_consent(user["user_id"])
+        flags = await detect_thesis_drift(db, personality_id)
+        return {"items": flags}
+
+    # ------------------------------------------------------------------
+    # Visibility + public leaderboard + public profile
+    # ------------------------------------------------------------------
+    @router.post("/personalities/{personality_id}/visibility")
+    async def visibility_toggle(personality_id: str, request: Request, payload: VisibilityRequest):
+        user = await require_user(request)
+        existing = await get_personality(db, personality_id)
+        if not existing:
+            raise HTTPException(404, "Personality not found.")
+        if existing.is_seed or existing.user_id == SYSTEM_USER_ID:
+            raise HTTPException(403, "Seed personalities are always public; can't toggle.")
+        if existing.user_id != user["user_id"]:
+            raise HTTPException(403, "Not your personality.")
+        updated = await set_visibility(db, personality_id, payload.public)
+        return {"item": updated.to_dict() if updated else None}
+
+    @router.get("/leaderboard")
+    async def leaderboard(days: int = 30, limit: int = 20):
+        """Public: anonymous browsers can hit this."""
+        days = max(1, min(days, 365))
+        limit = max(1, min(limit, 100))
+        rows = await compute_leaderboard(db, days=days, limit=limit, include_private=False)
+        return {
+            "items": rows,
+            "window_days": days,
+            "disclaimer": (
+                "Paper trading only. Past simulated performance does not predict real returns."
+            ),
+        }
+
+    @router.get("/public/{slug}")
+    async def public_profile(slug: str):
+        """Public personality profile: holdings preview + recent journal + sparkline."""
+        personality = await get_personality_by_slug(db, slug)
+        if personality is None:
+            raise HTTPException(404, "Personality not found or not public.")
+        journals = await list_journal_entries(db, personality_id=personality.id, limit=14)
+        # Surface only the audit-safe fields for the public view.
+        safe_personality = personality.to_dict()
+        safe_personality.pop("user_id", None)
+        safe_personality.pop("user_notes", None)
+        return {
+            "personality": safe_personality,
+            "journals": journals,
+            "disclaimer": (
+                "Paper trading only. Not investment advice. "
+                "Past simulated performance does not predict real returns."
+            ),
+        }
 
     return router
 

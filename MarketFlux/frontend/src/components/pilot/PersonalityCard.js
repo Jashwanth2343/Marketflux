@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Loader2, Play, Pause, Copy, Zap } from 'lucide-react';
+import { Loader2, Play, Pause, Copy, Zap, BookOpen, Eye, EyeOff } from 'lucide-react';
 
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { KillSwitchButton } from '@/components/pilot/KillSwitchButton';
+import { JournalPanel } from '@/components/pilot/JournalPanel';
+import { DriftBadge } from '@/components/pilot/DriftBadge';
 
 const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
@@ -62,6 +64,8 @@ export function PersonalityCard({
   const [proposing, setProposing] = useState(false);
   const [pausing, setPausing] = useState(false);
   const [cloning, setCloning] = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
+  const [togglingVis, setTogglingVis] = useState(false);
 
   if (!personality) return null;
 
@@ -137,6 +141,35 @@ export function PersonalityCard({
       toast.error(`Could not propose trades. Backend says: ${msg}`);
     } finally {
       setProposing(false);
+    }
+  };
+
+  const toggleVisibility = async (e) => {
+    e?.stopPropagation?.();
+    if (isSeed) {
+      toast.info('Seed personalities are already public.');
+      return;
+    }
+    setTogglingVis(true);
+    try {
+      const next = !personality.public_visibility;
+      const res = await axios.post(
+        `${API}/api/pilot/personalities/${personality.id}/visibility`,
+        { public: next },
+        { withCredentials: true }
+      );
+      const updated = res?.data?.item;
+      if (updated) onUpdated?.(updated);
+      toast.success(`${personality.name} is now ${next ? 'public' : 'private'}.`);
+    } catch (err) {
+      const detail =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Unknown error';
+      toast.error(`Could not toggle visibility. Backend says: ${String(detail)}`);
+    } finally {
+      setTogglingVis(false);
     }
   };
 
@@ -234,6 +267,12 @@ export function PersonalityCard({
             {personality.universe.length} tickers
           </span>
         ) : null}
+        {personality.public_visibility ? (
+          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
+            <Eye className="w-3 h-3" /> public
+          </span>
+        ) : null}
+        <DriftBadge personalityId={personality.id} />
       </div>
 
       {/* Actions */}
@@ -261,7 +300,37 @@ export function PersonalityCard({
             {cloning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
             Clone
           </Button>
-        ) : null}
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={toggleVisibility}
+            disabled={togglingVis}
+            className="gap-1 font-mono text-xs uppercase tracking-wider"
+            title={personality.public_visibility ? 'Hide from leaderboard' : 'Show on public leaderboard'}
+          >
+            {togglingVis ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : personality.public_visibility ? (
+              <EyeOff className="w-3 h-3" />
+            ) : (
+              <Eye className="w-3 h-3" />
+            )}
+            {personality.public_visibility ? 'Private' : 'Public'}
+          </Button>
+        )}
+
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={(e) => { e.stopPropagation(); setJournalOpen(true); }}
+          className="gap-1 font-mono text-xs uppercase tracking-wider"
+        >
+          <BookOpen className="w-3 h-3" />
+          Journal
+        </Button>
 
         <KillSwitchButton
           personalityId={personality.id}
@@ -284,6 +353,12 @@ export function PersonalityCard({
           </span>
         )}
       </div>
+
+      <JournalPanel
+        open={journalOpen}
+        onOpenChange={setJournalOpen}
+        personality={personality}
+      />
     </div>
   );
 }

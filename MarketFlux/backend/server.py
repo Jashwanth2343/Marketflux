@@ -1561,6 +1561,43 @@ async def periodic_news_fetch():
         await fetch_and_store_news()
         await asyncio.sleep(600)
 
+
+async def pilot_expire_sweep():
+    """Every 5 minutes, expire any Pilot proposals past their `expires_at`.
+    Idempotent and cheap; safe to run forever."""
+    from vnext.pilot.trade_proposals import expire_overdue_proposals
+
+    while True:
+        try:
+            await expire_overdue_proposals(db)
+        except Exception as exc:
+            logger.warning(f"pilot_expire_sweep: {exc}")
+        await asyncio.sleep(300)
+
+
+async def pilot_nightly_reflection_loop():
+    """Once per UTC day around 22:00 UTC (just past US market close),
+    generate journal entries + thesis drift flags for every personality.
+    Wakes every 30 minutes and checks whether today's batch has already run.
+    Safe under restart: the journal upsert is keyed by date."""
+    from vnext.pilot.reflection import run_nightly_reflection
+
+    last_ran_date: str | None = None
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            today_iso = now.date().isoformat()
+            # Window: 22:00–23:59 UTC (post-US-close). Run once per day.
+            if now.hour >= 22 and last_ran_date != today_iso:
+                logger.info("Pilot nightly reflection: starting for %s", today_iso)
+                result = await run_nightly_reflection(db)
+                logger.info("Pilot nightly reflection: done — %s", result)
+                last_ran_date = today_iso
+        except Exception as exc:
+            logger.warning(f"pilot_nightly_reflection_loop: {exc}")
+        await asyncio.sleep(1800)
+
+
 @app.on_event("startup")
 async def startup():
     # JWT_SECRET is already validated at module load time (C1).
@@ -1595,6 +1632,8 @@ async def startup():
 
     asyncio.create_task(periodic_news_fetch())
     asyncio.create_task(_warmup_finbert())
+    asyncio.create_task(pilot_expire_sweep())
+    asyncio.create_task(pilot_nightly_reflection_loop())
     logger.info("MarketFlux backend started")
 
 @app.on_event("shutdown")
