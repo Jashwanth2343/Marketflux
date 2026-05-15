@@ -23,6 +23,9 @@ import Auth from "@/pages/Auth";
 import ResearchCenter from "@/pages/ResearchCenter";
 import MacroDashboard from "@/pages/MacroDashboard";
 import RiskConsole from "@/pages/RiskConsole";
+import Pilot from "@/pages/Pilot";
+import PilotLeaderboard from "@/pages/PilotLeaderboard";
+import PilotPublicProfile from "@/pages/PilotPublicProfile";
 import { Toaster } from "@/components/ui/sonner";
 
 class ErrorBoundary extends React.Component {
@@ -111,6 +114,9 @@ function AppRouter() {
               <Route path="/theses/:thesisId/trade-lab" element={<ThesisTradeLab />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/research" element={<ResearchCenter />} />
+              <Route path="/pilot" element={<Pilot />} />
+              <Route path="/pilot/leaderboard" element={<PilotLeaderboard />} />
+              <Route path="/pilot/p/:slug" element={<PilotPublicProfile />} />
               <Route path="/macro" element={<MacroDashboard />} />
               <Route path="/risk" element={<RiskConsole />} />
             </Routes>

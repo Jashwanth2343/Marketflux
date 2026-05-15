@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, TerminalSquare, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield, BookOpenText } from 'lucide-react';
+import { Activity, LayoutDashboard, Newspaper, Search, Briefcase, TerminalSquare, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Globe, Shield, BookOpenText, Plane, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -11,6 +11,8 @@ const navItems = [
     { path: '/news', icon: Newspaper, label: 'News Feed' },
     { path: '/screener', icon: Search, label: 'AI Screener' },
     { path: '/research', icon: Brain, label: 'Research' },
+    { path: '/pilot', icon: Plane, label: 'Pilot' },
+    { path: '/pilot/leaderboard', icon: Trophy, label: 'Leaderboard' },
     { path: '/macro', icon: Globe, label: 'Macro' },
     { path: '/risk', icon: Shield, label: 'Risk' },
     { path: '/portfolio', icon: Briefcase, label: 'Portfolio' },
@@ -62,6 +64,8 @@ export default function TopNav() {
 
     const isActive = (path) => {
         if (path === '/') return location.pathname === '/';
+        // /pilot must not light up when we're on /pilot/leaderboard or /pilot/p/<slug>.
+        if (path === '/pilot') return location.pathname === '/pilot';
         return location.pathname === path || location.pathname.startsWith(`${path}/`);
     };
 
