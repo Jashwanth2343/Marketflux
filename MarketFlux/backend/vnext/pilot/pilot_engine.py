@@ -92,6 +92,16 @@ def _alpaca_get_account():
     return get_account
 
 
+def _alpaca_list_orders():
+    from vnext.alpaca_client import list_orders  # type: ignore
+    return list_orders
+
+
+def _alpaca_get_positions():
+    from vnext.alpaca_client import get_positions  # type: ignore
+    return get_positions
+
+
 # ---------------------------------------------------------------------------
 # Imports from the pilot subpackage
 # ---------------------------------------------------------------------------
@@ -110,6 +120,81 @@ from .trade_proposals import (
 # Mongo collection for ad-hoc "agent thoughts" feed (the live activity stream
 # the UI shows on the middle column).
 ACTIVITY_COLLECTION = "pilot_activity_events"
+
+
+def _as_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _policy_context_from_executed_proposals(
+    proposals: List[TradeProposal],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    open_trades: List[Dict[str, Any]] = []
+    portfolio_holdings: List[Dict[str, Any]] = []
+    for p in proposals:
+        if p.side != "buy":
+            continue
+        qty = _as_float(p.fill_qty if p.fill_qty is not None else p.qty)
+        price = _as_float(p.fill_price if p.fill_price is not None else p.quote_price)
+        ticker = (p.ticker or "").upper()
+        if qty <= 0 or price <= 0 or not ticker:
+            continue
+        open_trades.append({"ticker": ticker, "size": qty, "entry_price": price, "status": "open"})
+        portfolio_holdings.append({"ticker": ticker, "shares": qty, "avg_price": price})
+    return open_trades, portfolio_holdings
+
+
+def _policy_context_from_alpaca(
+    *,
+    positions: List[Dict[str, Any]],
+    open_orders: List[Dict[str, Any]],
+    fallback_price: float,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    open_trades: List[Dict[str, Any]] = []
+    portfolio_holdings: List[Dict[str, Any]] = []
+
+    for pos in positions:
+        ticker = str(pos.get("symbol") or "").upper()
+        qty = _as_float(pos.get("qty"))
+        entry_price = _as_float(pos.get("avg_entry_price")) or _as_float(pos.get("current_price"))
+        if not ticker or qty <= 0 or entry_price <= 0:
+            continue
+        open_trades.append({"ticker": ticker, "size": qty, "entry_price": entry_price, "status": "open"})
+        portfolio_holdings.append({"ticker": ticker, "shares": qty, "avg_price": entry_price})
+
+    for order in open_orders:
+        ticker = str(order.get("symbol") or "").upper()
+        qty = _as_float(order.get("qty"))
+        filled_qty = _as_float(order.get("filled_qty"))
+        remaining_qty = max(0.0, qty - filled_qty)
+        entry_price = (
+            _as_float(order.get("limit_price"))
+            or _as_float(order.get("filled_avg_price"))
+            or _as_float(fallback_price)
+        )
+        if not ticker or remaining_qty <= 0 or entry_price <= 0:
+            continue
+        open_trades.append(
+            {
+                "ticker": ticker,
+                "size": remaining_qty,
+                "entry_price": entry_price,
+                "status": "open",
+            }
+        )
+
+    return open_trades, portfolio_holdings
+
+
+def _policy_evidence_from_proposal(proposal: TradeProposal) -> List[Dict[str, Any]]:
+    derived = proposal.policy_verdict.get("derived", {}) if isinstance(proposal.policy_verdict, dict) else {}
+    confidence_score = _as_float(derived.get("confidence_score"))
+    if confidence_score > 0:
+        return [{"confidence": confidence_score}]
+    return []
 
 
 # ===========================================================================
@@ -232,17 +317,41 @@ async def execute_approved(
     # Re-evaluate policy at execution time. The world may have moved.
     try:
         evaluate_paper_trade, _ = _policy_engine_evaluate()
-        # We re-evaluate with the same inputs we recorded; if the env has gotten
-        # worse since the proposal, the user-facing reason is clear.
+        open_trades: List[Dict[str, Any]] = []
+        portfolio_holdings: List[Dict[str, Any]] = []
+        evidence_blocks = _policy_evidence_from_proposal(proposal)
+
+        executed = await list_proposals(
+            db,
+            user_id=user_id,
+            personality_id=proposal.personality_id,
+            status=ProposalStatus.EXECUTED.value,
+            limit=500,
+        )
+        open_trades, portfolio_holdings = _policy_context_from_executed_proposals(executed)
+
+        get_positions = _alpaca_get_positions()
+        list_orders = _alpaca_list_orders()
+        live_positions, live_open_orders = await asyncio.gather(
+            asyncio.to_thread(get_positions, account_id),
+            asyncio.to_thread(list_orders, account_id, "open", 200),
+        )
+        if live_positions or live_open_orders:
+            open_trades, portfolio_holdings = _policy_context_from_alpaca(
+                positions=live_positions or [],
+                open_orders=live_open_orders or [],
+                fallback_price=proposal.quote_price,
+            )
+
         live_check = evaluate_paper_trade(
             ticker=proposal.ticker,
             proposed_side=proposal.side,
             proposed_size=proposal.qty,
             current_price=proposal.quote_price,
             effective_policies=proposal.policy_verdict.get("effective_policies", {}),
-            open_trades=[],
-            evidence_blocks=[],
-            portfolio_holdings=[],
+            open_trades=open_trades,
+            evidence_blocks=evidence_blocks,
+            portfolio_holdings=portfolio_holdings,
             earnings_event=None,
         )
         if not live_check.get("allowed", True):

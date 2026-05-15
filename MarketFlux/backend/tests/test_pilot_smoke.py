@@ -45,6 +45,11 @@ from vnext.pilot.trade_proposals import (
     TradeProposal,
     default_expiry_iso,
 )
+from vnext.pilot.pilot_engine import (
+    _policy_context_from_alpaca,
+    _policy_context_from_executed_proposals,
+    _policy_evidence_from_proposal,
+)
 from vnext.pilot.reflection import (
     _parse_journal_output,
     _template_summary,
@@ -264,6 +269,53 @@ def test_default_expiry_is_in_the_future():
     assert parsed < datetime.now(timezone.utc) + timedelta(days=2)
 
 
+def test_policy_context_from_executed_proposals_uses_fill_data():
+    executed = TradeProposal(
+        id="e1",
+        user_id="u1",
+        personality_id="seed_atlas",
+        personality_name="Atlas",
+        ticker="aapl",
+        side="buy",
+        qty=10,
+        quote_price=100,
+        status=ProposalStatus.EXECUTED.value,
+        fill_qty=12,
+        fill_price=101.5,
+    )
+    open_trades, holdings = _policy_context_from_executed_proposals([executed])
+    assert open_trades == [{"ticker": "AAPL", "size": 12.0, "entry_price": 101.5, "status": "open"}]
+    assert holdings == [{"ticker": "AAPL", "shares": 12.0, "avg_price": 101.5}]
+
+
+def test_policy_context_from_alpaca_includes_positions_and_open_orders():
+    positions = [{"symbol": "MSFT", "qty": "5", "avg_entry_price": "300"}]
+    open_orders = [{"symbol": "NVDA", "qty": "3", "filled_qty": "1", "limit_price": "850"}]
+    open_trades, holdings = _policy_context_from_alpaca(
+        positions=positions,
+        open_orders=open_orders,
+        fallback_price=10,
+    )
+    assert {"ticker": "MSFT", "size": 5.0, "entry_price": 300.0, "status": "open"} in open_trades
+    assert {"ticker": "NVDA", "size": 2.0, "entry_price": 850.0, "status": "open"} in open_trades
+    assert holdings == [{"ticker": "MSFT", "shares": 5.0, "avg_price": 300.0}]
+
+
+def test_policy_evidence_from_proposal_reuses_prior_confidence():
+    p = TradeProposal(
+        id="p1",
+        user_id="u1",
+        personality_id="seed_atlas",
+        personality_name="Atlas",
+        ticker="TSLA",
+        side="buy",
+        qty=1,
+        quote_price=200,
+        policy_verdict={"derived": {"confidence_score": 77}},
+    )
+    assert _policy_evidence_from_proposal(p) == [{"confidence": 77.0}]
+
+
 # ===========================================================================
 # reflection tests (pure functions only — no Mongo, no LLM, no network)
 # ===========================================================================
@@ -351,6 +403,9 @@ def _run_all():
         test_proposal_construction_and_defaults,
         test_proposal_rejects_bad_side_and_qty,
         test_default_expiry_is_in_the_future,
+        test_policy_context_from_executed_proposals_uses_fill_data,
+        test_policy_context_from_alpaca_includes_positions_and_open_orders,
+        test_policy_evidence_from_proposal_reuses_prior_confidence,
         test_reflection_collections_are_named,
         test_journal_parser_extracts_three_sections,
         test_journal_parser_handles_no_labels,
