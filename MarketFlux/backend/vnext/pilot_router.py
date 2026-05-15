@@ -330,6 +330,17 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
     async def personalities_propose(personality_id: str, request: Request, payload: ProposeRequest):
         user = await require_user(request)
         await _require_consent(user["user_id"])
+
+        # FIX: Validate personality exists and guard cross-user proposals on
+        # non-seed personalities. Seeds remain proposable by any consenting user
+        # (they are shared templates), but a user cannot propose against another
+        # user's private personality clone.
+        p = await get_personality(db, personality_id)
+        if not p:
+            raise HTTPException(404, "Personality not found.")
+        if not p.is_seed and p.user_id != user["user_id"]:
+            raise HTTPException(403, "Not your personality.")
+
         result = await propose_trades(
             db,
             personality_id,
@@ -345,6 +356,34 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
     @router.post("/personalities/{personality_id}/kill")
     async def personalities_kill(personality_id: str, request: Request):
         user = await require_user(request)
+        # Kill switch intentionally bypasses consent check — safety must always work.
+        # FIX: For seed-based proposals the guard would block kill, so we look up
+        # the personality first: seeds allow kill by the proposal's owner (user_id
+        # on the proposal, not the personality). The _require_owned_mutable_personality
+        # helper is used only for user-owned clones.
+        p = await get_personality(db, personality_id)
+        if not p:
+            raise HTTPException(404, "Personality not found.")
+
+        if not p.is_seed:
+            # For cloned personalities, enforce ownership as before.
+            if p.user_id == SYSTEM_USER_ID:
+                raise HTTPException(403, "Cannot kill a system personality directly.")
+            if p.user_id != user["user_id"]:
+                raise HTTPException(403, "Not your personality.")
+
+        # For seed personalities, the kill targets proposals scoped to this user —
+        # emergency_stop must filter by both personality_id and user_id internally.
+
+        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "alpaca_account_id": 1})
+        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+        if alpaca_account_id is None:
+            logger.warning(
+                "personalities_kill called for user %s with no alpaca_account_id; "
+                "emergency_stop will proceed without cancelling broker orders.",
+                user["user_id"],
+            )
+
         # Kill switch must work even without prior consent — safety first.
         user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
         alpaca_account_id = (user_doc or {}).get("alpaca_account_id")

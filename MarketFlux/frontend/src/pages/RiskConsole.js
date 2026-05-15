@@ -318,38 +318,61 @@ export default function RiskConsole() {
   const betaColor = portBeta == null ? '#00F3FF' : portBeta > 1.3 ? '#F85149' : portBeta > 0.9 ? '#F0A500' : '#3FB950';
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+    <div className="min-h-screen p-4 md:p-6 space-y-5" data-testid="risk-console-page">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Shield className="w-7 h-7 text-primary" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Shield className="w-5 h-5" style={{ color: '#FF4444' }} />
           <div>
-            <h1 className="font-mono text-xl font-black tracking-tight text-foreground uppercase">Risk Console</h1>
+            <h1 className="font-mono text-xl font-bold tracking-tight text-foreground">
+              Risk <span style={{ color: '#FF4444', textShadow: '0 0 10px rgba(255,68,68,0.35)' }}>Console</span>
+            </h1>
             <p className="font-mono text-[11px] text-muted-foreground">
-              Portfolio Beta • Correlation Matrix • Stress Tests • Position Sizing
+              Beta · Correlation Matrix · Stress Tests · Position Sizing
             </p>
           </div>
         </div>
         {user && (
-          <Button onClick={analyzePortfolio} disabled={loading} variant="outline" size="sm"
-            className="font-mono text-xs uppercase tracking-wider">
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <Button
+            onClick={analyzePortfolio}
+            disabled={loading}
+            variant="ghost"
+            size="sm"
+            className="h-8 px-3 text-[11px] font-mono uppercase tracking-wider gap-1.5 transition-all"
+            style={{
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: loading ? '#FF4444' : 'rgba(255,255,255,0.4)',
+            }}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
         )}
       </div>
 
       {!user && (
-        <div className="p-6 border border-border/40 bg-card text-center mb-6">
-          <Shield className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
-          <p className="font-mono text-sm text-muted-foreground mb-1">Login required to analyze your portfolio risk</p>
-          <p className="font-mono text-xs text-muted-foreground/60">Use the single stock risk tool below without login</p>
+        <div
+          className="p-8 rounded-xl text-center"
+          style={{ border: '1px solid rgba(255,68,68,0.15)', background: 'rgba(255,68,68,0.04)' }}
+        >
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{ background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.2)' }}
+          >
+            <Shield className="w-7 h-7" style={{ color: '#FF4444' }} />
+          </div>
+          <p className="font-mono text-sm text-foreground font-semibold mb-1">Login required</p>
+          <p className="font-mono text-xs text-muted-foreground">Sign in to analyze your full portfolio risk</p>
+          <p className="font-mono text-[10px] text-muted-foreground/50 mt-1">Single stock risk tool available below without login</p>
         </div>
       )}
 
       {error && !loading && (
-        <div className="mb-4 p-3 border border-destructive/30 bg-destructive/5 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
-          <p className="font-mono text-xs text-destructive">{error}</p>
+        <div
+          className="p-3 rounded-lg flex items-center gap-2"
+          style={{ border: '1px solid rgba(255,68,68,0.25)', background: 'rgba(255,68,68,0.07)' }}
+        >
+          <AlertTriangle className="w-4 h-4 text-[#FF4444] flex-shrink-0" />
+          <p className="font-mono text-xs text-[#FF4444]">{error}</p>
         </div>
       )}
 

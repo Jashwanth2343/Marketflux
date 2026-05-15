@@ -20,26 +20,36 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.get("/overview")
     async def fundos_overview(request: Request):
         user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to view Fund OS overview.")
         return await build_fundos_overview(db, user)
 
     @router.get("/search")
     async def fundos_search(request: Request, q: str = ""):
         user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to search Fund OS.")
         return await search_fundos(db, user, q)
 
     @router.get("/strategies/queue")
     async def strategy_queue(request: Request, limit: int = 50):
         user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to view strategy queue.")
         return await build_strategy_queue(db, user, limit=max(1, min(limit, 100)))
 
     @router.get("/portfolio/paper")
     async def paper_portfolio(request: Request):
         user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to view paper portfolio.")
         return await build_paper_portfolio(user, db=db)
 
     @router.get("/audit-feed")
     async def audit_feed(request: Request, limit: int = 20):
         user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to view audit feed.")
         return await build_audit_feed(db, user, limit=max(1, min(limit, 100)))
 
     @router.post("/terminal/sessions")
