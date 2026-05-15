@@ -9,6 +9,7 @@ The router is intentionally thin: it delegates all logic to pilot/* modules.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, List, Optional
@@ -16,6 +17,7 @@ from typing import Any, Callable, List, Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from .alpaca_client import create_trading_account, is_alpaca_configured
 from .pilot import (
     Personality,
     PersonalityRiskPolicy,
@@ -129,6 +131,54 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
         if not getattr(router.state, "seeded", False):  # type: ignore[attr-defined]
             await ensure_seed_personalities(db)
             router.state.seeded = True  # type: ignore[attr-defined]
+
+    async def _require_owned_mutable_personality(personality_id: str, user_id: str) -> Personality:
+        """Return a personality only if this user may mutate it.
+
+        Seed personalities are shared system records, so user-specific controls
+        like pause/resume/override/kill must be performed on a clone instead.
+        """
+        p = await get_personality(db, personality_id)
+        if not p:
+            raise HTTPException(404, "Personality not found.")
+        if p.is_seed or p.user_id == SYSTEM_USER_ID:
+            raise HTTPException(403, "Cannot mutate a seed personality. Clone it first.")
+        if p.user_id != user_id:
+            raise HTTPException(403, "Not your personality.")
+        return p
+
+    async def _get_or_create_alpaca_account(user: dict) -> str:
+        """Get or provision the user's Alpaca paper account before approval."""
+        user_id = user["user_id"]
+        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+        if alpaca_account_id:
+            return alpaca_account_id
+
+        if not is_alpaca_configured():
+            raise HTTPException(503, "Alpaca Broker API is not configured; proposal was not approved.")
+
+        name_parts = str(user.get("name") or "").split()
+        given_name = name_parts[0] if name_parts else "Paper"
+        family_name = name_parts[-1] if len(name_parts) > 1 else "Trader"
+        email = user.get("email") or f"{user_id}@marketflux.paper"
+
+        result = await asyncio.to_thread(
+            create_trading_account,
+            given_name=given_name,
+            family_name=family_name,
+            email=email,
+        )
+        if not result or not result.get("account_id"):
+            raise HTTPException(503, "Failed to create Alpaca trading account; proposal was not approved.")
+
+        alpaca_account_id = result["account_id"]
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"alpaca_account_id": alpaca_account_id}},
+            upsert=True,
+        )
+        return alpaca_account_id
 
     # Provide a Starlette-state-like shim so we can stash a "seeded" flag.
     class _S:
@@ -280,24 +330,23 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
     async def personalities_pause(personality_id: str, request: Request):
         user = await require_user(request)
         await _require_consent(user["user_id"])
+        await _require_owned_mutable_personality(personality_id, user["user_id"])
         p = await set_paused(db, personality_id, True)
-        if not p:
-            raise HTTPException(404, "Personality not found.")
-        return {"item": p.to_dict()}
+        return {"item": p.to_dict() if p else None}
 
     @router.post("/personalities/{personality_id}/resume")
     async def personalities_resume(personality_id: str, request: Request):
         user = await require_user(request)
         await _require_consent(user["user_id"])
+        await _require_owned_mutable_personality(personality_id, user["user_id"])
         p = await set_paused(db, personality_id, False)
-        if not p:
-            raise HTTPException(404, "Personality not found.")
-        return {"item": p.to_dict()}
+        return {"item": p.to_dict() if p else None}
 
     @router.post("/personalities/{personality_id}/override")
     async def personalities_override(personality_id: str, request: Request, payload: OverrideRequest):
         user = await require_user(request)
         await _require_consent(user["user_id"])
+        await _require_owned_mutable_personality(personality_id, user["user_id"])
         p = await apply_user_override(
             db,
             personality_id,
@@ -333,6 +382,7 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
     async def personalities_kill(personality_id: str, request: Request):
         user = await require_user(request)
         # Kill switch must work even without prior consent — safety first.
+        await _require_owned_mutable_personality(personality_id, user["user_id"])
         user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
         alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
         return await emergency_stop(
@@ -390,6 +440,11 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
         if p.status != ProposalStatus.PENDING.value:
             raise HTTPException(409, f"Proposal already in terminal state: {p.status}")
 
+        # Provision the paper account before moving the proposal out of pending.
+        # If account creation fails, the user can retry approval and the proposal
+        # remains visible in the pending queue.
+        alpaca_account_id = await _get_or_create_alpaca_account(user)
+
         updated = await update_proposal_status(
             db,
             proposal_id,
@@ -398,19 +453,14 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
             reason=payload.reason,
         )
 
-        # Look up the user's Alpaca account_id and execute in the background.
-        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+        # Persist the account_id on the proposal so the audit trail is complete.
+        await db["pilot_trade_proposals"].update_one(
+            {"id": proposal_id},
+            {"$set": {"alpaca_account_id": alpaca_account_id}},
+        )
+        background.add_task(_safe_execute, db, proposal_id, user["user_id"], alpaca_account_id)
 
-        if alpaca_account_id:
-            # Persist the account_id on the proposal so the audit trail is complete
-            await db["pilot_trade_proposals"].update_one(
-                {"id": proposal_id},
-                {"$set": {"alpaca_account_id": alpaca_account_id}},
-            )
-            background.add_task(_safe_execute, db, proposal_id, user["user_id"], alpaca_account_id)
-
-        return {"item": updated.to_dict() if updated else None, "execution_dispatched": bool(alpaca_account_id)}
+        return {"item": updated.to_dict() if updated else None, "execution_dispatched": True}
 
     @router.post("/proposals/{proposal_id}/reject")
     async def proposals_reject(proposal_id: str, request: Request, payload: ProposalDecisionRequest):
