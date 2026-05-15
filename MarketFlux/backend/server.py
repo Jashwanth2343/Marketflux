@@ -125,7 +125,7 @@ class UserRegister(BaseModel):
         return v
 
 class UserLogin(BaseModel):
-    email: str
+    email: str = Field(max_length=254)
     password: str = Field(min_length=1, max_length=128)
 
     @field_validator("email")
@@ -1213,8 +1213,8 @@ async def get_quant_signals(ticker: str, request: Request, response: Response):
         response.headers["X-Cache"] = "MISS"
         return result
     except Exception as e:
-        logger.error(f"Signal computation error for {ticker}: {e}")
-        raise HTTPException(500, f"Signal computation failed: {str(e)}")
+        logger.error(f"Signal computation error for {ticker}: {e}", exc_info=True)
+        raise HTTPException(500, "Signal computation failed. Please try again.")
 
 
 @api_router.post("/research/signals/scan")
@@ -1230,8 +1230,8 @@ async def scan_signals(data: SignalScanRequest, request: Request):
         results = await scan_universe(tickers, db=db, concurrency=3)
         return {"results": results, "count": len(results)}
     except Exception as e:
-        logger.error(f"Signal scan error: {e}")
-        raise HTTPException(500, f"Signal scan failed: {str(e)}")
+        logger.error(f"Signal scan error: {e}", exc_info=True)
+        raise HTTPException(500, "Signal scan failed. Please try again.")
 
 
 # --- Research Memo Endpoints ---
@@ -1267,8 +1267,8 @@ async def generate_research_memo(data: ResearchMemoRequest, request: Request):
 
         return result
     except Exception as e:
-        logger.error(f"Research memo error for {ticker}: {e}")
-        raise HTTPException(500, f"Research memo generation failed: {str(e)}")
+        logger.error(f"Research memo error for {ticker}: {e}", exc_info=True)
+        raise HTTPException(500, "Research memo generation failed. Please try again.")
 
 
 @api_router.get("/research/memo/{ticker}/stream")
@@ -1321,8 +1321,8 @@ async def macro_dashboard(response: Response):
         response.headers["X-Cache"] = "MISS"
         return result
     except Exception as e:
-        logger.error(f"Macro dashboard error: {e}")
-        raise HTTPException(500, f"Macro dashboard failed: {str(e)}")
+        logger.error(f"Macro dashboard error: {e}", exc_info=True)
+        raise HTTPException(500, "Macro dashboard failed. Please try again.")
 
 
 # --- Risk Engine Endpoints ---
@@ -1341,8 +1341,8 @@ async def portfolio_risk_analysis(data: RiskAnalysisRequest, request: Request):
         result = await analyze_portfolio_risk(holdings_dicts, db=db)
         return result
     except Exception as e:
-        logger.error(f"Portfolio risk analysis error: {e}")
-        raise HTTPException(500, f"Risk analysis failed: {str(e)}")
+        logger.error(f"Portfolio risk analysis error: {e}", exc_info=True)
+        raise HTTPException(500, "Risk analysis failed. Please try again.")
 
 
 @api_router.get("/risk/stock/{ticker}")
@@ -1362,8 +1362,8 @@ async def stock_risk_profile(ticker: str, response: Response):
         response.headers["X-Cache"] = "MISS"
         return result
     except Exception as e:
-        logger.error(f"Stock risk profile error for {ticker}: {e}")
-        raise HTTPException(500, f"Risk profile failed: {str(e)}")
+        logger.error(f"Stock risk profile error for {ticker}: {e}", exc_info=True)
+        raise HTTPException(500, "Risk profile failed. Please try again.")
 
 
 # --- Earnings Intelligence Endpoints ---
@@ -1389,8 +1389,8 @@ async def earnings_intelligence(ticker: str, request: Request, response: Respons
         response.headers["X-Cache"] = "MISS"
         return result
     except Exception as e:
-        logger.error(f"Earnings intelligence error for {ticker}: {e}")
-        raise HTTPException(500, f"Earnings intelligence failed: {str(e)}")
+        logger.error(f"Earnings intelligence error for {ticker}: {e}", exc_info=True)
+        raise HTTPException(500, "Earnings intelligence failed. Please try again.")
 
 
 @api_router.post("/research/earnings/calendar")
@@ -1402,8 +1402,8 @@ async def earnings_calendar(data: SignalScanRequest):
         result = await get_earnings_calendar(tickers)
         return {"calendar": result}
     except Exception as e:
-        logger.error(f"Earnings calendar error: {e}")
-        raise HTTPException(500, f"Earnings calendar failed: {str(e)}")
+        logger.error(f"Earnings calendar error: {e}", exc_info=True)
+        raise HTTPException(500, "Earnings calendar failed. Please try again.")
 
 
 # --- Idea Generation / Research Ideas Endpoint ---
@@ -1437,8 +1437,8 @@ async def get_research_ideas(request: Request, response: Response):
         response.headers["X-Cache"] = "GENERATED"
         return result
     except Exception as e:
-        logger.error(f"Morning briefing error: {e}")
-        raise HTTPException(500, f"Ideas generation failed: {str(e)}")
+        logger.error(f"Morning briefing error: {e}", exc_info=True)
+        raise HTTPException(500, "Ideas generation failed. Please try again.")
 
 
 # --- Thematic Research Endpoint ---
@@ -1468,8 +1468,8 @@ async def thematic_research(data: ThematicRequest, request: Request):
         redis_cache_set(cache_key, result, ttl=3600)
         return result
     except Exception as e:
-        logger.error(f"Thematic research error: {e}")
-        raise HTTPException(500, f"Thematic research failed: {str(e)}")
+        logger.error(f"Thematic research error: {e}", exc_info=True)
+        raise HTTPException(500, "Thematic research failed. Please try again.")
 
 
 # --- Anomaly Detection Endpoint ---
@@ -1491,8 +1491,8 @@ async def market_anomalies(response: Response):
         response.headers["X-Cache"] = "MISS"
         return {"anomalies": results, "scanned": len(SP500_WATCHLIST[:50])}
     except Exception as e:
-        logger.error(f"Anomaly detection error: {e}")
-        raise HTTPException(500, f"Anomaly detection failed: {str(e)}")
+        logger.error(f"Anomaly detection error: {e}", exc_info=True)
+        raise HTTPException(500, "Anomaly detection failed. Please try again.")
 
 
 # --- Sector Rotation Endpoint ---
@@ -1513,8 +1513,8 @@ async def sector_rotation(response: Response):
         response.headers["X-Cache"] = "MISS"
         return result
     except Exception as e:
-        logger.error(f"Sector rotation error: {e}")
-        raise HTTPException(500, f"Sector rotation analysis failed: {str(e)}")
+        logger.error(f"Sector rotation error: {e}", exc_info=True)
+        raise HTTPException(500, "Sector rotation analysis failed. Please try again.")
 
 
 # ===========================================================================
