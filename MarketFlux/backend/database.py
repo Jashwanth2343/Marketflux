@@ -37,9 +37,11 @@ async def initialize_indexes(db):
         await db.pilot_activity_events.create_index(
             [("personality_id", 1), ("timestamp", -1)], background=True
         )
-        # 30-day TTL on activity feed so it doesn't grow unbounded
-        await db.pilot_activity_events.create_index(
-            "timestamp", expireAfterSeconds=2592000, background=True
+        # Do not create a TTL index on `timestamp` unless writers persist it as a BSON Date.
+        # MongoDB TTL indexes do not expire string values, so enabling TTL here would provide
+        # a false sense of retention if activity events are stored with ISO-formatted strings.
+        logger.warning(
+            "Skipping TTL index on pilot_activity_events.timestamp until the field is stored as a BSON Date."
         )
         await db.pilot_user_consent.create_index("user_id", unique=True, background=True)
 
