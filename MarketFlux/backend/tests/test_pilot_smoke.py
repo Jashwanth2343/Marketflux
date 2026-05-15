@@ -294,7 +294,6 @@ def test_policy_context_from_alpaca_includes_positions_and_open_orders():
     open_trades, holdings = _policy_context_from_alpaca(
         positions=positions,
         open_orders=open_orders,
-        fallback_price=10,
     )
     assert {"ticker": "MSFT", "size": 5.0, "entry_price": 300.0, "status": "open"} in open_trades
     assert {"ticker": "NVDA", "size": 2.0, "entry_price": 850.0, "status": "open"} in open_trades

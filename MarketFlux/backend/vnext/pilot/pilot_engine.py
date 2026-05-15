@@ -102,6 +102,11 @@ def _alpaca_get_positions():
     return get_positions
 
 
+def _alpaca_is_configured():
+    from vnext.alpaca_client import is_alpaca_configured  # type: ignore
+    return is_alpaca_configured()
+
+
 # ---------------------------------------------------------------------------
 # Imports from the pilot subpackage
 # ---------------------------------------------------------------------------
@@ -151,7 +156,6 @@ def _policy_context_from_alpaca(
     *,
     positions: List[Dict[str, Any]],
     open_orders: List[Dict[str, Any]],
-    fallback_price: float,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     open_trades: List[Dict[str, Any]] = []
     portfolio_holdings: List[Dict[str, Any]] = []
@@ -173,7 +177,6 @@ def _policy_context_from_alpaca(
         entry_price = (
             _as_float(order.get("limit_price"))
             or _as_float(order.get("filled_avg_price"))
-            or _as_float(fallback_price)
         )
         if not ticker or remaining_qty <= 0 or entry_price <= 0:
             continue
@@ -330,17 +333,18 @@ async def execute_approved(
         )
         open_trades, portfolio_holdings = _policy_context_from_executed_proposals(executed)
 
-        get_positions = _alpaca_get_positions()
-        list_orders = _alpaca_list_orders()
-        live_positions, live_open_orders = await asyncio.gather(
-            asyncio.to_thread(get_positions, account_id),
-            asyncio.to_thread(list_orders, account_id, "open", 200),
-        )
-        if live_positions or live_open_orders:
+        if _alpaca_is_configured():
+            get_positions = _alpaca_get_positions()
+            list_orders = _alpaca_list_orders()
+            live_positions, live_open_orders = await asyncio.gather(
+                asyncio.to_thread(get_positions, account_id),
+                asyncio.to_thread(list_orders, account_id, "open", 200),
+            )
+            # Prefer broker state over proposal history when available; executed
+            # proposals are only a fallback when broker integration is unavailable.
             open_trades, portfolio_holdings = _policy_context_from_alpaca(
                 positions=live_positions or [],
                 open_orders=live_open_orders or [],
-                fallback_price=proposal.quote_price,
             )
 
         live_check = evaluate_paper_trade(
