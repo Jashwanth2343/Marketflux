@@ -53,6 +53,7 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
   const [local, setLocal] = useState(proposal);
   const [showExecutedToast, setShowExecutedToast] = useState(false);
   const dismissTimerRef = useRef(null);
+  const statusPollTimerRef = useRef(null);
 
   useEffect(() => {
     setLocal(proposal);
@@ -62,6 +63,9 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
     return () => {
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
+      }
+      if (statusPollTimerRef.current) {
+        clearTimeout(statusPollTimerRef.current);
       }
     };
   }, []);
@@ -90,6 +94,13 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
     }, 10_000);
   };
 
+  const stopStatusPolling = () => {
+    if (statusPollTimerRef.current) {
+      clearTimeout(statusPollTimerRef.current);
+      statusPollTimerRef.current = null;
+    }
+  };
+
   const refreshProposal = async () => {
     try {
       const res = await axios.get(`${API}/api/pilot/proposals/${local.id}`, {
@@ -109,10 +120,12 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
             `Execution failed for ${item.ticker}. ${item.status_reason || ''}`.trim()
           );
         }
+        return item;
       }
     } catch {
       // Silent — we already toasted on approve. Avoid noisy refresh errors.
     }
+    return null;
   };
 
   const approve = async () => {
@@ -130,10 +143,25 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
       }
       toast.success(`Approved ${local.ticker}. Routing to paper account…`);
       setConfirmOpen(false);
-      // Refresh after a short delay to check for executed state
-      setTimeout(() => {
-        refreshProposal();
-      }, 5000);
+      // Poll for execution status for up to ~30s to avoid missing slow async fills.
+      stopStatusPolling();
+      let attempts = 0;
+      const maxAttempts = 15;
+      const poll = async () => {
+        attempts += 1;
+        const item = await refreshProposal();
+        const status = item?.status;
+        if (status && !['pending', 'approved'].includes(status)) {
+          stopStatusPolling();
+          return;
+        }
+        if (attempts < maxAttempts) {
+          statusPollTimerRef.current = setTimeout(poll, 2000);
+        } else {
+          stopStatusPolling();
+        }
+      };
+      statusPollTimerRef.current = setTimeout(poll, 2000);
     } catch (err) {
       const detail =
         err?.response?.data?.detail ||
