@@ -241,15 +241,19 @@ export default function Portfolio() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="portfolio-page">
-      <div>
-        <h1 className="text-xl md:text-3xl font-bold tracking-tighter uppercase text-foreground">
-          <Briefcase className="w-6 h-6 inline mr-2 text-secondary" />
-          Portfolio <span className="text-secondary glow-text-cyan">Manager</span>
-        </h1>
-        <p className="text-xs font-mono text-muted-foreground mt-1">
-          Track holdings and get AI-powered rebalancing insights
-        </p>
+    <div className="p-4 lg:p-6 space-y-5 min-h-screen" data-testid="portfolio-page">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Briefcase className="w-5 h-5 text-[#00F3FF]" />
+            <h1 className="text-xl md:text-2xl font-mono font-bold tracking-tight text-foreground">
+              Portfolio <span style={{ color: '#00F3FF', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>Manager</span>
+            </h1>
+          </div>
+          <p className="text-[11px] font-mono text-muted-foreground">
+            Track holdings · Real-time P&amp;L · AI rebalancing insights
+          </p>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -261,42 +265,50 @@ export default function Portfolio() {
             </div>
           )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="rounded-none border-border dark:bg-card/50 bg-card">
-            <CardContent className="p-4">
-              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1">Total Value</div>
-              <div className="font-data text-xl text-foreground">
-                {pricesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `$${formatPrice(totalCurrentValue)}`}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="rounded-none border-border dark:bg-card/50 bg-card">
-            <CardContent className="p-4">
-              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1">Total Gain/Loss</div>
-              <div className={`font-data text-xl flex items-center gap-1 ${totalPL >= 0 ? 'dark:text-[#00FF41] text-[#059669]' : 'text-[#FF3333]'}`}>
-                {pricesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                  <>
-                    {totalPL >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    {totalPL >= 0 ? '+' : ''}${formatPrice(totalPL)}
-                    <span className="text-xs ml-1">({totalPLPercent >= 0 ? '+' : ''}{totalPLPercent.toFixed(2)}%)</span>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="rounded-none border-border dark:bg-card/50 bg-card">
-            <CardContent className="p-4">
-              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1">Today's Change</div>
-              <div className={`font-data text-xl ${todayChangeTotal >= 0 ? 'dark:text-[#00FF41] text-[#059669]' : 'text-[#FF3333]'}`}>
-                {pricesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${todayChangeTotal >= 0 ? '+' : ''}$${formatPrice(todayChangeTotal)}`}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="rounded-none border-border dark:bg-card/50 bg-card">
-            <CardContent className="p-4">
-              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1">Holdings</div>
-              <div className="font-data text-xl text-foreground">{holdings.length}</div>
-            </CardContent>
-          </Card>
+          <div
+            className="rounded-xl p-4"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <DollarSign className="w-3 h-3" /> Total Value
+            </div>
+            <div className="font-data text-xl text-foreground">
+              {pricesLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : `$${formatPrice(totalCurrentValue)}`}
+            </div>
+          </div>
+          <div
+            className="rounded-xl p-4"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5">Total Gain/Loss</div>
+            <div className={`font-data text-xl flex items-center gap-1 ${totalPL >= 0 ? 'text-[#00FF41]' : 'text-[#FF4444]'}`}>
+              {pricesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                <>
+                  {totalPL >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                  {totalPL >= 0 ? '+' : ''}${formatPrice(totalPL)}
+                  <span className="text-xs ml-1 opacity-70">({totalPLPercent >= 0 ? '+' : ''}{totalPLPercent.toFixed(2)}%)</span>
+                </>
+              )}
+            </div>
+          </div>
+          <div
+            className="rounded-xl p-4"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5">Today's Change</div>
+            <div className={`font-data text-xl ${todayChangeTotal >= 0 ? 'text-[#00FF41]' : 'text-[#FF4444]'}`}>
+              {pricesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${todayChangeTotal >= 0 ? '+' : ''}$${formatPrice(todayChangeTotal)}`}
+            </div>
+          </div>
+          <div
+            className="rounded-xl p-4"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <PieChartIcon className="w-3 h-3" /> Holdings
+            </div>
+            <div className="font-data text-xl text-foreground">{holdings.length}</div>
+          </div>
         </div>
         </div>
       )}

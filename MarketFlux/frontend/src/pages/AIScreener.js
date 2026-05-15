@@ -126,98 +126,154 @@ export default function AIScreener() {
   ];
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="ai-screener-page">
+    <div className="p-4 lg:p-6 space-y-5 min-h-screen" data-testid="ai-screener-page">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-3xl font-bold tracking-tighter uppercase text-foreground">
-            Market <span className={useAIScreener ? "text-[#FFB000] glow-amber" : "text-[#00F3FF] glow-blue"}>Screener</span>
-          </h1>
-          <p className="text-xs font-mono text-muted-foreground mt-1">
-            {useAIScreener ? "Describe what you're looking for — AI converts it to filters" : "Track all markets and screen for opportunities"}
+          <div className="flex items-center gap-2 mb-1">
+            {useAIScreener ? <Zap className="w-5 h-5 text-[#FFB000]" /> : <BarChart3 className="w-5 h-5 text-[#00F3FF]" />}
+            <h1 className="text-xl md:text-2xl font-mono font-bold tracking-tight text-foreground">
+              Market{' '}
+              <span style={useAIScreener
+                ? { color: '#FFB000', textShadow: '0 0 10px rgba(255,176,0,0.4)' }
+                : { color: '#00F3FF', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>
+                Screener
+              </span>
+            </h1>
+          </div>
+          <p className="text-[11px] font-mono text-muted-foreground">
+            {useAIScreener ? "Natural language → AI-generated filters → matched stocks" : "Full market screener powered by TradingView"}
           </p>
         </div>
 
-        {/* Toggle Button */}
-        <button
-          onClick={() => setUseAIScreener(!useAIScreener)}
-          className={`px-4 py-2 flex items-center gap-2 text-xs font-mono uppercase tracking-wider border transition-colors ${useAIScreener
-            ? "bg-[#FFB000]/10 border-[#FFB000] text-[#FFB000]"
-            : "bg-card border-border text-muted-foreground hover:bg-muted"
-            }`}
+        {/* Mode toggle */}
+        <div
+          className="flex rounded-lg overflow-hidden flex-shrink-0"
+          style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}
         >
-          {useAIScreener ? <Zap className="w-4 h-4" /> : <BarChart3 className="w-4 h-4" />}
-          {useAIScreener ? "Use Standard Screener" : "Use AI Screener"}
-        </button>
+          <button
+            onClick={() => setUseAIScreener(false)}
+            className="px-3 py-2 flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider transition-all"
+            style={!useAIScreener ? {
+              background: 'rgba(0,243,255,0.1)', color: '#00F3FF',
+              borderRight: '1px solid rgba(255,255,255,0.08)',
+            } : {
+              color: 'rgba(255,255,255,0.35)',
+              borderRight: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <BarChart3 className="w-3.5 h-3.5" /> Standard
+          </button>
+          <button
+            onClick={() => setUseAIScreener(true)}
+            className="px-3 py-2 flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider transition-all"
+            style={useAIScreener ? {
+              background: 'rgba(255,176,0,0.1)', color: '#FFB000',
+            } : {
+              color: 'rgba(255,255,255,0.35)',
+            }}
+          >
+            <Zap className="w-3.5 h-3.5" /> AI Mode
+          </button>
+        </div>
       </div>
 
       {!useAIScreener ? (
         <TradingViewScreenerWidget />
       ) : (
         <>
-          <div className="bg-[#FFB000]/10 border border-[#FFB000]/40 p-3 flex gap-3 text-[#FFB000]">
-            <Zap className="w-4 h-4 shrink-0 mt-0.5" />
-            <p className="text-[10px] font-mono leading-relaxed">
-              <strong>AI Screener Mode Component:</strong> Natural language based screener - results might take time. Since AI generates the exact filters dynamically, results may vary or occasionally be inaccurate.
+          {/* AI disclaimer */}
+          <div
+            className="flex gap-3 p-3 rounded-xl"
+            style={{ background: 'rgba(255,176,0,0.06)', border: '1px solid rgba(255,176,0,0.2)' }}
+          >
+            <Zap className="w-4 h-4 shrink-0 mt-0.5 text-[#FFB000]" />
+            <p className="text-[11px] font-mono text-[rgba(255,176,0,0.85)] leading-relaxed">
+              AI interprets your query into dynamic stock filters. Results may vary — always verify before trading.
             </p>
           </div>
 
-          {/* Search */}
-          <Card className="rounded-none border-border dark:bg-card/50 bg-card">
-            <CardContent className="p-4">
-              <form data-testid="screener-form" onSubmit={handleScreen} className="space-y-3">
-                <div className="relative">
-                  <Zap className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#FFB000]" />
-                  <Input
-                    data-testid="screener-input"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="e.g. 'Show me large cap tech stocks with a low P/E ratio'"
-                    className="pl-12 pr-4 py-6 rounded-none bg-background border-border font-mono text-sm text-foreground placeholder:text-muted-foreground/50"
-                  />
-                </div>
-                <div className="flex items-center gap-3">
+          {/* Search box */}
+          <div
+            className="rounded-xl p-4 space-y-3"
+            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <form data-testid="screener-form" onSubmit={handleScreen} className="space-y-3">
+              <div className="relative">
+                <Zap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#FFB000]" />
+                <Input
+                  data-testid="screener-input"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g. 'Large-cap tech with low P/E and strong earnings growth'"
+                  className="pl-10 h-11 font-mono text-sm rounded-lg"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  data-testid="screener-submit"
+                  type="submit"
+                  disabled={loading || !query.trim()}
+                  size="sm"
+                  className="h-9 px-5 text-[11px] font-mono uppercase tracking-wider rounded-lg"
+                  style={{ background: '#FFB000', color: '#000' }}
+                >
+                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Search className="w-3.5 h-3.5 mr-1.5" />}
+                  Screen Stocks
+                </Button>
+                {results && (
                   <Button
-                    data-testid="screener-submit"
-                    type="submit"
-                    disabled={loading || !query.trim()}
-                    className="rounded-none bg-[#FFB000] text-black font-mono text-xs uppercase tracking-wider hover:bg-[#FFB000]/80"
+                    data-testid="screener-clear"
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setResults(null); setQuery(''); }}
+                    className="h-9 text-[11px] font-mono text-muted-foreground hover:text-foreground rounded-lg"
                   >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
-                    Screen Stocks
+                    <X className="w-3 h-3 mr-1" /> Clear
                   </Button>
-                  {results && (
-                    <Button
-                      data-testid="screener-clear"
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setResults(null); setQuery(''); }}
-                      className="rounded-none text-xs font-mono text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="w-3 h-3 mr-1" /> Clear
-                    </Button>
-                  )}
-                </div>
-              </form>
+                )}
+              </div>
+            </form>
 
-              {/* Suggestions */}
-              {!results && (
-                <div className="mt-3 flex flex-wrap gap-2">
+            {/* Suggestions */}
+            {!results && (
+              <div className="space-y-2 pt-1">
+                <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Try these:</p>
+                <div className="flex flex-wrap gap-2">
                   {suggestions.map(s => (
                     <button
                       key={s}
                       data-testid={`suggestion-${s.slice(0, 20).replace(/\s/g, '-')}`}
                       onClick={() => setQuery(s)}
-                      className="px-2 py-1 text-[10px] font-mono uppercase border border-border text-muted-foreground hover:border-[#FFB000] hover:text-[#FFB000] transition-colors"
+                      className="px-2.5 py-1.5 text-[10px] font-mono rounded-full transition-all"
+                      style={{
+                        background: 'rgba(255,176,0,0.06)',
+                        border: '1px solid rgba(255,176,0,0.18)',
+                        color: 'rgba(255,176,0,0.7)',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(255,176,0,0.12)';
+                        e.currentTarget.style.color = '#FFB000';
+                        e.currentTarget.style.borderColor = 'rgba(255,176,0,0.35)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(255,176,0,0.06)';
+                        e.currentTarget.style.color = 'rgba(255,176,0,0.7)';
+                        e.currentTarget.style.borderColor = 'rgba(255,176,0,0.18)';
+                      }}
                     >
                       {s}
                     </button>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            )}
+          </div>
 
           {/* Error */}
           {error && (
@@ -297,11 +353,14 @@ export default function AIScreener() {
 
               {/* Stock Results Table */}
               {results.stocks?.length > 0 && (
-                <Card className="rounded-none border-border dark:bg-card/50 bg-card overflow-hidden">
+                <div
+                  className="rounded-xl overflow-hidden"
+                  style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}
+                >
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm" data-testid="screener-results-table">
                       <thead>
-                        <tr className="border-b border-border dark:bg-muted/30 bg-muted">
+                        <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
                           <th className="text-left px-4 py-2.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Ticker</th>
                           <th className="text-left px-4 py-2.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Company</th>
                           <th className="text-left px-4 py-2.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Sector</th>
@@ -319,7 +378,10 @@ export default function AIScreener() {
                           return (
                             <tr
                               key={stock.symbol}
-                              className="border-b dark:border-border/50 border-border hover:dark:bg-muted/20 hover:bg-muted transition-colors"
+                              className="border-b transition-colors"
+                              style={{ borderColor: 'rgba(255,255,255,0.05)' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,176,0,0.04)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                             >
                               <td className="px-4 py-2.5">
                                 <Link
@@ -365,12 +427,21 @@ export default function AIScreener() {
                       </tbody>
                     </table>
                   </div>
-                </Card>
+                </div>
               )}
 
               {results.stocks?.length === 0 && (
-                <div className="py-8 text-center">
-                  <p className="text-sm font-mono text-muted-foreground" data-testid="no-results">No stocks matched your criteria. Try broadening your filters.</p>
+                <div className="py-12 flex flex-col items-center gap-3 text-center">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ background: 'rgba(255,176,0,0.07)', border: '1px solid rgba(255,176,0,0.15)' }}
+                  >
+                    <Search className="w-5 h-5 text-[#FFB000]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-mono font-semibold text-foreground mb-1" data-testid="no-results">No stocks matched</p>
+                    <p className="text-xs font-mono text-muted-foreground">Try broadening your criteria or rephrasing the query</p>
+                  </div>
                 </div>
               )}
             </div>
