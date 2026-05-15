@@ -16,6 +16,9 @@ import {
 } from '@/components/ui/alert-dialog';
 
 const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+const STATUS_POLL_INTERVAL_MS = 2000;
+const MAX_STATUS_POLL_ATTEMPTS = 15;
+const STATUS_POLLING_STATES = new Set(['pending', 'approved']);
 
 function formatCurrency(value) {
   if (value === null || value === undefined || value === '') return '--';
@@ -54,6 +57,7 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
   const [showExecutedToast, setShowExecutedToast] = useState(false);
   const dismissTimerRef = useRef(null);
   const statusPollTimerRef = useRef(null);
+  const statusPollRunRef = useRef(0);
 
   useEffect(() => {
     setLocal(proposal);
@@ -129,6 +133,7 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
   };
 
   const approve = async () => {
+    if (busy) return;
     setBusy(true);
     try {
       const res = await axios.post(
@@ -145,23 +150,26 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
       setConfirmOpen(false);
       // Poll for execution status for up to ~30s to avoid missing slow async fills.
       stopStatusPolling();
+      statusPollRunRef.current += 1;
+      const runId = statusPollRunRef.current;
       let attempts = 0;
-      const maxAttempts = 15;
       const poll = async () => {
+        if (runId !== statusPollRunRef.current) return;
         attempts += 1;
         const item = await refreshProposal();
+        if (runId !== statusPollRunRef.current) return;
         const status = item?.status;
-        if (status && !['pending', 'approved'].includes(status)) {
+        if (status !== undefined && status !== null && !STATUS_POLLING_STATES.has(status)) {
           stopStatusPolling();
           return;
         }
-        if (attempts < maxAttempts) {
-          statusPollTimerRef.current = setTimeout(poll, 2000);
+        if (attempts < MAX_STATUS_POLL_ATTEMPTS) {
+          statusPollTimerRef.current = setTimeout(poll, STATUS_POLL_INTERVAL_MS);
         } else {
           stopStatusPolling();
         }
       };
-      statusPollTimerRef.current = setTimeout(poll, 2000);
+      statusPollTimerRef.current = setTimeout(poll, STATUS_POLL_INTERVAL_MS);
     } catch (err) {
       const detail =
         err?.response?.data?.detail ||
