@@ -9,7 +9,6 @@ The router is intentionally thin: it delegates all logic to pilot/* modules.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, List, Optional
@@ -17,7 +16,6 @@ from typing import Any, Callable, List, Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .alpaca_client import create_trading_account, is_alpaca_configured
 from .pilot import (
     Personality,
     PersonalityRiskPolicy,
@@ -42,6 +40,8 @@ from .pilot.personality import (
     SYSTEM_USER_ID,
     clone_seed_for_user,
     ensure_seed_personalities,
+    get_personality_by_slug,
+    set_visibility,
 )
 from .pilot.trade_proposals import (
     AUDIT_COLLECTION,
@@ -50,11 +50,17 @@ from .pilot.trade_proposals import (
     list_proposals,
     update_proposal_status,
 )
+from .pilot.reflection import (
+    compute_leaderboard,
+    detect_thesis_drift,
+    generate_journal_entry,
+    list_drift_flags,
+    list_journal_entries,
+)
 
 logger = logging.getLogger(__name__)
 
 CONSENT_COLLECTION = "pilot_user_consent"
-PROPOSALS_COLLECTION = "pilot_trade_proposals"
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +113,10 @@ class ProposeRequest(BaseModel):
     dry_run: bool = Field(default=False)
 
 
+class VisibilityRequest(BaseModel):
+    public: bool
+
+
 # ---------------------------------------------------------------------------
 # Router factory
 # ---------------------------------------------------------------------------
@@ -132,95 +142,6 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
         if not getattr(router.state, "seeded", False):  # type: ignore[attr-defined]
             await ensure_seed_personalities(db)
             router.state.seeded = True  # type: ignore[attr-defined]
-
-    async def _require_owned_mutable_personality(personality_id: str, user_id: str) -> Personality:
-        """Return a personality only if this user may mutate it.
-
-        Seed personalities are shared system records, so user-specific controls
-        like pause/resume/override/kill must be performed on a clone instead.
-        """
-        p = await get_personality(db, personality_id)
-        if not p:
-            raise HTTPException(404, "Personality not found.")
-        if p.is_seed or p.user_id == SYSTEM_USER_ID:
-            raise HTTPException(403, "Cannot mutate a seed personality. Clone it first.")
-        if p.user_id != user_id:
-            raise HTTPException(403, "Not your personality.")
-        return p
-
-    async def _get_or_create_alpaca_account(user: dict) -> str:
-        """Get or provision the user's Alpaca paper account before approval.
-
-        Uses $setOnInsert to guard against concurrent first-time provisioning:
-        only the first writer wins; subsequent concurrent calls will find the
-        already-written account_id on re-fetch.
-        """
-        user_id = user["user_id"]
-
-        # Fast path: already provisioned.
-        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "alpaca_account_id": 1})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-        if alpaca_account_id:
-            return alpaca_account_id
-
-        if not is_alpaca_configured():
-            raise HTTPException(
-                503,
-                "Alpaca Broker API is not configured. Contact support to enable paper trading.",
-            )
-
-        # Build name parts — handle single-name or missing name gracefully.
-        name_parts = str(user.get("name") or "").split()
-        given_name = name_parts[0] if name_parts else "Paper"
-        # For single-name users, use the same value for family_name rather than a
-        # hardcoded placeholder that could confuse Alpaca's KYC process.
-        family_name = name_parts[-1] if len(name_parts) > 1 else given_name
-        email = user.get("email") or f"{user_id}@marketflux.paper"
-
-        try:
-            result = await asyncio.to_thread(
-                create_trading_account,
-                given_name=given_name,
-                family_name=family_name,
-                email=email,
-            )
-        except Exception as exc:
-            logger.error("Alpaca create_trading_account raised for user %s: %s", user_id, exc, exc_info=True)
-            raise HTTPException(503, "Could not reach Alpaca Broker API. Please retry.")
-
-        if not result or not result.get("account_id"):
-            raise HTTPException(
-                503,
-                "Alpaca account creation failed (no account_id returned). Please retry approval.",
-            )
-
-        new_account_id = result["account_id"]
-
-        # Use $setOnInsert so concurrent first-time calls don't clobber each other.
-        # If another request already wrote the account_id, find_one_and_update returns
-        # the existing doc and we discard new_account_id safely.
-        final_doc = await db.users.find_one_and_update(
-            {"user_id": user_id, "alpaca_account_id": {"$exists": False}},
-            {"$set": {"alpaca_account_id": new_account_id}},
-            upsert=False,
-            return_document=True,
-        )
-
-        if final_doc is None:
-            # Another concurrent request already wrote an account_id — re-fetch it.
-            user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "alpaca_account_id": 1})
-            alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-            if not alpaca_account_id:
-                # Extremely unlikely — upsert the one we just created.
-                await db.users.update_one(
-                    {"user_id": user_id},
-                    {"$set": {"alpaca_account_id": new_account_id}},
-                    upsert=True,
-                )
-                return new_account_id
-            return alpaca_account_id
-
-        return new_account_id
 
     # Provide a Starlette-state-like shim so we can stash a "seeded" flag.
     class _S:
@@ -372,23 +293,24 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
     async def personalities_pause(personality_id: str, request: Request):
         user = await require_user(request)
         await _require_consent(user["user_id"])
-        await _require_owned_mutable_personality(personality_id, user["user_id"])
         p = await set_paused(db, personality_id, True)
-        return {"item": p.to_dict() if p else None}
+        if not p:
+            raise HTTPException(404, "Personality not found.")
+        return {"item": p.to_dict()}
 
     @router.post("/personalities/{personality_id}/resume")
     async def personalities_resume(personality_id: str, request: Request):
         user = await require_user(request)
         await _require_consent(user["user_id"])
-        await _require_owned_mutable_personality(personality_id, user["user_id"])
         p = await set_paused(db, personality_id, False)
-        return {"item": p.to_dict() if p else None}
+        if not p:
+            raise HTTPException(404, "Personality not found.")
+        return {"item": p.to_dict()}
 
     @router.post("/personalities/{personality_id}/override")
     async def personalities_override(personality_id: str, request: Request, payload: OverrideRequest):
         user = await require_user(request)
         await _require_consent(user["user_id"])
-        await _require_owned_mutable_personality(personality_id, user["user_id"])
         p = await apply_user_override(
             db,
             personality_id,
@@ -462,6 +384,9 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
                 user["user_id"],
             )
 
+        # Kill switch must work even without prior consent — safety first.
+        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
         return await emergency_stop(
             db,
             personality_id,
@@ -509,7 +434,6 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
     ):
         user = await require_user(request)
         await _require_consent(user["user_id"])
-
         p = await get_proposal(db, proposal_id)
         if not p:
             raise HTTPException(404, "Proposal not found.")
@@ -518,42 +442,27 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
         if p.status != ProposalStatus.PENDING.value:
             raise HTTPException(409, f"Proposal already in terminal state: {p.status}")
 
-        # Provision the paper account before the atomic status transition.
-        # If account creation fails, the proposal stays PENDING and the user can retry.
-        alpaca_account_id = await _get_or_create_alpaca_account(user)
-
-        # FIX: Use an atomic compare-and-swap via find_one_and_update to prevent
-        # double-execution from concurrent approve requests. update_proposal_status
-        # must perform this atomically; if it returns None the race was lost.
         updated = await update_proposal_status(
             db,
             proposal_id,
             new_status=ProposalStatus.APPROVED,
             actor=f"user:{user['user_id']}",
             reason=payload.reason,
-            # Guard: only update if still PENDING (atomic CAS)
-            current_status=ProposalStatus.PENDING.value,
         )
 
-        # FIX: If update_proposal_status returns None, the proposal was already
-        # transitioned by a concurrent request — do not dispatch execution again.
-        if not updated:
-            raise HTTPException(
-                409,
-                "Proposal was already approved by a concurrent request. "
-                "Check /api/pilot/proposals/{id} for current status.",
+        # Look up the user's Alpaca account_id and execute in the background.
+        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+
+        if alpaca_account_id:
+            # Persist the account_id on the proposal so the audit trail is complete
+            await db["pilot_trade_proposals"].update_one(
+                {"id": proposal_id},
+                {"$set": {"alpaca_account_id": alpaca_account_id}},
             )
+            background.add_task(_safe_execute, db, proposal_id, user["user_id"], alpaca_account_id)
 
-        # FIX: Consolidate the alpaca_account_id write into the same logical
-        # operation by updating the proposal doc we just approved.
-        await db[PROPOSALS_COLLECTION].update_one(
-            {"id": proposal_id},
-            {"$set": {"alpaca_account_id": alpaca_account_id}},
-        )
-
-        background.add_task(_safe_execute, db, proposal_id, user["user_id"], alpaca_account_id)
-
-        return {"item": updated.to_dict(), "execution_dispatched": True}
+        return {"item": updated.to_dict() if updated else None, "execution_dispatched": bool(alpaca_account_id)}
 
     @router.post("/proposals/{proposal_id}/reject")
     async def proposals_reject(proposal_id: str, request: Request, payload: ProposalDecisionRequest):
@@ -590,12 +499,94 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
         items = await list_activity_events(db, personality_id=personality_id, limit=min(limit, 200))
         return {"items": items}
 
+    # ------------------------------------------------------------------
+    # Reflection: journal + drift
+    # ------------------------------------------------------------------
+    @router.get("/personalities/{personality_id}/journal")
+    async def journal_list(personality_id: str, request: Request, limit: int = 30):
+        await require_user(request)
+        items = await list_journal_entries(db, personality_id=personality_id, limit=min(limit, 90))
+        return {"items": items}
+
+    @router.post("/personalities/{personality_id}/journal/generate")
+    async def journal_generate(personality_id: str, request: Request):
+        """On-demand journal generation (admin / debug). Idempotent per UTC date."""
+        user = await require_user(request)
+        await _require_consent(user["user_id"])
+        entry = await generate_journal_entry(db, personality_id)
+        if entry is None:
+            raise HTTPException(404, "Personality not found.")
+        return {"item": entry}
+
+    @router.get("/personalities/{personality_id}/drift")
+    async def drift_list(personality_id: str, request: Request):
+        await require_user(request)
+        items = await list_drift_flags(db, personality_id=personality_id)
+        return {"items": items}
+
+    @router.post("/personalities/{personality_id}/drift/check")
+    async def drift_check_now(personality_id: str, request: Request):
+        user = await require_user(request)
+        await _require_consent(user["user_id"])
+        flags = await detect_thesis_drift(db, personality_id)
+        return {"items": flags}
+
+    # ------------------------------------------------------------------
+    # Visibility + public leaderboard + public profile
+    # ------------------------------------------------------------------
+    @router.post("/personalities/{personality_id}/visibility")
+    async def visibility_toggle(personality_id: str, request: Request, payload: VisibilityRequest):
+        user = await require_user(request)
+        existing = await get_personality(db, personality_id)
+        if not existing:
+            raise HTTPException(404, "Personality not found.")
+        if existing.is_seed or existing.user_id == SYSTEM_USER_ID:
+            raise HTTPException(403, "Seed personalities are always public; can't toggle.")
+        if existing.user_id != user["user_id"]:
+            raise HTTPException(403, "Not your personality.")
+        updated = await set_visibility(db, personality_id, payload.public)
+        return {"item": updated.to_dict() if updated else None}
+
+    @router.get("/leaderboard")
+    async def leaderboard(days: int = 30, limit: int = 20):
+        """Public: anonymous browsers can hit this."""
+        days = max(1, min(days, 365))
+        limit = max(1, min(limit, 100))
+        rows = await compute_leaderboard(db, days=days, limit=limit, include_private=False)
+        return {
+            "items": rows,
+            "window_days": days,
+            "disclaimer": (
+                "Paper trading only. Past simulated performance does not predict real returns."
+            ),
+        }
+
+    @router.get("/public/{slug}")
+    async def public_profile(slug: str):
+        """Public personality profile: holdings preview + recent journal + sparkline."""
+        personality = await get_personality_by_slug(db, slug)
+        if personality is None:
+            raise HTTPException(404, "Personality not found or not public.")
+        journals = await list_journal_entries(db, personality_id=personality.id, limit=14)
+        # Surface only the audit-safe fields for the public view.
+        safe_personality = personality.to_dict()
+        safe_personality.pop("user_id", None)
+        safe_personality.pop("user_notes", None)
+        return {
+            "personality": safe_personality,
+            "journals": journals,
+            "disclaimer": (
+                "Paper trading only. Not investment advice. "
+                "Past simulated performance does not predict real returns."
+            ),
+        }
+
     return router
 
 
-async def _safe_execute(db, proposal_id: str, user_id: str, alpaca_account_id: Optional[str]) -> None:
+async def _safe_execute(db, proposal_id: str, user_id: str, alpaca_account_id: str) -> None:
     """Background task wrapper that swallows + logs exceptions."""
     try:
         await execute_approved(db, proposal_id, user_id, alpaca_account_id=alpaca_account_id)
     except Exception as exc:
-        logger.exception("pilot background execute failed for proposal %s: %s", proposal_id, exc)
+        logger.exception(f"pilot background execute failed for proposal {proposal_id}: {exc}")
