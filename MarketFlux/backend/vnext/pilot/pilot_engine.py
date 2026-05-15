@@ -338,26 +338,34 @@ async def emergency_stop(
         if updated:
             expired_ids.append(p.id)
 
-    # Cancel any in-flight Alpaca orders for executed-but-uncanceled proposals.
+    # Cancel any in-flight Alpaca orders for this personality.
+    #
+    # Do not gate on the local proposal lifecycle state here: proposals are
+    # typically transitioned to "executed" immediately after order submission,
+    # while the Alpaca order itself may still be open or partially filled and
+    # therefore still cancellable. The broker is the source of truth for
+    # whether an order can be cancelled, so attempt cancellation for every
+    # unique Alpaca order id we have recorded.
     cancelled: List[str] = []
     cancel_order = _alpaca_cancel_order()
     if alpaca_account_id:
-        # Cancel orders for proposals that have an Alpaca order id and weren't
-        # already in a terminal "completed" state on Alpaca's side.
         all_for_personality = await list_proposals(
             db,
             user_id=user_id,
             personality_id=personality_id,
             limit=500,
         )
+        seen_alpaca_order_ids = set()
         for p in all_for_personality:
-            if p.alpaca_order_id and p.status in {ProposalStatus.APPROVED.value}:
-                try:
-                    success = await asyncio.to_thread(cancel_order, alpaca_account_id, p.alpaca_order_id)
-                    if success:
-                        cancelled.append(p.alpaca_order_id)
-                except Exception as exc:
-                    logger.warning(f"pilot_engine: cancel_order failed for {p.alpaca_order_id}: {exc}")
+            if not p.alpaca_order_id or p.alpaca_order_id in seen_alpaca_order_ids:
+                continue
+            seen_alpaca_order_ids.add(p.alpaca_order_id)
+            try:
+                success = await asyncio.to_thread(cancel_order, alpaca_account_id, p.alpaca_order_id)
+                if success:
+                    cancelled.append(p.alpaca_order_id)
+            except Exception as exc:
+                logger.warning(f"pilot_engine: cancel_order failed for {p.alpaca_order_id}: {exc}")
 
     return _ok(
         personality_id=personality_id,
