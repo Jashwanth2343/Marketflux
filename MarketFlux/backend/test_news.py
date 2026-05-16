@@ -1,3 +1,7 @@
+if __name__ != "__main__":
+    import pytest
+    pytest.skip("Manual smoke script; run directly with python.", allow_module_level=True)
+
 import asyncio
 from market_data import get_ticker_news
 
