@@ -20,26 +20,21 @@ export default function TradingCopilotPanel() {
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
-        try {
-            const settled = await Promise.allSettled([
-                axios.get(`${API_BASE}/api/pilot/consent`, { withCredentials: true }),
-                axios.get(`${API_BASE}/api/pilot/proposals`, { withCredentials: true, params: { status: 'pending', limit: 20 } }),
-                axios.get(`${API_BASE}/api/pilot/personalities`, { withCredentials: true }),
-            ]);
-            if (settled.every((s) => s.status === 'rejected')) {
-                toast.error('Failed to load copilot data');
-            }
-            const consentRes = settled[0].status === 'fulfilled' ? settled[0].value : null;
-            const proposalRes = settled[1].status === 'fulfilled' ? settled[1].value : null;
-            const personalityRes = settled[2].status === 'fulfilled' ? settled[2].value : null;
-            setConsentStatus(consentRes?.data || null);
-            setProposals(Array.isArray(proposalRes?.data?.items) ? proposalRes.data.items : []);
-            setPersonalities(Array.isArray(personalityRes?.data?.items) ? personalityRes.data.items : []);
-        } catch {
+        const settled = await Promise.allSettled([
+            axios.get(`${API_BASE}/api/pilot/consent`, { withCredentials: true }),
+            axios.get(`${API_BASE}/api/pilot/proposals`, { withCredentials: true, params: { status: 'pending', limit: 20 } }),
+            axios.get(`${API_BASE}/api/pilot/personalities`, { withCredentials: true }),
+        ]);
+        if (settled.every((s) => s.status === 'rejected')) {
             toast.error('Failed to load copilot data');
-        } finally {
-            setLoading(false);
         }
+        const consentRes = settled[0].status === 'fulfilled' ? settled[0].value : null;
+        const proposalRes = settled[1].status === 'fulfilled' ? settled[1].value : null;
+        const personalityRes = settled[2].status === 'fulfilled' ? settled[2].value : null;
+        setConsentStatus(consentRes?.data || null);
+        setProposals(Array.isArray(proposalRes?.data?.items) ? proposalRes.data.items : []);
+        setPersonalities(Array.isArray(personalityRes?.data?.items) ? personalityRes.data.items : []);
+        setLoading(false);
     }, []);
 
     useEffect(() => {
