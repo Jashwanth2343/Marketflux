@@ -1,3 +1,7 @@
+if __name__ != "__main__":
+    import pytest
+    pytest.skip("Manual smoke script; run directly with python.", allow_module_level=True)
+
 import asyncio
 from react_agent import run_react_agent
 import logging
