@@ -1,7 +1,7 @@
-"""FastAPI router for Alpaca Broker API integration.
+"""FastAPI router for Alpaca Trading API integration.
 
-Provides endpoints for managing Alpaca sub-accounts per user,
-submitting/canceling orders, viewing positions, and portfolio history.
+Uses the Trading API (paper) — single account, no sub-accounts.
+All endpoints require login via get_current_user.
 """
 from __future__ import annotations
 
@@ -12,10 +12,12 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .alpaca_client import (
+    cancel_all_orders,
     cancel_order,
+    close_all_positions,
     close_position,
-    create_trading_account,
     get_account,
+    get_asset,
     get_order,
     get_portfolio_history,
     get_positions,
@@ -39,11 +41,6 @@ class AlpacaOrderRequest(BaseModel):
     time_in_force: str = Field(default="day", pattern="^(day|gtc|ioc|fok)$")
 
 
-class AlpacaAccountCreateRequest(BaseModel):
-    given_name: Optional[str] = None
-    family_name: Optional[str] = None
-
-
 class AlpacaClosePositionRequest(BaseModel):
     symbol: str
 
@@ -53,7 +50,7 @@ class AlpacaClosePositionRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRouter:
-    router = APIRouter(prefix="/api/alpaca", tags=["alpaca-broker"])
+    router = APIRouter(prefix="/api/alpaca", tags=["alpaca-trading"])
 
     async def require_user(request: Request) -> dict:
         user = await get_current_user(request)
@@ -61,40 +58,9 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             raise HTTPException(401, "Login required.")
         return user
 
-    async def _get_or_create_alpaca_account(user: dict, db) -> str:
-        """Get the user's Alpaca account_id, creating one if needed."""
-        user_id = user["user_id"]
-
-        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-
-        if alpaca_account_id:
-            return alpaca_account_id
-
-        given_name = user.get("name", "Paper").split()[0] if user.get("name") else "Paper"
-        family_name = (
-            user.get("name", "Trader").split()[-1]
-            if user.get("name") and len(user.get("name", "").split()) > 1
-            else "Trader"
-        )
-        email = user.get("email", f"{user_id}@marketflux.paper")
-
-        # create_trading_account is a blocking network call — run in thread pool
-        result = await asyncio.to_thread(
-            create_trading_account,
-            given_name=given_name,
-            family_name=family_name,
-            email=email,
-        )
-        if not result:
-            raise HTTPException(503, "Failed to create Alpaca trading account. Check Broker API credentials.")
-
-        alpaca_account_id = result["account_id"]
-        await db.users.update_one(
-            {"user_id": user_id},
-            {"$set": {"alpaca_account_id": alpaca_account_id}},
-        )
-        return alpaca_account_id
+    def _require_configured():
+        if not is_alpaca_configured():
+            raise HTTPException(503, "Alpaca Trading API is not configured.")
 
     # ------------------------------------------------------------------
     # Health / config check
@@ -104,8 +70,8 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     async def alpaca_status():
         return {
             "configured": is_alpaca_configured(),
-            "mode": "sandbox",
-            "provider": "alpaca-broker-api",
+            "mode": "paper",
+            "provider": "alpaca-trading-api",
         }
 
     # ------------------------------------------------------------------
@@ -114,32 +80,23 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
     @router.get("/account")
     async def alpaca_account(request: Request):
-        """Get the user's Alpaca paper trading account summary."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
-
-        user = await require_user(request)
-        account_id = await _get_or_create_alpaca_account(user, db)
-        account_info = await asyncio.to_thread(get_account, account_id)
+        """Get the paper trading account summary."""
+        _require_configured()
+        await require_user(request)
+        account_info = await asyncio.to_thread(get_account)
         if not account_info:
             raise HTTPException(502, "Unable to fetch account from Alpaca.")
         return {"item": account_info}
 
     @router.post("/account")
-    async def alpaca_create_account(request: Request, payload: AlpacaAccountCreateRequest):
-        """Explicitly provision an Alpaca sub-account for the user."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
-
-        user = await require_user(request)
-        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-        if (user_doc or {}).get("alpaca_account_id"):
-            account_info = await asyncio.to_thread(get_account, user_doc["alpaca_account_id"])
-            return {"item": account_info, "message": "Account already exists."}
-
-        account_id = await _get_or_create_alpaca_account(user, db)
-        account_info = await asyncio.to_thread(get_account, account_id)
-        return {"item": account_info, "message": "Account created successfully."}
+    async def alpaca_create_account(request: Request):
+        """No-op for backwards compatibility — Trading API uses a single account."""
+        _require_configured()
+        await require_user(request)
+        account_info = await asyncio.to_thread(get_account)
+        if not account_info:
+            raise HTTPException(502, "Unable to fetch account from Alpaca.")
+        return {"item": account_info, "message": "Using shared paper trading account."}
 
     # ------------------------------------------------------------------
     # Orders
@@ -148,18 +105,14 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.post("/orders")
     async def alpaca_submit_order(request: Request, payload: AlpacaOrderRequest):
         """Submit a paper trade order via Alpaca."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
-
-        user = await require_user(request)
-        account_id = await _get_or_create_alpaca_account(user, db)
+        _require_configured()
+        await require_user(request)
 
         if payload.order_type == "limit":
             if payload.limit_price is None or payload.limit_price <= 0:
                 raise HTTPException(422, "limit_price is required for limit orders.")
             order = await asyncio.to_thread(
                 submit_limit_order,
-                account_id=account_id,
                 symbol=payload.symbol,
                 qty=payload.qty,
                 side=payload.side,
@@ -169,7 +122,6 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         else:
             order = await asyncio.to_thread(
                 submit_market_order,
-                account_id=account_id,
                 symbol=payload.symbol,
                 qty=payload.qty,
                 side=payload.side,
@@ -182,24 +134,18 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
     @router.get("/orders")
     async def alpaca_list_orders(request: Request, status: str = "all", limit: int = 50):
-        """List orders for the user's Alpaca account."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
-
-        user = await require_user(request)
-        account_id = await _get_or_create_alpaca_account(user, db)
-        orders = await asyncio.to_thread(list_orders, account_id, status=status, limit=min(limit, 200))
+        """List orders for the paper trading account."""
+        _require_configured()
+        await require_user(request)
+        orders = await asyncio.to_thread(list_orders, status=status, limit=min(limit, 200))
         return {"items": orders, "total": len(orders)}
 
     @router.get("/orders/{order_id}")
     async def alpaca_get_order(order_id: str, request: Request):
         """Get a specific order by ID."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
-
-        user = await require_user(request)
-        account_id = await _get_or_create_alpaca_account(user, db)
-        order = await asyncio.to_thread(get_order, account_id, order_id)
+        _require_configured()
+        await require_user(request)
+        order = await asyncio.to_thread(get_order, order_id)
         if not order:
             raise HTTPException(404, "Order not found.")
         return {"item": order}
@@ -207,15 +153,22 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.delete("/orders/{order_id}")
     async def alpaca_cancel_order(order_id: str, request: Request):
         """Cancel a pending order."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
-
-        user = await require_user(request)
-        account_id = await _get_or_create_alpaca_account(user, db)
-        success = await asyncio.to_thread(cancel_order, account_id, order_id)
+        _require_configured()
+        await require_user(request)
+        success = await asyncio.to_thread(cancel_order, order_id)
         if not success:
             raise HTTPException(400, "Failed to cancel order. It may already be filled or cancelled.")
         return {"message": "Order cancelled successfully."}
+
+    @router.delete("/orders")
+    async def alpaca_cancel_all_orders(request: Request):
+        """Cancel all open orders."""
+        _require_configured()
+        await require_user(request)
+        success = await asyncio.to_thread(cancel_all_orders)
+        if not success:
+            raise HTTPException(502, "Failed to cancel orders.")
+        return {"message": "All open orders cancelled."}
 
     # ------------------------------------------------------------------
     # Positions
@@ -223,27 +176,31 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
     @router.get("/positions")
     async def alpaca_positions(request: Request):
-        """Get all open positions for the user's Alpaca account."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
-
-        user = await require_user(request)
-        account_id = await _get_or_create_alpaca_account(user, db)
-        positions = await asyncio.to_thread(get_positions, account_id)
+        """Get all open positions."""
+        _require_configured()
+        await require_user(request)
+        positions = await asyncio.to_thread(get_positions)
         return {"items": positions, "total": len(positions)}
 
     @router.post("/positions/close")
     async def alpaca_close_position(request: Request, payload: AlpacaClosePositionRequest):
         """Close a position by symbol."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
-
-        user = await require_user(request)
-        account_id = await _get_or_create_alpaca_account(user, db)
-        result = await asyncio.to_thread(close_position, account_id, payload.symbol)
+        _require_configured()
+        await require_user(request)
+        result = await asyncio.to_thread(close_position, payload.symbol)
         if not result:
             raise HTTPException(400, f"Failed to close position for {payload.symbol}.")
         return {"item": result, "message": f"Position closed for {payload.symbol}."}
+
+    @router.post("/positions/liquidate")
+    async def alpaca_liquidate_all(request: Request):
+        """Close all open positions and cancel open orders."""
+        _require_configured()
+        await require_user(request)
+        success = await asyncio.to_thread(close_all_positions)
+        if not success:
+            raise HTTPException(502, "Failed to liquidate positions.")
+        return {"message": "All positions closed and open orders cancelled."}
 
     # ------------------------------------------------------------------
     # Portfolio History
@@ -252,8 +209,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.get("/portfolio-history")
     async def alpaca_portfolio_history(request: Request, period: str = "1M", timeframe: str = "1D"):
         """Get portfolio value history for charting."""
-        if not is_alpaca_configured():
-            raise HTTPException(503, "Alpaca Broker API is not configured.")
+        _require_configured()
 
         valid_periods = {"1D", "1W", "1M", "3M", "6M", "1A", "all"}
         valid_timeframes = {"1Min", "5Min", "15Min", "1H", "1D"}
@@ -262,11 +218,24 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         if timeframe not in valid_timeframes:
             raise HTTPException(422, f"Invalid timeframe. Must be one of: {', '.join(sorted(valid_timeframes))}")
 
-        user = await require_user(request)
-        account_id = await _get_or_create_alpaca_account(user, db)
-        history = await asyncio.to_thread(get_portfolio_history, account_id, period=period, timeframe=timeframe)
+        await require_user(request)
+        history = await asyncio.to_thread(get_portfolio_history, period=period, timeframe=timeframe)
         if not history:
             return {"timestamp": [], "equity": [], "profit_loss": [], "profit_loss_pct": [], "base_value": 0, "timeframe": timeframe}
         return history
+
+    # ------------------------------------------------------------------
+    # Assets
+    # ------------------------------------------------------------------
+
+    @router.get("/assets/{symbol}")
+    async def alpaca_get_asset(symbol: str, request: Request):
+        """Get asset info by symbol."""
+        _require_configured()
+        await require_user(request)
+        asset = await asyncio.to_thread(get_asset, symbol)
+        if not asset:
+            raise HTTPException(404, f"Asset not found: {symbol}")
+        return {"item": asset}
 
     return router

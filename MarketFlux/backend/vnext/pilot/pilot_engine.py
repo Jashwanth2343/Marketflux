@@ -304,6 +304,8 @@ async def execute_approved(
     """Submit a previously approved proposal to Alpaca paper.
 
     Returns {ok, proposal} or {ok: False, error, ...}.
+    alpaca_account_id is accepted for API compat but ignored (Trading API
+    uses the single paper account).
     """
     proposal = await get_proposal(db, proposal_id)
     if proposal is None:
@@ -313,9 +315,8 @@ async def execute_approved(
     if proposal.status != ProposalStatus.APPROVED.value:
         return _err("proposal_not_approved", status=proposal.status, proposal_id=proposal_id)
 
-    account_id = alpaca_account_id or proposal.alpaca_account_id
-    if not account_id:
-        return _err("alpaca_account_missing", proposal_id=proposal_id)
+    if not _alpaca_is_configured():
+        return _err("alpaca_not_configured", proposal_id=proposal_id)
 
     # Re-evaluate policy at execution time. The world may have moved.
     try:
@@ -337,11 +338,9 @@ async def execute_approved(
             get_positions = _alpaca_get_positions()
             list_orders = _alpaca_list_orders()
             live_positions, live_open_orders = await asyncio.gather(
-                asyncio.to_thread(get_positions, account_id),
-                asyncio.to_thread(list_orders, account_id, "open", 200),
+                asyncio.to_thread(get_positions),
+                asyncio.to_thread(list_orders, "open", 200),
             )
-            # Prefer broker state over proposal history when available; executed
-            # proposals are only a fallback when broker integration is unavailable.
             open_trades, portfolio_holdings = _policy_context_from_alpaca(
                 positions=live_positions or [],
                 open_orders=live_open_orders or [],
@@ -375,7 +374,6 @@ async def execute_approved(
     try:
         order = await asyncio.to_thread(
             submit,
-            account_id,
             proposal.ticker,
             float(proposal.qty),
             proposal.side,
@@ -422,7 +420,11 @@ async def emergency_stop(
     user_id: str,
     alpaca_account_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Kill switch. Pauses the personality and cancels its pending Alpaca orders."""
+    """Kill switch. Pauses the personality and cancels its pending Alpaca orders.
+
+    alpaca_account_id is accepted for API compat but ignored (Trading API
+    uses the single paper account).
+    """
     personality = await get_personality(db, personality_id)
     if personality is None:
         return _err("personality_not_found", personality_id=personality_id)
@@ -452,16 +454,9 @@ async def emergency_stop(
             expired_ids.append(p.id)
 
     # Cancel any in-flight Alpaca orders for this personality.
-    #
-    # Do not gate on the local proposal lifecycle state here: proposals are
-    # typically transitioned to "executed" immediately after order submission,
-    # while the Alpaca order itself may still be open or partially filled and
-    # therefore still cancellable. The broker is the source of truth for
-    # whether an order can be cancelled, so attempt cancellation for every
-    # unique Alpaca order id we have recorded.
     cancelled: List[str] = []
-    cancel_order = _alpaca_cancel_order()
-    if alpaca_account_id:
+    if _alpaca_is_configured():
+        cancel_order = _alpaca_cancel_order()
         all_for_personality = await list_proposals(
             db,
             user_id=user_id,
@@ -474,7 +469,7 @@ async def emergency_stop(
                 continue
             seen_alpaca_order_ids.add(p.alpaca_order_id)
             try:
-                success = await asyncio.to_thread(cancel_order, alpaca_account_id, p.alpaca_order_id)
+                success = await asyncio.to_thread(cancel_order, p.alpaca_order_id)
                 if success:
                     cancelled.append(p.alpaca_order_id)
             except Exception as exc:
