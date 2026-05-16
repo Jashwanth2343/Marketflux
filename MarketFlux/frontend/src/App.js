@@ -1,6 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import TopNav from "@/components/TopNav";
@@ -21,6 +21,26 @@ import Auth from "@/pages/Auth";
 import PilotLeaderboard from "@/pages/PilotLeaderboard";
 import PilotPublicProfile from "@/pages/PilotPublicProfile";
 import { Toaster } from "@/components/ui/sonner";
+
+function ThesisRedirect() {
+  const { thesisId } = useParams();
+  return <Navigate to={`/intelligence/thesis/${thesisId}`} replace />;
+}
+
+function ThesisTradLabRedirect() {
+  const { thesisId } = useParams();
+  return <Navigate to={`/intelligence/thesis/${thesisId}/trade-lab`} replace />;
+}
+
+function PilotProfileRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={`/leaderboard/p/${slug}`} replace />;
+}
+
+function FundOSTerminalRedirect() {
+  const { strategyId } = useParams();
+  return <Navigate to={`/copilot?tab=studio&strategy=${strategyId}`} replace />;
+}
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -111,13 +131,15 @@ function AppRouter() {
               <Route path="/macro" element={<Navigate to="/intelligence?tab=macro" replace />} />
               <Route path="/theses" element={<Navigate to="/intelligence?tab=theses" replace />} />
               <Route path="/theses/new" element={<Navigate to="/intelligence/thesis/new" replace />} />
+              <Route path="/theses/:thesisId" element={<ThesisRedirect />} />
+              <Route path="/theses/:thesisId/trade-lab" element={<ThesisTradLabRedirect />} />
               <Route path="/risk" element={<Navigate to="/portfolio?tab=risk" replace />} />
               <Route path="/fund-os" element={<Navigate to="/copilot?tab=studio" replace />} />
               <Route path="/fund-os/terminal" element={<Navigate to="/copilot?tab=studio" replace />} />
-              <Route path="/fund-os/terminal/:strategyId" element={<Navigate to="/copilot?tab=studio" replace />} />
+              <Route path="/fund-os/terminal/:strategyId" element={<FundOSTerminalRedirect />} />
               <Route path="/pilot" element={<Navigate to="/copilot" replace />} />
               <Route path="/pilot/leaderboard" element={<Navigate to="/leaderboard" replace />} />
-              <Route path="/pilot/p/:slug" element={<Navigate to="/leaderboard/p/:slug" replace />} />
+              <Route path="/pilot/p/:slug" element={<PilotProfileRedirect />} />
             </Routes>
           </main>
         </div>

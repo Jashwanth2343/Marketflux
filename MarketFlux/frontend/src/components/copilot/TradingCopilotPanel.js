@@ -45,7 +45,11 @@ export default function TradingCopilotPanel() {
 
     const grantConsent = async () => {
         try {
-            await axios.post(`${API}/api/pilot/consent`, { consent: true }, { withCredentials: true });
+            await axios.post(`${API}/api/pilot/consent`, {
+                accept_paper_only: true,
+                accept_not_advice: true,
+                accept_audit_logging: true,
+            }, { withCredentials: true });
             toast.success('Copilot consent granted');
             fetchAll();
         } catch (err) {
@@ -88,7 +92,7 @@ export default function TradingCopilotPanel() {
         );
     }
 
-    if (consentStatus && !consentStatus.consented) {
+    if (consentStatus && !consentStatus.item) {
         return (
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center max-w-lg mx-auto">
                 <ShieldCheck className="w-12 h-12 text-primary mx-auto mb-4" />

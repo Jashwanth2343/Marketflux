@@ -66,7 +66,7 @@ function PaperPortfolioPlaceholder() {
 
 export default function Copilot() {
     const [searchParams, setSearchParams] = useSearchParams();
-    const activeTab = searchParams.get('tab') || 'studio';
+    const activeTab = searchParams.get('tab') || 'copilot';
 
     const handleTabChange = (value) => {
         setSearchParams({ tab: value }, { replace: true });

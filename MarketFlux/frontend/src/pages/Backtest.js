@@ -377,7 +377,7 @@ function ResultsPanel({ result, walkForward }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {walkForward.windows.map((w, i) => (
+                                {(walkForward.folds || []).map((w, i) => (
                                     <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
                                         <td className="py-2 px-2 text-muted-foreground">{i + 1}</td>
                                         <td className="py-2 px-2">{w.window.train_start} → {w.window.train_end}</td>

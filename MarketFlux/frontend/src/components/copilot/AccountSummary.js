@@ -27,8 +27,9 @@ export default function AccountSummary() {
                 alpacaApi.getAccount(),
                 alpacaApi.getPositions(),
             ]);
-            setAccount(acct);
-            setPositions(Array.isArray(pos) ? pos : []);
+            setAccount(acct?.item || acct);
+            const posList = pos?.items || pos;
+            setPositions(Array.isArray(posList) ? posList : []);
         } catch (err) {
             setError(err?.response?.data?.detail || err?.message || 'Failed to load account');
         } finally {

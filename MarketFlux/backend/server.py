@@ -1678,8 +1678,11 @@ async def health_db():
     except Exception:
         pass
     try:
-        from cache import redis_cache_get
-        result["redis"]["connected"] = True
+        from cache import _get_redis
+        client = _get_redis()
+        if client is not None:
+            client.ping()
+            result["redis"]["connected"] = True
     except Exception:
         pass
     return result

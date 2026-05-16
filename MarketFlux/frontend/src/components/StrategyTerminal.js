@@ -25,7 +25,7 @@ function toneForConfidence(confidence) {
   return 'border-rose-400/20 bg-rose-400/10 text-rose-300';
 }
 
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 
 export default function StrategyTerminal({ embedded = false }) {
@@ -45,12 +45,15 @@ export default function StrategyTerminal({ embedded = false }) {
 
   const strategySummary = useMemo(() => meta?.strategy || null, [meta]);
   const { strategyId } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryStrategyId = searchParams.get('strategy');
 
   useEffect(() => {
-    if (strategyId) {
-      loadStrategy(strategyId);
+    const id = strategyId || queryStrategyId;
+    if (id) {
+      loadStrategy(id);
     }
-  }, [strategyId]);
+  }, [strategyId, queryStrategyId]);
 
   const loadStrategy = async (id) => {
     try {
