@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import List, Dict
 import asyncio
 import httpx
-from ai_service import analyze_sentiments_batch
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +93,6 @@ async def fetch_single_feed(feed_info: Dict) -> List[Dict]:
                     "published_at": pub_date.isoformat(),
                     "fetched_at": datetime.now(timezone.utc).isoformat(),
                     "tickers": [],
-                    "sentiment": None,
-                    "sentiment_score": None,
                     "thumbnail_url": thumbnail_url,
                 }
                 articles.append(article)
@@ -113,15 +110,6 @@ async def fetch_all_feeds() -> List[Dict]:
     for result in results:
         if isinstance(result, list):
             all_articles.extend(result)
-
-    if all_articles:
-        # Run FinBERT Batch inference on the scraped general news
-        titles = [art["title"] for art in all_articles]
-        sentiments = await analyze_sentiments_batch(titles)
-        
-        for art, sent in zip(all_articles, sentiments):
-            art["sentiment"] = sent["label"]
-            art["sentiment_score"] = sent["score"]
 
     # Embed articles into semantic news store for agent RAG
     try:

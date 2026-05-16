@@ -98,12 +98,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-async def _warmup_finbert():
-    await asyncio.sleep(5)
-    from ai_service import _get_sentiment_pipeline
-    await asyncio.to_thread(_get_sentiment_pipeline)
-    logger.info("FinBERT pre-warmed and ready")
-
 @app.get("/")
 def read_root():
     return {
@@ -1589,31 +1583,7 @@ async def fetch_and_store_news():
         articles = await fetch_all_feeds()
         stored = await store_articles(db, articles)
 
-        # Articles already have sentiment computed via fetch_all_feeds
-        unanalyzed = await db.news_articles.find(
-            {"sentiment": None}, {"_id": 0}
-        ).sort("published_date", -1).limit(50).to_list(50)
-
-        if unanalyzed:
-            titles = [article["title"] for article in unanalyzed]
-            
-            # Using our robust imported ai_service batch processor
-            from ai_service import analyze_sentiments_batch
-            sentiments = await analyze_sentiments_batch(titles)
-            
-            for article, sentiment in zip(unanalyzed, sentiments):
-                try:
-                    await db.news_articles.update_one(
-                        {"article_id": article["article_id"]},
-                        {"$set": {
-                            "sentiment": sentiment["label"],
-                            "sentiment_score": sentiment["score"],
-                        }}
-                    )
-                except Exception as e:
-                    logger.error(f"Sentiment DB update error: {e}")
-
-        logger.info(f"News refresh: {stored} new, {len(unanalyzed)} retro-analyzed")
+        logger.info(f"News refresh: {stored} articles stored")
     except Exception as e:
         logger.error(f"News fetch error: {e}")
 
@@ -1702,7 +1672,6 @@ async def startup():
         logger.warning(f"Postgres pool initialization failed: {exc}")
 
     asyncio.create_task(periodic_news_fetch())
-    asyncio.create_task(_warmup_finbert())
     asyncio.create_task(pilot_expire_sweep())
     asyncio.create_task(pilot_nightly_reflection_loop())
     logger.info("MarketFlux backend started")
