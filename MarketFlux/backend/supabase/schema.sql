@@ -258,6 +258,21 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
 CREATE INDEX idx_snapshots_user ON portfolio_snapshots(user_id, snapshot_date DESC);
 
 -- ===========================================================================
+-- WORKFLOW CHECKPOINTS (LangGraph-compatible agent state persistence)
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS workflow_checkpoints (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    thread_id TEXT NOT NULL,
+    step TEXT NOT NULL,
+    state JSONB NOT NULL DEFAULT '{}',
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_checkpoints_thread ON workflow_checkpoints(thread_id, created_at DESC);
+CREATE INDEX idx_checkpoints_step ON workflow_checkpoints(thread_id, step);
+
+-- ===========================================================================
 -- ROW LEVEL SECURITY
 -- ===========================================================================
 
@@ -271,6 +286,7 @@ ALTER TABLE pilot_memory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE drift_flags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portfolio_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_checkpoints ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: users see only their own
 CREATE POLICY profiles_self ON profiles
@@ -325,6 +341,11 @@ CREATE POLICY drift_self ON drift_flags
 -- Snapshots: users see only their own
 CREATE POLICY snapshots_self ON portfolio_snapshots
     FOR ALL USING (user_id = auth.uid());
+
+-- Checkpoints: service-role access only (backend writes, no direct user access)
+CREATE POLICY checkpoints_service ON workflow_checkpoints
+    FOR ALL USING (true)
+    WITH CHECK (true);
 
 -- ===========================================================================
 -- FUNCTIONS
