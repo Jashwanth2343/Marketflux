@@ -278,7 +278,7 @@ function StockRiskPanel() {
 }
 
 // --- Main RiskConsole Page ---
-export default function RiskConsole() {
+export default function RiskConsole({ embedded = false }) {
   const { user } = useAuth();
   const [portfolioResult, setPortfolioResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -317,8 +317,8 @@ export default function RiskConsole() {
   const portBeta = result?.portfolio_beta;
   const betaColor = portBeta == null ? '#00F3FF' : portBeta > 1.3 ? '#F85149' : portBeta > 0.9 ? '#F0A500' : '#3FB950';
 
-  return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+  const content = (
+    <>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -497,6 +497,14 @@ export default function RiskConsole() {
           </Card>
         </div>
       </div>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      {content}
     </div>
   );
 }

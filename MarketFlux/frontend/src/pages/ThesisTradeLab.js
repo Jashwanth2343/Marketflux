@@ -225,7 +225,7 @@ export default function ThesisTradeLab() {
             </p>
           </div>
           <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/5 text-foreground hover:bg-white/10">
-            <Link to={`/theses/${thesisId}`}>
+            <Link to={`/intelligence/thesis/${thesisId}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to thesis
             </Link>

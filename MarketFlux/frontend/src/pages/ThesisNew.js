@@ -84,7 +84,7 @@ export default function ThesisNew() {
       });
       const thesisId = res.item?.thesis?.id;
       toast.success('Thesis created. Evidence collection is running in the background.');
-      navigate(`/theses/${thesisId}`);
+      navigate(`/intelligence/thesis/${thesisId}`);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Unable to create thesis right now.');
     } finally {
@@ -104,7 +104,7 @@ export default function ThesisNew() {
             </p>
           </div>
           <Button asChild variant="outline" className="rounded-full border-white/10 bg-white/5 text-foreground hover:bg-white/10">
-            <Link to="/theses">
+            <Link to="/intelligence?tab=theses">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to library
             </Link>

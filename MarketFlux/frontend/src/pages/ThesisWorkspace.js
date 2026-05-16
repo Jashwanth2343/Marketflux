@@ -278,7 +278,7 @@ export default function ThesisWorkspace() {
               Refresh
             </Button>
             <Button asChild className="rounded-full">
-              <Link to={`/theses/${thesisId}/trade-lab`}>
+              <Link to={`/intelligence/thesis/${thesisId}/trade-lab`}>
                 Open paper trade lab
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -481,7 +481,7 @@ export default function ThesisWorkspace() {
                           </div>
                         )}
                         <Button asChild variant="outline" className="w-full rounded-full border-primary/20 bg-primary/10 text-primary hover:bg-primary/20">
-                          <Link to={`/theses/${thesisId}/trade-lab`}>Go to paper trade lab</Link>
+                          <Link to={`/intelligence/thesis/${thesisId}/trade-lab`}>Go to paper trade lab</Link>
                         </Button>
                       </CardContent>
                     </Card>

@@ -82,8 +82,7 @@ export default function SearchBar({ variant = 'default', className = '' }) {
     if (typeof item === 'string') {
       navigate(`/stock/${item}`);
     } else if (item.kind === 'strategy') {
-      // Just route to fund-os for now, or could have a modal
-      navigate(`/fund-os?strategy=${item.id}`);
+      navigate(`/copilot?tab=studio&strategy=${item.id}`);
     } else {
       navigate(`/stock/${item.symbol || item}`);
     }

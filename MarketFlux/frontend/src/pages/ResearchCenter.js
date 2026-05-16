@@ -508,7 +508,7 @@ function ThematicResearch() {
 }
 
 // --- Main ResearchCenter Page ---
-export default function ResearchCenter() {
+export default function ResearchCenter({ embedded = false }) {
   const [activeTab, setActiveTab] = useState('ideas');
   const [ticker, setTicker] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -530,8 +530,8 @@ export default function ResearchCenter() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+  const content = (
+    <>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
@@ -648,10 +648,10 @@ export default function ResearchCenter() {
             </CardHeader>
             <CardContent className="pt-3 space-y-1.5">
               {[
-                { label: 'Macro Dashboard', path: '/macro', icon: Activity, color: '#00F3FF' },
-                { label: 'Risk Console', path: '/risk', icon: Shield, color: '#F0A500' },
-                { label: 'AI Screener', path: '/screener', icon: Search, color: '#00FF41' },
-                { label: 'News Feed', path: '/news', icon: Star, color: '#F0A500' },
+                { label: 'Macro Dashboard', path: '/intelligence?tab=macro', icon: Activity, color: '#00F3FF' },
+                { label: 'Risk Console', path: '/portfolio?tab=risk', icon: Shield, color: '#F0A500' },
+                { label: 'AI Screener', path: '/intelligence?tab=screener', icon: Search, color: '#00FF41' },
+                { label: 'News Feed', path: '/intelligence?tab=news', icon: Star, color: '#F0A500' },
               ].map(({ label, path, icon: Icon, color }) => (
                 <button
                   key={path}
@@ -691,6 +691,14 @@ export default function ResearchCenter() {
           </Card>
         </div>
       </div>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      {content}
     </div>
   );
 }

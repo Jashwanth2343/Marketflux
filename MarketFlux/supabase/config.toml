@@ -1,0 +1,13 @@
+[project]
+id = "etanlxohfiwhdwkbqyzq"
+name = "MarketFlux"
+
+[db]
+port = 54322
+major_version = 15
+
+[api]
+enabled = false
+
+[auth]
+enabled = false

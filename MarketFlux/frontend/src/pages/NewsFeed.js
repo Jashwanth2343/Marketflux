@@ -6,7 +6,7 @@ import { Search, RefreshCw, Filter } from 'lucide-react';
 import NewsCard from '@/components/NewsCard';
 import api from '@/lib/api';
 
-export default function NewsFeed() {
+export default function NewsFeed({ embedded = false }) {
   const [articles, setArticles] = useState([]);
   const [keyword, setKeyword] = useState('');
   const [sentimentFilter, setSentimentFilter] = useState('');
@@ -62,8 +62,8 @@ export default function NewsFeed() {
   const sentimentOptions = ['', 'bullish', 'bearish', 'neutral'];
   const categoryOptions = ['', 'general', 'technology', 'finance', 'world'];
 
-  return (
-    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="news-feed-page">
+  const content = (
+    <>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -192,6 +192,14 @@ export default function NewsFeed() {
           Load More
         </Button>
       )}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="news-feed-page">
+      {content}
     </div>
   );
 }

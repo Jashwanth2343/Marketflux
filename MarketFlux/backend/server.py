@@ -1623,10 +1623,20 @@ async def startup():
         from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
 
         if is_pg_configured():
-            await get_pg_pool()
+            pool = await get_pg_pool()
             logger.info("Shared vNext Postgres pool initialized")
+            if os.getenv("MARKETFLUX_AUTO_APPLY_SCHEMA") == "true" and os.getenv("NODE_ENV") != "production":
+                async with pool.acquire() as conn:
+                    exists = await conn.fetchval(
+                        "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='theses')"
+                    )
+                    if not exists:
+                        schema_path = Path(__file__).parent / "sql" / "vnext_pgvector_schema.sql"
+                        if schema_path.exists():
+                            await conn.execute(schema_path.read_text())
+                            logger.info("Dev auto-applied vnext_pgvector_schema.sql")
         else:
-            logger.info("Shared vNext Postgres pool skipped: MARKETFLUX_VNEXT_DATABASE_URL/FUNDOS_DATABASE_URL not configured")
+            logger.info("Shared vNext Postgres pool skipped: SUPABASE_DB_URL/MARKETFLUX_VNEXT_DATABASE_URL/FUNDOS_DATABASE_URL not configured")
     except Exception as exc:
         logger.warning(f"Postgres pool initialization failed: {exc}")
 
@@ -1645,6 +1655,34 @@ async def shutdown():
     except Exception as exc:
         logger.warning(f"Failed to close shared vNext Postgres pool cleanly: {exc}")
     client.close()
+
+@app.get("/api/health/db")
+async def health_db():
+    result = {"postgres": {"connected": False}, "mongo": {"connected": False}, "redis": {"connected": False}}
+    try:
+        result["mongo"]["connected"] = await db.command("ping") is not None
+    except Exception:
+        pass
+    try:
+        from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
+        if is_pg_configured():
+            pool = await get_pg_pool()
+            async with pool.acquire() as conn:
+                result["postgres"]["connected"] = True
+                tables = await conn.fetch(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('theses','strategy_proposals','paper_trades')"
+                )
+                result["postgres"]["tables_ok"] = len(tables) == 3
+                vec = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')")
+                result["postgres"]["vector_ext"] = bool(vec)
+    except Exception:
+        pass
+    try:
+        from cache import redis_cache_get
+        result["redis"]["connected"] = True
+    except Exception:
+        pass
+    return result
 
 app.include_router(api_router)
 

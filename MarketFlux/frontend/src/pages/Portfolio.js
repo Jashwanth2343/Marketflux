@@ -30,7 +30,7 @@ function renderMarkdown(text) {
 
 const DONUT_COLORS = ['#00FF41', '#00F3FF', '#FFB000', '#FF3333', '#8B5CF6', '#F472B6', '#34D399', '#FBBF24', '#60A5FA', '#C084FC'];
 
-export default function Portfolio() {
+export default function Portfolio({ embedded = false }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [holdings, setHoldings] = useState(() => {
@@ -240,8 +240,8 @@ export default function Portfolio() {
     );
   };
 
-  return (
-    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="portfolio-page">
+  const content = (
+    <>
       <div>
         <h1 className="text-xl md:text-3xl font-bold tracking-tighter uppercase text-foreground">
           <Briefcase className="w-6 h-6 inline mr-2 text-secondary" />
@@ -612,6 +612,14 @@ export default function Portfolio() {
           </CardContent>
         </Card>
       )}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="portfolio-page">
+      {content}
     </div>
   );
 }
