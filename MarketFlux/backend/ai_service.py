@@ -8,12 +8,8 @@ from datetime import datetime, timezone, timedelta
 import diskcache
 import yfinance as yf
 
-# Disable HuggingFace Hub network calls when loading models
-os.environ["HF_HUB_OFFLINE"] = "1"
-
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
-from transformers import pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -26,19 +22,6 @@ os.makedirs(_CACHE_BASE, mode=0o700, exist_ok=True)
 _ticker_cache = diskcache.Cache(os.path.join(_CACHE_BASE, "ticker_cache"))
 _usage_cache = diskcache.Cache(os.path.join(_CACHE_BASE, "usage_cache"))
 
-
-_sentiment_pipeline = None
-
-def _get_sentiment_pipeline():
-    global _sentiment_pipeline
-    if _sentiment_pipeline is None:
-        try:
-            logger.info("Lazy-loading FinBERT sentiment pipeline...")
-            _sentiment_pipeline = pipeline("sentiment-analysis", model="ProsusAI/finbert")
-            logger.info("FinBERT loaded successfully.")
-        except Exception as e:
-            logger.error(f"Failed to load FinBERT: {e}")
-    return _sentiment_pipeline
 
 # We defer genai configuration to lazily use the env var
 _gemini_configured = False
@@ -102,45 +85,6 @@ def get_gemini_model(model_id: str = GEMINI_FLASH, system_instruction: Optional[
     if system_instruction:
         return genai.GenerativeModel(model_id, system_instruction=system_instruction, safety_settings=safety_settings)
     return genai.GenerativeModel(model_id, safety_settings=safety_settings)
-
-
-async def analyze_sentiments_batch(headlines: List[str]) -> List[Dict]:
-    """
-    Use open-source FinBERT for batch news sentiment analysis.
-    Truncates to 512 chars and only classifies if confidence > 0.65.
-    """
-    try:
-        global _sentiment_pipeline
-        if not _sentiment_pipeline:
-            return [{"label": "LOADING", "score": 0.0} for _ in headlines]
-            
-        if not headlines:
-            return []
-
-        # Truncate all headlines to 512 chars for FinBERT Tokenizer limits
-        truncated_headlines = [h[:512] for h in headlines]
-
-        # Use asyncio.to_thread()
-        results = await asyncio.to_thread(_sentiment_pipeline, truncated_headlines)
-        
-        processed_results = []
-        for res in results:
-            label = res['label'].upper()
-            score = round(res['score'], 2)
-            
-            # Fallback to Neutral if the model isn't confident enough
-            if score < 0.65:
-                label = 'NEUTRAL'
-                
-            processed_results.append({
-                "label": label,
-                "score": score
-            })
-            
-        return processed_results
-    except Exception as e:
-        logger.error(f"Sentiment analysis batch error: {e}")
-        return [{"label": "NEUTRAL", "score": 0.0} for _ in headlines]
 
 
 async def generate_summary(title: str, content: str) -> str:
