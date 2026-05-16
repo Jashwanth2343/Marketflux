@@ -198,24 +198,32 @@ export default function MacroDashboard({ embedded = false }) {
 
   useEffect(() => { load(); }, []);
 
-  if (loading) return (
-    <div className="p-4 md:p-6 space-y-4">
-      <Skeleton className="h-8 w-48" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-48" />)}
+  if (loading) {
+    const skeleton = (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-48" />)}
+        </div>
       </div>
-    </div>
-  );
+    );
+    if (embedded) return skeleton;
+    return <div className="p-4 md:p-6">{skeleton}</div>;
+  }
 
-  if (error) return (
-    <div className="p-6 text-center">
-      <AlertTriangle className="w-10 h-10 text-destructive mx-auto mb-3" />
-      <p className="font-mono text-sm text-destructive">{error}</p>
-      <Button onClick={() => load()} variant="outline" className="mt-4 font-mono text-xs uppercase tracking-wider">
-        <RefreshCw className="w-3.5 h-3.5 mr-2" /> Retry
-      </Button>
-    </div>
-  );
+  if (error) {
+    const errContent = (
+      <div className="py-6 text-center">
+        <AlertTriangle className="w-10 h-10 text-destructive mx-auto mb-3" />
+        <p className="font-mono text-sm text-destructive">{error}</p>
+        <Button onClick={() => load()} variant="outline" className="mt-4 font-mono text-xs uppercase tracking-wider">
+          <RefreshCw className="w-3.5 h-3.5 mr-2" /> Retry
+        </Button>
+      </div>
+    );
+    if (embedded) return errContent;
+    return <div className="p-4 md:p-6">{errContent}</div>;
+  }
 
   const { yield_curve, assets, sectors, vix_regime, fear_greed, economic_calendar, macro_summary, fetched_at } = data || {};
 

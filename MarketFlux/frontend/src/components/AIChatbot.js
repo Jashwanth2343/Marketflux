@@ -388,9 +388,12 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
   const getContext = () => {
     const path = location.pathname;
     if (path.startsWith('/stock/')) return `User is viewing stock details for ${path.split('/stock/')[1]}`;
-    if (path === '/news') return 'User is on the news feed page';
-    if (path === '/screener') return 'User is on the AI stock screener page';
-    if (path === '/portfolio') return 'User is on the portfolio page';
+    if (path === '/intelligence') return 'User is on the intelligence hub (news, screener, research, macro, theses)';
+    if (path === '/copilot') return 'User is on the trading copilot page';
+    if (path === '/backtest') return 'User is on the backtest lab';
+    if (path === '/portfolio') return 'User is on the portfolio & risk page';
+    if (path === '/leaderboard') return 'User is on the pilot leaderboard';
+    if (path.startsWith('/intelligence/thesis')) return 'User is viewing a thesis workspace';
     return 'User is on the dashboard';
   };
 

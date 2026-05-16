@@ -1694,6 +1694,7 @@ from vnext.adapter import build_adapter_router
 from vnext.fundos_router import build_fundos_router
 from vnext.alpaca_router import build_alpaca_router
 from vnext.pilot_router import build_pilot_router
+from vnext.alpaca_webhooks import build_webhook_router
 from backtest.router import build_backtest_router
 
 app.include_router(build_vnext_router(db, get_current_user))
@@ -1701,4 +1702,5 @@ app.include_router(build_adapter_router(db, get_current_user))
 app.include_router(build_fundos_router(db, get_current_user))
 app.include_router(build_alpaca_router(db, get_current_user))
 app.include_router(build_pilot_router(db, get_current_user))
+app.include_router(build_webhook_router(db))
 app.include_router(build_backtest_router(get_current_user))

@@ -280,7 +280,7 @@ export default function PilotLeaderboard() {
             <div className="px-4 py-12 text-center text-xs text-muted-foreground">Loading…</div>
           ) : rest.length === 0 && podium.length === 0 ? (
             <div className="px-4 py-12 text-center text-xs text-muted-foreground">
-              No public personalities yet. Toggle a personality public on your /pilot dashboard to
+              No public personalities yet. Toggle a personality public on your Copilot dashboard to
               appear here.
             </div>
           ) : (

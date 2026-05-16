@@ -50,9 +50,8 @@ export default function StrategyTerminal({ embedded = false }) {
 
   useEffect(() => {
     const id = strategyId || queryStrategyId;
-    if (id) {
-      loadStrategy(id);
-    }
+    if (id) loadStrategy(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [strategyId, queryStrategyId]);
 
   const loadStrategy = async (id) => {
