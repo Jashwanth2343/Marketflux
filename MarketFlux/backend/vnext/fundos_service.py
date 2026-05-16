@@ -45,7 +45,8 @@ async def build_strategy_queue(db, user: Optional[Dict[str, Any]], limit: int = 
         if user_id:
             rows = await conn.fetch("SELECT * FROM strategy_proposals WHERE owner_user_id = $1 ORDER BY created_at DESC LIMIT $2", user_id, limit)
         else:
-            rows = await conn.fetch("SELECT * FROM strategy_proposals ORDER BY created_at DESC LIMIT $1", limit)
+            # Unauthenticated callers receive an empty queue — never expose other users' strategies
+            rows = []
             
         for row in rows:
             items.append({

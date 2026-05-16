@@ -234,8 +234,28 @@ export default function Dashboard() {
                   </div>
                 </Link>
               ))}
+              {loading && activeMovers.length === 0 && (
+                <div className="space-y-0">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="flex items-center justify-between py-2.5 px-4 border-b border-border/10 animate-pulse">
+                      <div className="space-y-1">
+                        <div className="h-2.5 w-12 bg-muted rounded" />
+                        <div className="h-2 w-20 bg-muted/60 rounded" />
+                      </div>
+                      <div className="space-y-1 text-right">
+                        <div className="h-2.5 w-14 bg-muted rounded" />
+                        <div className="h-2 w-10 bg-muted/60 rounded ml-auto" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {activeMovers.length === 0 && !loading && (
-                <div className="flex h-full items-center justify-center text-xs text-muted-foreground font-mono">No data</div>
+                <div className="flex flex-col h-full items-center justify-center gap-2 text-center px-4">
+                  <span className="text-2xl">📊</span>
+                  <p className="text-xs font-mono text-muted-foreground">Market data unavailable</p>
+                  <p className="text-[10px] text-muted-foreground/50 font-mono">Check back during market hours</p>
+                </div>
               )}
             </div>
           </CardContent>
@@ -290,15 +310,15 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
-                <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">VOLATILITY(VIX)</span>
+                <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">VOLATILITY</span>
                 <span className="text-[13px] font-bold font-sans text-foreground">
-                  29.49 (+24%)
+                  {indices['VIX']?.price ? `${indices['VIX'].price.toFixed(1)}` : indices['^VIX']?.price ? `${indices['^VIX'].price.toFixed(1)}` : '--'}
                 </span>
               </div>
               <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
-                <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">MARKET BREADTH</span>
-                <span className={`text-[13px] font-bold font-sans text-foreground`}>
-                  Bearish: {mood.bearish || 88}%
+                <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">SENTIMENT</span>
+                <span className={`text-[13px] font-bold font-sans ${mood.dominant === 'bullish' ? 'text-[#00FF41]' : mood.dominant === 'bearish' ? 'text-[#FF4444]' : 'text-[#FFB000]'}`}>
+                  {mood.fng_index ? `${mood.fng_index}/100` : '--'}
                 </span>
               </div>
             </div>

@@ -5,7 +5,8 @@ submitting/canceling orders, viewing positions, and portfolio history.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, List, Optional
+import asyncio
+from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -71,10 +72,16 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             return alpaca_account_id
 
         given_name = user.get("name", "Paper").split()[0] if user.get("name") else "Paper"
-        family_name = user.get("name", "Trader").split()[-1] if user.get("name") and len(user.get("name", "").split()) > 1 else "Trader"
+        family_name = (
+            user.get("name", "Trader").split()[-1]
+            if user.get("name") and len(user.get("name", "").split()) > 1
+            else "Trader"
+        )
         email = user.get("email", f"{user_id}@marketflux.paper")
 
-        result = create_trading_account(
+        # create_trading_account is a blocking network call — run in thread pool
+        result = await asyncio.to_thread(
+            create_trading_account,
             given_name=given_name,
             family_name=family_name,
             email=email,
@@ -113,7 +120,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
         user = await require_user(request)
         account_id = await _get_or_create_alpaca_account(user, db)
-        account_info = get_account(account_id)
+        account_info = await asyncio.to_thread(get_account, account_id)
         if not account_info:
             raise HTTPException(502, "Unable to fetch account from Alpaca.")
         return {"item": account_info}
@@ -127,11 +134,11 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         user = await require_user(request)
         user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
         if (user_doc or {}).get("alpaca_account_id"):
-            account_info = get_account(user_doc["alpaca_account_id"])
+            account_info = await asyncio.to_thread(get_account, user_doc["alpaca_account_id"])
             return {"item": account_info, "message": "Account already exists."}
 
         account_id = await _get_or_create_alpaca_account(user, db)
-        account_info = get_account(account_id)
+        account_info = await asyncio.to_thread(get_account, account_id)
         return {"item": account_info, "message": "Account created successfully."}
 
     # ------------------------------------------------------------------
@@ -150,7 +157,8 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         if payload.order_type == "limit":
             if payload.limit_price is None or payload.limit_price <= 0:
                 raise HTTPException(422, "limit_price is required for limit orders.")
-            order = submit_limit_order(
+            order = await asyncio.to_thread(
+                submit_limit_order,
                 account_id=account_id,
                 symbol=payload.symbol,
                 qty=payload.qty,
@@ -159,7 +167,8 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
                 time_in_force=payload.time_in_force,
             )
         else:
-            order = submit_market_order(
+            order = await asyncio.to_thread(
+                submit_market_order,
                 account_id=account_id,
                 symbol=payload.symbol,
                 qty=payload.qty,
@@ -179,7 +188,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
         user = await require_user(request)
         account_id = await _get_or_create_alpaca_account(user, db)
-        orders = list_orders(account_id, status=status, limit=min(limit, 200))
+        orders = await asyncio.to_thread(list_orders, account_id, status=status, limit=min(limit, 200))
         return {"items": orders, "total": len(orders)}
 
     @router.get("/orders/{order_id}")
@@ -190,7 +199,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
         user = await require_user(request)
         account_id = await _get_or_create_alpaca_account(user, db)
-        order = get_order(account_id, order_id)
+        order = await asyncio.to_thread(get_order, account_id, order_id)
         if not order:
             raise HTTPException(404, "Order not found.")
         return {"item": order}
@@ -203,7 +212,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
         user = await require_user(request)
         account_id = await _get_or_create_alpaca_account(user, db)
-        success = cancel_order(account_id, order_id)
+        success = await asyncio.to_thread(cancel_order, account_id, order_id)
         if not success:
             raise HTTPException(400, "Failed to cancel order. It may already be filled or cancelled.")
         return {"message": "Order cancelled successfully."}
@@ -220,7 +229,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
         user = await require_user(request)
         account_id = await _get_or_create_alpaca_account(user, db)
-        positions = get_positions(account_id)
+        positions = await asyncio.to_thread(get_positions, account_id)
         return {"items": positions, "total": len(positions)}
 
     @router.post("/positions/close")
@@ -231,7 +240,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
         user = await require_user(request)
         account_id = await _get_or_create_alpaca_account(user, db)
-        result = close_position(account_id, payload.symbol)
+        result = await asyncio.to_thread(close_position, account_id, payload.symbol)
         if not result:
             raise HTTPException(400, f"Failed to close position for {payload.symbol}.")
         return {"item": result, "message": f"Position closed for {payload.symbol}."}
@@ -255,7 +264,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
         user = await require_user(request)
         account_id = await _get_or_create_alpaca_account(user, db)
-        history = get_portfolio_history(account_id, period=period, timeframe=timeframe)
+        history = await asyncio.to_thread(get_portfolio_history, account_id, period=period, timeframe=timeframe)
         if not history:
             return {"timestamp": [], "equity": [], "profit_loss": [], "profit_loss_pct": [], "base_value": 0, "timeframe": timeframe}
         return history

@@ -222,31 +222,46 @@ export default function MacroDashboard({ embedded = false }) {
   const content = (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Globe className="w-7 h-7 text-primary" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Globe className="w-5 h-5 text-[#00F3FF]" />
           <div>
-            <h1 className="font-mono text-xl font-black tracking-tight text-foreground uppercase">Macro Dashboard</h1>
+            <h1 className="font-mono text-xl font-bold tracking-tight text-foreground">
+              Macro <span style={{ color: '#00F3FF', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>Dashboard</span>
+            </h1>
             <p className="font-mono text-[11px] text-muted-foreground">
-              Yield Curve • VIX Regime • Sector Rotation • Economic Calendar
+              Yield Curve · VIX Regime · Sector Rotation · Economic Calendar
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {fetched_at && (
             <span className="font-mono text-[10px] text-muted-foreground hidden md:inline">
-              Updated {new Date(fetched_at).toLocaleTimeString()}
+              {new Date(fetched_at).toLocaleTimeString()}
             </span>
           )}
-          <Button onClick={() => load(true)} disabled={refreshing} variant="outline" size="sm" className="font-mono text-xs uppercase tracking-wider">
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
+          <Button
+            onClick={() => load(true)}
+            disabled={refreshing}
+            variant="ghost"
+            size="sm"
+            className="h-8 px-3 text-[11px] font-mono uppercase tracking-wider gap-1.5"
+            style={{
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: refreshing ? '#00F3FF' : 'rgba(255,255,255,0.4)',
+            }}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
           </Button>
         </div>
       </div>
 
       {/* Macro Summary Banner */}
       {macro_summary && (
-        <div className="mb-6 p-3 border border-[#00F3FF]/20 bg-[#00F3FF]/5">
+        <div
+          className="p-3.5 rounded-xl"
+          style={{ border: '1px solid rgba(0,243,255,0.18)', background: 'rgba(0,243,255,0.05)' }}
+        >
           <p className="font-mono text-[10px] text-[#00F3FF] uppercase tracking-wider mb-1.5">Macro Intelligence Summary</p>
           <p className="font-mono text-xs text-foreground/80 leading-relaxed">{macro_summary}</p>
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -243,7 +244,7 @@ function ResearchMemoPanel({ ticker }) {
         <div className="relative">
           <div
             className="prose prose-invert max-w-none font-body text-sm leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: '<p>' + renderMarkdown(memoText) + '</p>' }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize('<p>' + renderMarkdown(memoText) + '</p>') }}
             style={{ fontSize: '0.8rem', lineHeight: '1.6' }}
           />
           {streaming && <span className="inline-block w-2 h-3.5 bg-primary animate-pulse ml-0.5" />}

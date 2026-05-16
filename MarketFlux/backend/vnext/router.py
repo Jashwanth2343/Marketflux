@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+import re as _re
 from .engines import (
     build_command_center,
     build_compare_view,
@@ -15,6 +16,14 @@ from .engines import (
     build_ticker_workspace,
     build_watchlist_board,
 )
+
+_TICKER_RE = _re.compile(r'^[A-Z0-9.\-\^]{1,10}$')
+
+def _validate_ticker(ticker: str) -> str:
+    t = ticker.upper().strip()
+    if not _TICKER_RE.match(t):
+        raise HTTPException(422, f"Invalid ticker symbol: {ticker!r}")
+    return t
 from .repository import get_daily_brief, save_daily_brief
 from .schemas import MiroFishReportStatusRequest, MiroFishScenarioCreate, StrategyTerminalRequest
 from .mirofish_bridge import MiroFishBridgeClient
@@ -54,6 +63,7 @@ def build_vnext_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
 
     @router.get("/research/ticker/{ticker}")
     async def ticker_workspace(ticker: str):
+        ticker = _validate_ticker(ticker)
         return await build_ticker_workspace(ticker)
 
     @router.get("/watchlists/board")
@@ -68,7 +78,7 @@ def build_vnext_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
 
     @router.get("/compare")
     async def compare_tickers(tickers: str):
-        parsed = [ticker.strip().upper() for ticker in tickers.split(",") if ticker.strip()]
+        parsed = [_validate_ticker(t) for t in tickers.split(",") if t.strip()]
         if len(parsed) < 2:
             raise HTTPException(422, "Please provide at least two comma-separated tickers.")
         return await build_compare_view(parsed)

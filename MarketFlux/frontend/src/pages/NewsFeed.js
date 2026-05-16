@@ -1,10 +1,70 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, RefreshCw, Filter } from 'lucide-react';
+import { Search, RefreshCw, Filter, Newspaper, Wifi, WifiOff } from 'lucide-react';
 import NewsCard from '@/components/NewsCard';
 import api from '@/lib/api';
+
+const SENTIMENT_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'bullish', label: '▲ Bullish', color: '#00FF41', bg: 'rgba(0,255,65,0.08)', border: 'rgba(0,255,65,0.25)' },
+  { value: 'bearish', label: '▼ Bearish', color: '#FF4444', bg: 'rgba(255,68,68,0.08)', border: 'rgba(255,68,68,0.25)' },
+  { value: 'neutral', label: '◆ Neutral', color: '#FFB000', bg: 'rgba(255,176,0,0.08)', border: 'rgba(255,176,0,0.25)' },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'general', label: 'General' },
+  { value: 'technology', label: 'Tech' },
+  { value: 'finance', label: 'Finance' },
+  { value: 'world', label: 'World' },
+];
+
+function SkeletonCard() {
+  return (
+    <div
+      className="rounded-lg border overflow-hidden"
+      style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.07)' }}
+    >
+      <div className="w-full h-36 skeleton-shimmer" />
+      <div className="p-3.5 space-y-2.5">
+        <div className="flex gap-1">
+          <div className="h-4 w-12 rounded skeleton-shimmer" />
+          <div className="h-4 w-10 rounded skeleton-shimmer" />
+        </div>
+        <div className="space-y-1.5">
+          <div className="h-4 w-full rounded skeleton-shimmer" />
+          <div className="h-4 w-4/5 rounded skeleton-shimmer" />
+        </div>
+        <div className="flex gap-2 pt-2 border-t border-[rgba(255,255,255,0.05)]">
+          <div className="h-3 w-16 rounded skeleton-shimmer" />
+          <div className="h-3 w-12 rounded skeleton-shimmer" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterPill({ active, label, color, bg, border, onClick, testId }) {
+  return (
+    <button
+      data-testid={testId}
+      onClick={onClick}
+      className="px-3 py-1.5 rounded-full text-[11px] font-mono font-semibold tracking-wide transition-all duration-150"
+      style={active && color ? {
+        color, background: bg, borderColor: border,
+        border: '1px solid', boxShadow: `0 0 8px ${bg}`
+      } : {
+        color: active ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)',
+        background: active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+        border: '1px solid',
+        borderColor: active ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function NewsFeed({ embedded = false }) {
   const [articles, setArticles] = useState([]);
@@ -15,7 +75,9 @@ export default function NewsFeed({ embedded = false }) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [total, setTotal] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -41,7 +103,10 @@ export default function NewsFeed({ embedded = false }) {
     } catch (e) {
       if (mountedRef.current) console.error('News fetch error:', e);
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+        setInitialLoad(false);
+      }
     }
   }, [keyword, sentimentFilter, categoryFilter, watchlistOnly]);
 
@@ -53,143 +118,249 @@ export default function NewsFeed({ embedded = false }) {
   };
 
   const refreshNews = async () => {
+    setRefreshing(true);
     try {
       await api.post('/news/refresh');
       setTimeout(() => fetchNews(1), 2000);
     } catch { }
+    finally { setTimeout(() => setRefreshing(false), 2500); }
   };
 
-  const sentimentOptions = ['', 'bullish', 'bearish', 'neutral'];
-  const categoryOptions = ['', 'general', 'technology', 'finance', 'world'];
+  const hasActiveFilters = sentimentFilter || categoryFilter || watchlistOnly || keyword;
 
   const content = (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-3xl font-bold tracking-tighter uppercase text-foreground">
-            News <span className="text-secondary glow-text-cyan">Feed</span>
-          </h1>
-          <p className="text-xs font-mono text-muted-foreground mt-1">{total} articles</p>
+          <div className="flex items-center gap-2 mb-1">
+            <Newspaper className="w-5 h-5 text-[#00F3FF]" />
+            <h1 className="text-xl md:text-2xl font-mono font-bold tracking-tight text-foreground">
+              News <span style={{ color: '#00F3FF', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>Feed</span>
+            </h1>
+          </div>
+          <p className="text-[11px] font-mono text-muted-foreground">
+            {total > 0 ? (
+              <span>{total.toLocaleString()} articles · AI-analyzed sentiment</span>
+            ) : (
+              <span>Market intelligence · Real-time</span>
+            )}
+          </p>
         </div>
+
         <Button
           data-testid="refresh-news"
-          variant="outline"
+          variant="ghost"
           size="sm"
           onClick={refreshNews}
-          className="rounded-none border-border font-mono text-xs uppercase tracking-wider hover:bg-secondary hover:text-black"
+          disabled={refreshing}
+          className="text-[11px] font-mono uppercase tracking-wider gap-1.5 h-8 px-3 transition-all"
+          style={{
+            color: refreshing ? '#00FF41' : 'rgba(255,255,255,0.4)',
+            border: '1px solid',
+            borderColor: refreshing ? 'rgba(0,255,65,0.3)' : 'rgba(255,255,255,0.08)',
+            background: refreshing ? 'rgba(0,255,65,0.05)' : 'transparent',
+          }}
         >
-          <RefreshCw className="w-3 h-3 mr-2" />
-          Refresh
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing…' : 'Refresh'}
         </Button>
       </div>
 
-      {/* Search & Filters */}
-      <Card className="rounded-none border-border dark:bg-card/50 bg-card">
-        <CardContent className="p-4">
-          <form onSubmit={handleSearch} className="flex gap-2 mb-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                data-testid="news-search-input"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="Search headlines..."
-                className="pl-10 rounded-none bg-background border-border font-mono text-sm"
+      {/* Search + Filters */}
+      <div
+        className="rounded-xl p-4 space-y-3"
+        style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.07)',
+        }}
+      >
+        {/* Search bar */}
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              data-testid="news-search-input"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="Search headlines, tickers, topics…"
+              className="pl-10 h-9 text-sm font-mono rounded-lg"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            />
+          </div>
+          <Button
+            data-testid="news-search-btn"
+            type="submit"
+            size="sm"
+            className="h-9 px-4 text-[11px] font-mono uppercase tracking-wider rounded-lg"
+            style={{ background: '#00F3FF', color: '#000' }}
+          >
+            Search
+          </Button>
+        </form>
+
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 mr-1">
+            <Filter className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Filters</span>
+          </div>
+
+          {/* Divider */}
+          <div className="h-4 w-px bg-[rgba(255,255,255,0.1)]" />
+
+          {/* Sentiment */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {SENTIMENT_OPTIONS.map(opt => (
+              <FilterPill
+                key={opt.value || 'all-s'}
+                testId={`filter-sentiment-${opt.value || 'all'}`}
+                active={sentimentFilter === opt.value}
+                label={opt.label}
+                color={opt.color}
+                bg={opt.bg}
+                border={opt.border}
+                onClick={() => setSentimentFilter(opt.value)}
               />
-            </div>
-            <Button
-              data-testid="news-search-btn"
-              type="submit"
-              className="rounded-none bg-primary text-black font-mono text-xs uppercase hover:bg-primary/80"
+            ))}
+          </div>
+
+          <div className="h-4 w-px bg-[rgba(255,255,255,0.1)]" />
+
+          {/* Category */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {CATEGORY_OPTIONS.map(opt => (
+              <FilterPill
+                key={opt.value || 'all-c'}
+                testId={`filter-category-${opt.value || 'all'}`}
+                active={categoryFilter === opt.value}
+                label={opt.label}
+                onClick={() => setCategoryFilter(opt.value)}
+              />
+            ))}
+          </div>
+
+          <div className="h-4 w-px bg-[rgba(255,255,255,0.1)]" />
+
+          {/* Watchlist toggle */}
+          <button
+            onClick={() => setWatchlistOnly(!watchlistOnly)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-semibold tracking-wide transition-all duration-150"
+            style={watchlistOnly ? {
+              color: '#00FF41', background: 'rgba(0,255,65,0.08)',
+              border: '1px solid rgba(0,255,65,0.25)',
+              boxShadow: '0 0 8px rgba(0,255,65,0.1)',
+            } : {
+              color: 'rgba(255,255,255,0.35)',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${watchlistOnly ? 'bg-[#00FF41] pulse-live' : 'bg-[rgba(255,255,255,0.2)]'}`} />
+            Watchlist
+          </button>
+
+          {/* Clear all */}
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setSentimentFilter(''); setCategoryFilter('');
+                setWatchlistOnly(false); setKeyword('');
+              }}
+              className="ml-auto text-[10px] font-mono text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
             >
-              Search
-            </Button>
-          </form>
-
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-1">
-              <Filter className="w-3 h-3 text-muted-foreground" />
-              <span className="text-[10px] font-mono text-muted-foreground uppercase mr-1">Sentiment:</span>
-              {sentimentOptions.map(s => (
-                <button
-                  key={s || 'all'}
-                  data-testid={`filter-sentiment-${s || 'all'}`}
-                  onClick={() => setSentimentFilter(s)}
-                  className={`px-2 py-1 text-[10px] font-mono uppercase tracking-wider border transition-colors ${sentimentFilter === s
-                      ? s === 'bullish' ? 'dark:border-[#00FF41] border-[#059669] dark:text-[#00FF41] text-[#059669] dark:bg-[#00FF41] bg-[#059669]/10'
-                        : s === 'bearish' ? 'border-[#FF3333] text-[#FF3333] bg-[#FF3333]/10'
-                          : s === 'neutral' ? 'border-[#FFB000] text-[#FFB000] bg-[#FFB000]/10'
-                            : 'border-primary text-primary bg-primary/10'
-                      : 'border-border text-muted-foreground hover:border-muted-foreground/50'
-                    }`}
-                >
-                  {s || 'All'}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1 ml-2">
-              <span className="text-[10px] font-mono text-muted-foreground uppercase mr-1">Category:</span>
-              {categoryOptions.map(c => (
-                <button
-                  key={c || 'all'}
-                  data-testid={`filter-category-${c || 'all'}`}
-                  onClick={() => setCategoryFilter(c)}
-                  className={`px-2 py-1 text-[10px] font-mono uppercase tracking-wider border transition-colors ${categoryFilter === c
-                      ? 'border-secondary text-secondary bg-secondary/10'
-                      : 'border-border text-muted-foreground hover:border-muted-foreground/50'
-                    }`}
-                >
-                  {c || 'All'}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-1 ml-4 border-l border-border pl-4">
-              <button
-                onClick={() => setWatchlistOnly(!watchlistOnly)}
-                className={`px-3 py-1 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider border transition-all ${watchlistOnly
-                    ? 'dark:border-[#00FF41] border-[#059669] dark:text-[#00FF41] text-[#059669] dark:bg-[#00FF41] bg-[#059669]/10 shadow-[0_0_10px_rgba(0,255,65,0.2)]'
-                    : 'border-border text-muted-foreground hover:border-muted-foreground/50'
-                  }`}
-              >
-                <div className={`w-2 h-2 rounded-full ${watchlistOnly ? 'dark:bg-[#00FF41] bg-[#059669] animate-pulse' : 'bg-muted-foreground'}`} />
-                My Watchlist
-              </button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Articles Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {articles.map((article, i) => (
-          <div key={article.article_id || i} data-testid={`news-article-${i}`}>
-            <NewsCard article={article} />
-          </div>
-        ))}
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
-      {loading && (
-        <div className="py-8 text-center">
-          <div className="w-6 h-6 border-2 border-primary border-t-transparent animate-spin mx-auto" />
+      {/* Articles Grid */}
+      {initialLoad ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : articles.length === 0 ? (
+        <div className="py-20 flex flex-col items-center gap-4 text-center">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(0,243,255,0.07)', border: '1px solid rgba(0,243,255,0.15)' }}
+          >
+            {keyword || sentimentFilter || categoryFilter ? (
+              <Search className="w-7 h-7" style={{ color: '#00F3FF' }} />
+            ) : (
+              <WifiOff className="w-7 h-7" style={{ color: '#00F3FF' }} />
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-mono font-semibold text-foreground mb-1">
+              {keyword || sentimentFilter || categoryFilter
+                ? 'No articles match your filters'
+                : 'No articles available'}
+            </p>
+            <p className="text-xs font-mono text-muted-foreground">
+              {keyword || sentimentFilter || categoryFilter
+                ? 'Try adjusting your search or clearing filters'
+                : 'Click Refresh to pull the latest market news'}
+            </p>
+          </div>
+          {(keyword || sentimentFilter || categoryFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setSentimentFilter(''); setCategoryFilter(''); setKeyword(''); }}
+              className="text-xs font-mono text-[#00F3FF] hover:bg-[rgba(0,243,255,0.06)]"
+            >
+              Clear filters
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {articles.map((article, i) => (
+            <div key={article.article_id || i} data-testid={`news-article-${i}`}>
+              <NewsCard article={article} />
+            </div>
+          ))}
         </div>
       )}
 
-      {!loading && articles.length === 0 && (
-        <div className="py-12 text-center">
-          <p className="text-sm font-mono text-muted-foreground">No articles found. Try refreshing or adjusting filters.</p>
+      {/* Loading more */}
+      {loading && !initialLoad && (
+        <div className="py-6 text-center">
+          <div
+            className="w-5 h-5 rounded-full border-2 animate-spin mx-auto"
+            style={{ borderColor: 'rgba(0,243,255,0.2)', borderTopColor: '#00F3FF' }}
+          />
         </div>
       )}
 
+      {/* Load More */}
       {hasMore && !loading && articles.length > 0 && (
         <Button
           data-testid="load-more-news"
-          variant="outline"
+          variant="ghost"
           onClick={() => fetchNews(page + 1, true)}
-          className="w-full rounded-none border-border font-mono text-xs uppercase hover:bg-primary hover:text-black"
+          className="w-full h-10 text-[11px] font-mono uppercase tracking-wider transition-all"
+          style={{
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: 'rgba(255,255,255,0.4)',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = 'rgba(0,243,255,0.25)';
+            e.currentTarget.style.color = '#00F3FF';
+            e.currentTarget.style.background = 'rgba(0,243,255,0.04)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
+            e.currentTarget.style.background = 'transparent';
+          }}
         >
-          Load More
+          Load more articles ↓
         </Button>
       )}
     </>

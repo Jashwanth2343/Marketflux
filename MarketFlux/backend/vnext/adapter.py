@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, Request
 
+from fastapi import APIRouter, HTTPException, Request
 from market_data import get_market_overview, get_rich_stock_data
 from vnext.adapter_helpers import build_adapter_envelope, collect_regime_inputs
 from vnext.engines import (
@@ -12,6 +13,14 @@ from vnext.engines import (
     build_portfolio_diagnostics,
     build_signal_feed,
 )
+import re as _re
+_TICKER_RE = _re.compile(r'^[A-Z0-9.\-\^]{1,10}$')
+
+def _validate_ticker(ticker: str) -> str:
+    t = ticker.upper().strip()
+    if not _TICKER_RE.match(t):
+        raise HTTPException(422, f"Invalid ticker symbol: {ticker!r}")
+    return t
 
 def build_adapter_router(db: Any, get_current_user: Callable[[Request], Any]) -> APIRouter:
     router = APIRouter(prefix="/api/vnext-adapter", tags=["marketflux-adapter"])
@@ -40,14 +49,18 @@ def build_adapter_router(db: Any, get_current_user: Callable[[Request], Any]) ->
 
     @router.get("/market/ticker/{ticker}")
     async def get_ticker(ticker: str):
+        ticker = _validate_ticker(ticker)
         try:
-            data = await get_rich_stock_data(ticker.upper())
+            data = await get_rich_stock_data(ticker)
             return build_adapter_envelope(payload=data, source="MarketFlux Retail Core")
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(404, str(e))
 
     @router.get("/research/ticker/{ticker}")
     async def get_research_ticker(ticker: str):
+        ticker = _validate_ticker(ticker)
         data = await build_ticker_workspace(ticker)
         return build_adapter_envelope(payload=data, source="MarketFlux Retail Core")
 
