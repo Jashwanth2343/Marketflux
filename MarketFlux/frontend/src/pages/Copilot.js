@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plane, Wand2, ListChecks, Wallet } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 
 const StrategyTerminal = lazy(() => import('@/components/StrategyTerminal'));
 const TradingCopilotPanel = lazy(() => import('@/components/copilot/TradingCopilotPanel'));
@@ -22,54 +23,19 @@ function LoadingSpinner() {
     );
 }
 
-function CopilotPlaceholder() {
-    return (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center">
-            <Plane className="w-12 h-12 text-primary mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">Trading Copilot</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                AI-powered trading assistant with approval-gated execution.
-                The copilot analyzes markets, generates trade proposals, and executes after your approval.
-            </p>
-            <p className="text-xs text-muted-foreground mt-4 font-mono">
-                Coming soon — use Strategy Studio for agent-powered analysis now.
-            </p>
-        </div>
-    );
-}
-
-function ProposalsPlaceholder() {
-    return (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center">
-            <ListChecks className="w-12 h-12 text-primary mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">Trade Proposals</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                AI-generated trade proposals will appear here for your review.
-                Approve or reject each proposal before execution.
-            </p>
-        </div>
-    );
-}
-
-function PaperPortfolioPlaceholder() {
-    return (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center">
-            <Wallet className="w-12 h-12 text-primary mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">Paper Portfolio</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Your Alpaca paper trading account summary, positions, and order history will display here.
-                Connect your Alpaca account to get started.
-            </p>
-        </div>
-    );
-}
-
 export default function Copilot() {
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || 'copilot';
 
     const handleTabChange = (value) => {
-        setSearchParams({ tab: value }, { replace: true });
+        setSearchParams(
+            (prev) => {
+                const next = new URLSearchParams(prev);
+                next.set('tab', value);
+                return next;
+            },
+            { replace: true },
+        );
     };
 
     return (
@@ -109,7 +75,22 @@ export default function Copilot() {
                     </Suspense>
                 </TabsContent>
                 <TabsContent value="proposals" className="mt-0">
-                    <ProposalsPlaceholder />
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center max-w-lg mx-auto">
+                        <ListChecks className="w-12 h-12 text-primary mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-foreground mb-2">Trade proposals</h3>
+                        <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                            Pending proposals, consent, and generation controls live under{' '}
+                            <span className="font-mono text-foreground">Trading Copilot</span>.
+                        </p>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="font-mono text-xs uppercase tracking-wider"
+                            onClick={() => handleTabChange('copilot')}
+                        >
+                            Open Trading Copilot
+                        </Button>
+                    </div>
                 </TabsContent>
                 <TabsContent value="portfolio" className="mt-0">
                     <Suspense fallback={<LoadingSpinner />}>
