@@ -118,6 +118,17 @@ def run_walk_forward(
     for sanity-checking performance decay between regimes. When the strategy
     becomes parameterized, the train segment is where the optimizer would run.
     """
+    start_dt = pd.Timestamp(start)
+    end_dt = pd.Timestamp(end)
+    range_months = (end_dt.year - start_dt.year) * 12 + (end_dt.month - start_dt.month)
+    min_required = train_months + test_months
+    if range_months < min_required:
+        raise ValueError(
+            f"Date range ({range_months} months) is too short for "
+            f"train_months ({train_months}) + test_months ({test_months}). "
+            f"Need at least {min_required} months."
+        )
+
     strat = Strategy.from_dict(strategy)
     cost_model = cost_model_from_dict(costs) if costs is not None else DEFAULT_COSTS
     if data is None:
@@ -173,11 +184,20 @@ def run_walk_forward(
 
     aggregate_metrics = _stitch_oos_metrics(oos_equity_segments, oos_trades, initial_capital)
 
+    profitable_folds = sum(
+        1 for f in fold_results
+        if f["test"]["metrics"].get("total_return", 0) > 0
+    )
+    consistency_score = (
+        profitable_folds / len(fold_results) if fold_results else 0.0
+    )
+
     return {
         "strategy_name": strat.name,
         "windows": [w.as_dict() for w in windows],
         "folds": fold_results,
         "aggregate_oos": aggregate_metrics,
+        "consistency_score": consistency_score,
     }
 
 

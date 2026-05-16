@@ -74,9 +74,10 @@ class BacktestResult:
     universe: List[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
-        from .metrics import compute_metrics
+        from .metrics import compute_metrics, monthly_returns
 
-        metrics = compute_metrics(self.equity_curve, [t.as_dict() for t in self.trades])
+        trade_dicts = [t.as_dict() for t in self.trades]
+        metrics = compute_metrics(self.equity_curve, trade_dicts)
         return {
             "strategy_name": self.strategy_name,
             "start": self.start.isoformat(),
@@ -85,6 +86,7 @@ class BacktestResult:
             "final_equity": self.final_equity,
             "universe": self.universe,
             "metrics": metrics.as_dict(),
+            "monthly_returns": monthly_returns(self.equity_curve),
             "equity_curve": [
                 {"date": idx.isoformat(), "equity": float(val)}
                 for idx, val in self.equity_curve.items()
