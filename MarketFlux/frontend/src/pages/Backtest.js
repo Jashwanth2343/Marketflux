@@ -465,8 +465,12 @@ export default function Backtest() {
             const ex = await getExampleStrategy();
             setStrategy(ex);
             toast.success('Example strategy loaded');
-        } catch {
-            toast.error('Failed to load example');
+        } catch (err) {
+            if (err?.response?.status === 401) {
+                toast.error('Sign in to load the example strategy');
+            } else {
+                toast.error('Failed to load example');
+            }
         }
     }, []);
 

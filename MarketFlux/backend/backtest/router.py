@@ -4,8 +4,8 @@ Endpoints (all under ``/api/backtest``):
 
 * ``POST /run``           – single in-sample backtest.
 * ``POST /walk-forward``  – walk-forward analysis (train/test windows).
-* ``POST /validate``      – static validation of a strategy DSL payload.
-* ``GET  /example``       – returns a runnable example strategy.
+* ``POST /validate``      – static validation of a strategy DSL payload (**login required**).
+* ``GET  /example``       – returns a runnable example strategy (**login required**).
 """
 from __future__ import annotations
 
@@ -74,11 +74,19 @@ def build_backtest_router(get_current_user: Callable[[Request], Any]) -> APIRout
     router = APIRouter(prefix="/api/backtest", tags=["backtest"])
 
     @router.get("/example")
-    async def example():
+    async def example(request: Request):
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to load example strategies")
+
         return {"strategy": _example_strategy()}
 
     @router.post("/validate")
-    async def validate(payload: Dict[str, Any]):
+    async def validate(payload: Dict[str, Any], request: Request):
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Login required to validate strategies")
+
         try:
             validate_strategy(payload)
             Strategy.from_dict(payload)

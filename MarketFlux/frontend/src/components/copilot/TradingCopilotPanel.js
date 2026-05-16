@@ -6,8 +6,7 @@ import axios from 'axios';
 import { ProposalCard } from '@/components/pilot/ProposalCard';
 import { GlassBoxTrade } from '@/components/pilot/GlassBoxTrade';
 import AccountSummary from '@/components/copilot/AccountSummary';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import { API_BASE } from '@/lib/api';
 
 export default function TradingCopilotPanel() {
     const [consentStatus, setConsentStatus] = useState(null);
@@ -22,11 +21,17 @@ export default function TradingCopilotPanel() {
     const fetchAll = useCallback(async () => {
         setLoading(true);
         try {
-            const [consentRes, proposalRes, personalityRes] = await Promise.all([
-                axios.get(`${API}/api/pilot/consent`, { withCredentials: true }).catch(() => null),
-                axios.get(`${API}/api/pilot/proposals`, { withCredentials: true, params: { status: 'pending', limit: 20 } }).catch(() => null),
-                axios.get(`${API}/api/pilot/personalities`, { withCredentials: true }).catch(() => null),
+            const settled = await Promise.allSettled([
+                axios.get(`${API_BASE}/api/pilot/consent`, { withCredentials: true }),
+                axios.get(`${API_BASE}/api/pilot/proposals`, { withCredentials: true, params: { status: 'pending', limit: 20 } }),
+                axios.get(`${API_BASE}/api/pilot/personalities`, { withCredentials: true }),
             ]);
+            if (settled.every((s) => s.status === 'rejected')) {
+                toast.error('Failed to load copilot data');
+            }
+            const consentRes = settled[0].status === 'fulfilled' ? settled[0].value : null;
+            const proposalRes = settled[1].status === 'fulfilled' ? settled[1].value : null;
+            const personalityRes = settled[2].status === 'fulfilled' ? settled[2].value : null;
             setConsentStatus(consentRes?.data || null);
             setProposals(Array.isArray(proposalRes?.data?.items) ? proposalRes.data.items : []);
             setPersonalities(Array.isArray(personalityRes?.data?.items) ? personalityRes.data.items : []);
@@ -45,7 +50,7 @@ export default function TradingCopilotPanel() {
 
     const grantConsent = async () => {
         try {
-            await axios.post(`${API}/api/pilot/consent`, {
+            await axios.post(`${API_BASE}/api/pilot/consent`, {
                 accept_paper_only: true,
                 accept_not_advice: true,
                 accept_audit_logging: true,
@@ -60,7 +65,7 @@ export default function TradingCopilotPanel() {
     const generateProposal = async (personalityId) => {
         setGenerating(true);
         try {
-            await axios.post(`${API}/api/pilot/personalities/${personalityId}/propose`, {}, { withCredentials: true });
+            await axios.post(`${API_BASE}/api/pilot/personalities/${personalityId}/propose`, {}, { withCredentials: true });
             toast.success('Proposal generation started');
             setTimeout(fetchAll, 3000);
         } catch (err) {
