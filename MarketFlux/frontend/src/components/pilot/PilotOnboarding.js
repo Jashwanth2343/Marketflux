@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import axios from 'axios';
 import { Loader2, ShieldCheck } from 'lucide-react';
 
 import {
@@ -15,8 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 
 export function PilotOnboarding({ open, onOpenChange, onConsented }) {
   const [paperOnly, setPaperOnly] = useState(true);
@@ -39,7 +37,7 @@ export function PilotOnboarding({ open, onOpenChange, onConsented }) {
       };
       const trimmed = killPhrase.trim();
       if (trimmed) payload.kill_phrase = trimmed;
-      const res = await axios.post(`${API}/api/pilot/consent`, payload, { withCredentials: true });
+      const res = await api.post('/pilot/consent', payload);
       toast.success('Pilot consent recorded. You are in control.');
       onConsented?.(res.data?.item || null);
       onOpenChange?.(false);

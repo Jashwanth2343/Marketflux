@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { toast } from 'sonner';
 import {
   Loader2,
@@ -32,8 +31,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { AdversarialDebate } from '@/components/pilot/AdversarialDebate';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 
 function formatDate(value) {
   if (!value) return '--';
@@ -397,9 +395,7 @@ export function GlassBoxTrade({ open, onOpenChange, proposalId, initialProposal 
     setLoading(true);
     const run = async () => {
       try {
-        const res = await axios.get(`${API}/api/pilot/proposals/${proposalId}`, {
-          withCredentials: true,
-        });
+        const res = await api.get(`/pilot/proposals/${proposalId}`);
         if (!active) return;
         setProposal(res?.data?.item || initialProposal || null);
         setAudit(Array.isArray(res?.data?.audit) ? res.data.audit : []);
