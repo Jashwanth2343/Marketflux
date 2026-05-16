@@ -81,7 +81,7 @@ const TradingViewScreenerWidget = memo(() => {
   );
 });
 
-export default function AIScreener() {
+export default function AIScreener({ embedded = false }) {
   const [useAIScreener, setUseAIScreener] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
@@ -125,8 +125,8 @@ export default function AIScreener() {
     'Compare AAPL, MSFT, GOOGL, NVDA',
   ];
 
-  return (
-    <div className="p-4 lg:p-6 space-y-5 min-h-screen" data-testid="ai-screener-page">
+  const content = (
+    <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
@@ -448,6 +448,14 @@ export default function AIScreener() {
           )}
         </>
       )}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="ai-screener-page">
+      {content}
     </div>
   );
 }

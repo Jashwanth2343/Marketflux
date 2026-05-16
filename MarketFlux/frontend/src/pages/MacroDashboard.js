@@ -175,7 +175,7 @@ function EconCalendar({ calendar }) {
 }
 
 // --- Main MacroDashboard Page ---
-export default function MacroDashboard() {
+export default function MacroDashboard({ embedded = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -219,8 +219,8 @@ export default function MacroDashboard() {
 
   const { yield_curve, assets, sectors, vix_regime, fear_greed, economic_calendar, macro_summary, fetched_at } = data || {};
 
-  return (
-    <div className="min-h-screen p-4 md:p-6 space-y-5" data-testid="macro-dashboard-page">
+  const content = (
+    <>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -363,6 +363,14 @@ export default function MacroDashboard() {
           </Card>
         </div>
       </div>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      {content}
     </div>
   );
 }

@@ -30,7 +30,7 @@ function renderMarkdown(text) {
 
 const DONUT_COLORS = ['#00FF41', '#00F3FF', '#FFB000', '#FF3333', '#8B5CF6', '#F472B6', '#34D399', '#FBBF24', '#60A5FA', '#C084FC'];
 
-export default function Portfolio() {
+export default function Portfolio({ embedded = false }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [holdings, setHoldings] = useState(() => {
@@ -240,8 +240,8 @@ export default function Portfolio() {
     );
   };
 
-  return (
-    <div className="p-4 lg:p-6 space-y-5 min-h-screen" data-testid="portfolio-page">
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -624,6 +624,14 @@ export default function Portfolio() {
           </CardContent>
         </Card>
       )}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="portfolio-page">
+      {content}
     </div>
   );
 }

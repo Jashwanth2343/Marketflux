@@ -335,7 +335,7 @@ export default function Dashboard() {
             Latest Headlines
             <span className="w-2 h-2 rounded-full bg-primary pulse-live" />
           </CardTitle>
-          <Link to="/news" data-testid="view-all-news" className="text-[10px] sm:text-xs font-bold text-primary hover:underline flex items-center">
+          <Link to="/intelligence?tab=news" data-testid="view-all-news" className="text-[10px] sm:text-xs font-bold text-primary hover:underline flex items-center">
             View All Recent News
           </Link>
         </CardHeader>

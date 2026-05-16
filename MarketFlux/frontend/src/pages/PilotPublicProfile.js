@@ -106,7 +106,7 @@ export default function PilotPublicProfile() {
             <p className="text-xs text-muted-foreground max-w-sm text-center">
               {String(error || 'Either this Pilot is private, or the link is wrong.')}
             </p>
-            <Link to="/pilot/leaderboard">
+            <Link to="/leaderboard">
               <Button size="sm" variant="outline" className="gap-1 font-mono text-xs uppercase tracking-wider">
                 <Trophy className="w-3 h-3" />
                 Open Leaderboard
@@ -128,14 +128,14 @@ export default function PilotPublicProfile() {
       <header className="border-b border-border bg-card/40 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <Link to="/pilot/leaderboard">
+            <Link to="/leaderboard">
               <Button size="sm" variant="ghost" className="gap-1 font-mono text-xs uppercase tracking-wider">
                 <ArrowLeft className="w-3 h-3" />
                 Leaderboard
               </Button>
             </Link>
           </div>
-          <Link to="/pilot">
+          <Link to="/copilot">
             <Button size="sm" variant="outline" className="gap-1 font-mono text-xs uppercase tracking-wider">
               <Plane className="w-3 h-3" />
               Build your own

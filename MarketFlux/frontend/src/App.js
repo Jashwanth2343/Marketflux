@@ -1,32 +1,46 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import TopNav from "@/components/TopNav";
 
 const AIChatbot = lazy(() => import("@/components/AIChatbot"));
-const StrategyTerminal = lazy(() => import("@/components/StrategyTerminal"));
 import ScanlineOverlay from "@/components/ScanlineOverlay";
 import AuthCallback from "@/components/AuthCallback";
 import Dashboard from "@/pages/Dashboard";
-import FundOS from "@/pages/FundOS";
-import NewsFeed from "@/pages/NewsFeed";
+import Intelligence from "@/pages/Intelligence";
+import Copilot from "@/pages/Copilot";
+import PortfolioRisk from "@/pages/PortfolioRisk";
+import Backtest from "@/pages/Backtest";
 import StockDetail from "@/pages/StockDetail";
-import AIScreener from "@/pages/AIScreener";
-import Portfolio from "@/pages/Portfolio";
-import Theses from "@/pages/Theses";
 import ThesisNew from "@/pages/ThesisNew";
 import ThesisWorkspace from "@/pages/ThesisWorkspace";
 import ThesisTradeLab from "@/pages/ThesisTradeLab";
 import Auth from "@/pages/Auth";
-import ResearchCenter from "@/pages/ResearchCenter";
-import MacroDashboard from "@/pages/MacroDashboard";
-import RiskConsole from "@/pages/RiskConsole";
-import Pilot from "@/pages/Pilot";
 import PilotLeaderboard from "@/pages/PilotLeaderboard";
 import PilotPublicProfile from "@/pages/PilotPublicProfile";
 import { Toaster } from "@/components/ui/sonner";
+
+function ThesisRedirect() {
+  const { thesisId } = useParams();
+  return <Navigate to={`/intelligence/thesis/${thesisId}`} replace />;
+}
+
+function ThesisTradLabRedirect() {
+  const { thesisId } = useParams();
+  return <Navigate to={`/intelligence/thesis/${thesisId}/trade-lab`} replace />;
+}
+
+function PilotProfileRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={`/leaderboard/p/${slug}`} replace />;
+}
+
+function FundOSTerminalRedirect() {
+  const { strategyId } = useParams();
+  return <Navigate to={`/copilot?tab=studio&strategy=${strategyId}`} replace />;
+}
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -60,10 +74,8 @@ class ErrorBoundary extends React.Component {
 function AppRouter() {
   const location = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isStrategyTerminalOpen, setIsStrategyTerminalOpen] = useState(false);
   const [chatWidth, setChatWidth] = useState(380);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
-  const isFundOsRoute = location.pathname === '/fund-os';
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
@@ -80,14 +92,12 @@ function AppRouter() {
       window.removeEventListener("marketflux:open-terminal", openTerminal);
       window.removeEventListener("marketflux:close-terminal", closeTerminal);
     };
-  }, [isFundOsRoute]);
+  }, []);
 
-  // Check URL fragment for session_id synchronously during render
   if (location.hash?.includes('session_id=')) {
     return <AuthCallback />;
   }
 
-  // Calculate dynamic margin for desktop chat side panel
   const mainMarginRight = isDesktop && isChatOpen ? chatWidth : 0;
 
   return (
@@ -100,25 +110,36 @@ function AppRouter() {
           <TopNav />
           <main className="flex-1 overflow-y-auto flex flex-col relative w-full">
             <Routes>
+              {/* Core pages */}
               <Route path="/" element={<Dashboard />} />
-              <Route path="/fund-os" element={<FundOS />} />
-              <Route path="/fund-os/terminal" element={<Suspense fallback={<div className="flex h-full items-center justify-center"><div className="animate-spin text-primary">Loading...</div></div>}><StrategyTerminal /></Suspense>} />
-              <Route path="/fund-os/terminal/:strategyId" element={<Suspense fallback={<div className="flex h-full items-center justify-center"><div className="animate-spin text-primary">Loading...</div></div>}><StrategyTerminal /></Suspense>} />
-              <Route path="/news" element={<NewsFeed />} />
-              <Route path="/screener" element={<AIScreener />} />
+              <Route path="/intelligence" element={<Intelligence />} />
+              <Route path="/intelligence/thesis/new" element={<ThesisNew />} />
+              <Route path="/intelligence/thesis/:thesisId" element={<ThesisWorkspace />} />
+              <Route path="/intelligence/thesis/:thesisId/trade-lab" element={<ThesisTradeLab />} />
+              <Route path="/copilot" element={<Copilot />} />
+              <Route path="/backtest" element={<Backtest />} />
+              <Route path="/portfolio" element={<PortfolioRisk />} />
+              <Route path="/leaderboard" element={<PilotLeaderboard />} />
+              <Route path="/leaderboard/p/:slug" element={<PilotPublicProfile />} />
               <Route path="/stock/:ticker" element={<StockDetail />} />
-              <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="/theses" element={<Theses />} />
-              <Route path="/theses/new" element={<ThesisNew />} />
-              <Route path="/theses/:thesisId" element={<ThesisWorkspace />} />
-              <Route path="/theses/:thesisId/trade-lab" element={<ThesisTradeLab />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/research" element={<ResearchCenter />} />
-              <Route path="/pilot" element={<Pilot />} />
-              <Route path="/pilot/leaderboard" element={<PilotLeaderboard />} />
-              <Route path="/pilot/p/:slug" element={<PilotPublicProfile />} />
-              <Route path="/macro" element={<MacroDashboard />} />
-              <Route path="/risk" element={<RiskConsole />} />
+
+              {/* Legacy redirects */}
+              <Route path="/news" element={<Navigate to="/intelligence?tab=news" replace />} />
+              <Route path="/screener" element={<Navigate to="/intelligence?tab=screener" replace />} />
+              <Route path="/research" element={<Navigate to="/intelligence?tab=research" replace />} />
+              <Route path="/macro" element={<Navigate to="/intelligence?tab=macro" replace />} />
+              <Route path="/theses" element={<Navigate to="/intelligence?tab=theses" replace />} />
+              <Route path="/theses/new" element={<Navigate to="/intelligence/thesis/new" replace />} />
+              <Route path="/theses/:thesisId" element={<ThesisRedirect />} />
+              <Route path="/theses/:thesisId/trade-lab" element={<ThesisTradLabRedirect />} />
+              <Route path="/risk" element={<Navigate to="/portfolio?tab=risk" replace />} />
+              <Route path="/fund-os" element={<Navigate to="/copilot?tab=studio" replace />} />
+              <Route path="/fund-os/terminal" element={<Navigate to="/copilot?tab=studio" replace />} />
+              <Route path="/fund-os/terminal/:strategyId" element={<FundOSTerminalRedirect />} />
+              <Route path="/pilot" element={<Navigate to="/copilot" replace />} />
+              <Route path="/pilot/leaderboard" element={<Navigate to="/leaderboard" replace />} />
+              <Route path="/pilot/p/:slug" element={<PilotProfileRedirect />} />
             </Routes>
           </main>
         </div>

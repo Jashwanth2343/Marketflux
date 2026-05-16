@@ -66,7 +66,7 @@ function FilterPill({ active, label, color, bg, border, onClick, testId }) {
   );
 }
 
-export default function NewsFeed() {
+export default function NewsFeed({ embedded = false }) {
   const [articles, setArticles] = useState([]);
   const [keyword, setKeyword] = useState('');
   const [sentimentFilter, setSentimentFilter] = useState('');
@@ -128,9 +128,8 @@ export default function NewsFeed() {
 
   const hasActiveFilters = sentimentFilter || categoryFilter || watchlistOnly || keyword;
 
-  return (
-    <div className="p-4 lg:p-6 space-y-5 min-h-screen" data-testid="news-feed-page">
-
+  const content = (
+    <>
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -364,6 +363,14 @@ export default function NewsFeed() {
           Load more articles ↓
         </Button>
       )}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="p-4 lg:p-6 space-y-4 grid-bg min-h-screen" data-testid="news-feed-page">
+      {content}
     </div>
   );
 }

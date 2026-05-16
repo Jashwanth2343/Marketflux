@@ -10,7 +10,9 @@ _POOL: Optional[asyncpg.Pool] = None
 
 
 def get_pg_dsn() -> Optional[str]:
-    return os.getenv("MARKETFLUX_VNEXT_DATABASE_URL") or os.getenv("FUNDOS_DATABASE_URL")
+    return (os.getenv("SUPABASE_DB_URL")
+            or os.getenv("MARKETFLUX_VNEXT_DATABASE_URL")
+            or os.getenv("FUNDOS_DATABASE_URL"))
 
 
 def is_pg_configured() -> bool:

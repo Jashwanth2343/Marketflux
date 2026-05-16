@@ -25,10 +25,10 @@ function toneForConfidence(confidence) {
   return 'border-rose-400/20 bg-rose-400/10 text-rose-300';
 }
 
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 
-export default function StrategyTerminal() {
+export default function StrategyTerminal({ embedded = false }) {
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState(PRESET_PROMPTS[0]);
   const [mode, setMode] = useState('swing');
@@ -45,12 +45,15 @@ export default function StrategyTerminal() {
 
   const strategySummary = useMemo(() => meta?.strategy || null, [meta]);
   const { strategyId } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryStrategyId = searchParams.get('strategy');
 
   useEffect(() => {
-    if (strategyId) {
-      loadStrategy(strategyId);
+    const id = strategyId || queryStrategyId;
+    if (id) {
+      loadStrategy(id);
     }
-  }, [strategyId]);
+  }, [strategyId, queryStrategyId]);
 
   const loadStrategy = async (id) => {
     try {
@@ -176,28 +179,29 @@ export default function StrategyTerminal() {
     setLoading(false);
   };
 
-  return (
-    <div className="flex flex-col min-h-full w-full bg-[#05080A] overflow-y-auto">
-      <div className="flex flex-1 flex-col w-full min-h-[800px]">
-        <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
-          <div>
-            <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
-              <TerminalSquare className="w-4 h-4 text-primary" />
-              Strategy Terminal
-            </div>
-            <div className="mt-2 flex items-center gap-3">
-              <h2 className="fundos-display text-2xl font-semibold text-foreground">Agentic trade studio</h2>
-              {strategySummary && (
-                <span className={`rounded-full border px-3 py-1 text-[11px] font-mono uppercase tracking-[0.14em] ${toneForConfidence(strategySummary.confidence || 50)}`}>
-                  {strategySummary.confidence || 50}/100
-                </span>
-              )}
-            </div>
+  const content = (
+    <div className="flex flex-1 flex-col w-full min-h-[800px]">
+      <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+            <TerminalSquare className="w-4 h-4 text-primary" />
+            Strategy Terminal
           </div>
-          <button onClick={() => navigate('/fund-os')} className="rounded-full border border-white/10 bg-white/5 p-2 text-muted-foreground hover:text-foreground">
+          <div className="mt-2 flex items-center gap-3">
+            <h2 className="fundos-display text-2xl font-semibold text-foreground">Agentic trade studio</h2>
+            {strategySummary && (
+              <span className={`rounded-full border px-3 py-1 text-[11px] font-mono uppercase tracking-[0.14em] ${toneForConfidence(strategySummary.confidence || 50)}`}>
+                {strategySummary.confidence || 50}/100
+              </span>
+            )}
+          </div>
+        </div>
+        {!embedded && (
+          <button onClick={() => navigate('/copilot?tab=studio')} className="rounded-full border border-white/10 bg-white/5 p-2 text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
-        </div>
+        )}
+      </div>
 
         <div className="grid flex-1 gap-0 lg:grid-cols-[360px_1fr]">
           <div className="border-b border-white/8 p-5 lg:border-b-0 lg:border-r">
@@ -371,6 +375,13 @@ export default function StrategyTerminal() {
           </div>
         </div>
       </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="flex flex-col min-h-full w-full bg-[#05080A] overflow-y-auto">
+      {content}
     </div>
   );
 }

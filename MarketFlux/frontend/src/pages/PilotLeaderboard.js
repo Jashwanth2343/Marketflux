@@ -89,7 +89,7 @@ function LeaderRow({ row, index }) {
   // Server returns rows already enriched with a public flag; only public ones link.
   return (
     <Link
-      to={`/pilot/p/${(row.public_slug || '').toString()}`}
+      to={`/leaderboard/p/${(row.public_slug || '').toString()}`}
       className="block"
       onClick={(e) => {
         if (!row.public_slug) e.preventDefault();
@@ -180,7 +180,7 @@ export default function PilotLeaderboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/pilot">
+            <Link to="/copilot">
               <Button size="sm" variant="outline" className="gap-1 font-mono text-xs uppercase tracking-wider">
                 <Plane className="w-3 h-3" />
                 My Pilot
@@ -230,7 +230,7 @@ export default function PilotLeaderboard() {
               return (
                 <Link
                   key={row.personality_id}
-                  to={`/pilot/p/${row.public_slug || ''}`}
+                  to={`/leaderboard/p/${row.public_slug || ''}`}
                   onClick={(e) => { if (!row.public_slug) e.preventDefault(); }}
                 >
                   <Card

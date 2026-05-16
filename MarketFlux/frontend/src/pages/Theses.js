@@ -38,7 +38,7 @@ function statusTone(status) {
   return 'text-slate-200 border-white/10 bg-white/5';
 }
 
-export default function Theses() {
+export default function Theses({ embedded = false }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -109,8 +109,8 @@ export default function Theses() {
     );
   }
 
-  return (
-    <div className="thesis-shell min-h-screen p-4 md:p-6 lg:p-8" data-testid="theses-page">
+  const content = (
+    <>
       <div className="mx-auto max-w-7xl space-y-6">
         <Card className="thesis-panel overflow-hidden rounded-[32px] border-white/10">
           <CardContent className="relative p-6 md:p-8 lg:p-10">
@@ -130,7 +130,7 @@ export default function Theses() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <Button onClick={() => navigate('/theses/new')} className="h-11 rounded-full px-6 text-sm font-semibold">
+                  <Button onClick={() => navigate('/intelligence/thesis/new')} className="h-11 rounded-full px-6 text-sm font-semibold">
                     Create thesis
                   </Button>
                   <Button variant="outline" onClick={() => navigate('/portfolio')} className="h-11 rounded-full border-white/10 bg-white/5 px-6 text-sm font-semibold text-foreground hover:bg-white/10">
@@ -203,7 +203,7 @@ export default function Theses() {
                 <CardDescription className="thesis-kicker">Workspace index</CardDescription>
                 <CardTitle className="thesis-display mt-2 text-3xl font-semibold text-foreground">Your thesis library</CardTitle>
               </div>
-              <Button variant="outline" onClick={() => navigate('/theses/new')} className="rounded-full border-primary/20 bg-primary/10 text-primary hover:bg-primary/20">
+              <Button variant="outline" onClick={() => navigate('/intelligence/thesis/new')} className="rounded-full border-primary/20 bg-primary/10 text-primary hover:bg-primary/20">
                 New thesis
               </Button>
             </div>
@@ -224,7 +224,7 @@ export default function Theses() {
                 <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
                   Start with a single ticker, define the claim, and let MarketFlux collect the first round of evidence blocks in the background.
                 </p>
-                <Button className="mt-6" onClick={() => navigate('/theses/new')}>
+                <Button className="mt-6" onClick={() => navigate('/intelligence/thesis/new')}>
                   Create your first thesis
                 </Button>
               </div>
@@ -273,7 +273,7 @@ export default function Theses() {
                         <TableCell className="text-sm text-muted-foreground">{formatDate(item.updated_at)}</TableCell>
                         <TableCell className="text-right">
                           <Button asChild variant="ghost" className="rounded-full text-primary hover:bg-primary/10 hover:text-primary">
-                            <Link to={`/theses/${item.id}`}>
+                            <Link to={`/intelligence/thesis/${item.id}`}>
                               Open
                               <ArrowRight className="ml-2 h-4 w-4" />
                             </Link>
@@ -288,6 +288,14 @@ export default function Theses() {
           </CardContent>
         </Card>
       </div>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="thesis-shell min-h-screen p-4 md:p-6 lg:p-8" data-testid="theses-page">
+      {content}
     </div>
   );
 }
