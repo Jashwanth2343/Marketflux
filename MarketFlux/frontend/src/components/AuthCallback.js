@@ -1,34 +1,27 @@
 import { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 export default function AuthCallback() {
   const hasProcessed = useRef(false);
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { checkAuth } = useAuth();
 
   useEffect(() => {
     if (hasProcessed.current) return;
     hasProcessed.current = true;
 
-    const hash = window.location.hash;
-    const params = new URLSearchParams(hash.substring(1));
-    const sessionId = params.get('session_id');
-
-    if (sessionId) {
-      api.post('/auth/google-session', { session_id: sessionId })
-        .then(res => {
-          setUser(res.data.user);
-          navigate('/', { replace: true, state: { user: res.data.user } });
-        })
-        .catch(() => {
-          navigate('/auth', { replace: true });
-        });
-    } else {
-      navigate('/', { replace: true });
-    }
-  }, [navigate, setUser]);
+    // Supabase OAuth returns tokens in the URL hash/query after redirect.
+    // The supabase-js client auto-detects and stores the session.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        checkAuth().then(() => navigate('/', { replace: true }));
+      } else {
+        navigate('/auth', { replace: true });
+      }
+    });
+  }, [navigate, checkAuth]);
 
   return (
     <div className="flex items-center justify-center h-screen bg-background">

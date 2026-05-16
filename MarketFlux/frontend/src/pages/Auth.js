@@ -79,7 +79,7 @@ export default function Auth() {
       await login(loginEmail, loginPassword);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid credentials. Please try again.');
+      setError(err.message || err.response?.data?.detail || 'Invalid credentials. Please try again.');
     }
     setLoading(false);
   };
@@ -93,7 +93,7 @@ export default function Auth() {
       setSuccess('Account created! Redirecting...');
       setTimeout(() => navigate('/'), 800);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      setError(err.message || err.response?.data?.detail || 'Registration failed. Please try again.');
     }
     setLoading(false);
   };
