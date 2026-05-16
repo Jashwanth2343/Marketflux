@@ -85,11 +85,11 @@ def get_account() -> Optional[Dict[str, Any]]:
             "cash": str(account.cash) if account.cash is not None else "0",
             "buying_power": str(account.buying_power) if account.buying_power is not None else "0",
             "equity": str(account.equity) if account.equity is not None else "0",
-            "portfolio_value": str(account.portfolio_value) if account.portfolio_value is not None else "0",
-            "last_equity": str(account.last_equity) if account.last_equity is not None else "0",
-            "unrealized_pl": str(account.unrealized_pl) if account.unrealized_pl is not None else "0",
-            "unrealized_plpc": str(account.unrealized_plpc) if account.unrealized_plpc is not None else "0",
-            "currency": str(account.currency) if account.currency else "USD",
+            "portfolio_value": str(getattr(account, "portfolio_value", None) or account.equity or 0),
+            "last_equity": str(getattr(account, "last_equity", None) or 0),
+            "unrealized_pl": str(getattr(account, "unrealized_intraday_pl", None) or getattr(account, "unrealized_pl", None) or 0),
+            "unrealized_plpc": str(getattr(account, "unrealized_intraday_plpc", None) or getattr(account, "unrealized_plpc", None) or 0),
+            "currency": str(getattr(account, "currency", "USD") or "USD"),
             "created_at": str(account.created_at) if account.created_at else None,
         }
     except Exception as exc:
