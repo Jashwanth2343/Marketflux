@@ -1,0 +1,85 @@
+// craco.config.dev.js - Development config without visual-edits babel plugin
+// Used in environments where the visual-edits babel plugin is not compatible
+const path = require("path");
+require("dotenv").config();
+
+const config = {
+  enableHealthCheck: process.env.ENABLE_HEALTH_CHECK === "true",
+  enableVisualEdits: false,
+};
+
+let WebpackHealthPlugin;
+let setupHealthEndpoints;
+let healthPluginInstance;
+
+if (config.enableHealthCheck) {
+  WebpackHealthPlugin = require("./plugins/health-check/webpack-health-plugin");
+  setupHealthEndpoints = require("./plugins/health-check/health-endpoints");
+  healthPluginInstance = new WebpackHealthPlugin();
+}
+
+const webpackConfig = {
+  eslint: {
+    configure: {
+      extends: ["plugin:react-hooks/recommended"],
+      rules: {
+        "react-hooks/rules-of-hooks": "error",
+        "react-hooks/exhaustive-deps": "warn",
+      },
+    },
+  },
+  jest: {
+    configure: {
+      moduleNameMapper: {
+        "^@/(.*)$": "<rootDir>/src/$1",
+      },
+    },
+  },
+  webpack: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+    configure: (webpackConfig) => {
+      webpackConfig.watchOptions = {
+        ...webpackConfig.watchOptions,
+        ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/build/**',
+          '**/dist/**',
+          '**/coverage/**',
+          '**/public/**',
+        ],
+      };
+
+      if (config.enableHealthCheck && healthPluginInstance) {
+        webpackConfig.plugins.push(healthPluginInstance);
+      }
+      return webpackConfig;
+    },
+  },
+};
+
+webpackConfig.devServer = (devServerConfig) => {
+  devServerConfig.headers = {
+    ...devServerConfig.headers,
+    "Cache-Control": "no-store, no-cache, must-revalidate",
+    Pragma: "no-cache",
+  };
+
+  if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
+    const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
+
+    devServerConfig.setupMiddlewares = (middlewares, devServer) => {
+      if (originalSetupMiddlewares) {
+        middlewares = originalSetupMiddlewares(middlewares, devServer);
+      }
+      setupHealthEndpoints(devServer, healthPluginInstance);
+      return middlewares;
+    };
+  }
+
+  return devServerConfig;
+};
+
+module.exports = webpackConfig;
