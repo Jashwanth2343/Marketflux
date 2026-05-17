@@ -16,6 +16,8 @@ export function AuthProvider({ children }) {
         setUser(_mapSupabaseUser(s.user));
       }
       setLoading(false);
+    }).catch(() => {
+      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -32,21 +34,31 @@ export function AuthProvider({ children }) {
   }, [session]);
 
   const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    setUser(_mapSupabaseUser(data.user));
-    return data;
+    let result;
+    try {
+      result = await supabase.auth.signInWithPassword({ email, password });
+    } catch {
+      throw new Error('Unable to connect to auth service. Please try again.');
+    }
+    if (result.error) throw new Error(result.error.message);
+    setUser(_mapSupabaseUser(result.data.user));
+    return result.data;
   };
 
   const register = async (email, password, name) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: name } },
-    });
-    if (error) throw error;
-    if (data.user) setUser(_mapSupabaseUser(data.user));
-    return data;
+    let result;
+    try {
+      result = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: name } },
+      });
+    } catch {
+      throw new Error('Unable to connect to auth service. Please try again.');
+    }
+    if (result.error) throw new Error(result.error.message);
+    if (result.data.user) setUser(_mapSupabaseUser(result.data.user));
+    return result.data;
   };
 
   const logout = async () => {
