@@ -603,17 +603,6 @@ async def get_ticker_news(symbol: str) -> List[Dict]:
                     "thumbnail_url": thumbnail_url,
                 })
         
-        if articles:
-            # Run fast batch sentiment inference on titles
-            titles = [art["title"] for art in articles]
-            from ai_service import analyze_sentiments_batch
-            sentiments = await analyze_sentiments_batch(titles)
-            
-            for art, sent in zip(articles, sentiments):
-                art["sentiment"] = sent["label"]
-                art["sentiment_score"] = sent["score"]
-
-        # Cache for 15 minutes to avoid redundant FinBERT inference on hot reloads
         await cache_set_async(cache_key, articles, expire=900)
 
         # Embed into semantic news store for agent RAG

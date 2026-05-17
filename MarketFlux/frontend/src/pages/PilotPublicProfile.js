@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import axios from 'axios';
 import { ArrowLeft, Loader2, Plane, Trophy, BookOpen, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 
 const GLYPHS = {
   circle: (color) => (
@@ -76,7 +74,7 @@ export default function PilotPublicProfile() {
     setError(null);
     (async () => {
       try {
-        const res = await axios.get(`${API}/api/pilot/public/${encodeURIComponent(slug)}`);
+        const res = await api.get(`/pilot/public/${encodeURIComponent(slug)}`);
         if (!cancelled) setData(res?.data);
       } catch (err) {
         if (!cancelled) {

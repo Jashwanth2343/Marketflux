@@ -110,6 +110,7 @@ def _alpaca_is_configured():
 # ---------------------------------------------------------------------------
 # Imports from the pilot subpackage
 # ---------------------------------------------------------------------------
+from .checkpoints import get_checkpoint_store
 from .memory import (
     record_debate_insight,
     record_trade_outcome,
@@ -240,9 +241,22 @@ async def propose_trades(
 
     await _activity(db, personality_id, "cycle_start", f"Scanning {len(personality.universe)} tickers.")
 
+    # ---- Checkpoint: start workflow thread ----
+    ckpt = get_checkpoint_store()
+    thread_id = ckpt.new_thread(
+        personality_id=personality_id,
+        user_id=user_id,
+        workflow_type="propose_trades",
+    )
+
     # ---- 1. Universe scan ----
     candidates = await _scan_universe(personality, db)
+    await ckpt.save(thread_id, step="universe_scan", state={
+        "candidate_count": len(candidates or []),
+        "universe_size": len(personality.universe),
+    })
     if not candidates:
+        await ckpt.complete(thread_id, result={"outcome": "no_candidates"})
         await _activity(db, personality_id, "no_candidates", "Universe scan returned nothing.")
         return _ok(personality_id=personality_id, proposals=[], scanned=len(personality.universe))
 
@@ -252,6 +266,7 @@ async def propose_trades(
     qualifying = qualifying[:max_candidates]
 
     if not qualifying:
+        await ckpt.complete(thread_id, result={"outcome": "no_qualifying"})
         await _activity(
             db,
             personality_id,
@@ -267,6 +282,10 @@ async def propose_trades(
         f"{len(qualifying)} candidates above floor {floor:.0f}.",
         payload={"tickers": [c["ticker"] for c in qualifying]},
     )
+    await ckpt.save(thread_id, step="candidates_selected", state={
+        "tickers": [c["ticker"] for c in qualifying],
+        "floor": floor,
+    })
 
     # ---- 2. Per-candidate decision pipeline ----
     proposals: List[TradeProposal] = []
@@ -289,6 +308,11 @@ async def propose_trades(
             continue
         proposals.append(proposal)
 
+    await ckpt.complete(thread_id, result={
+        "outcome": "proposals_created",
+        "count": len(proposals),
+        "proposal_ids": [p.id for p in proposals],
+    })
     await _activity(
         db,
         personality_id,
@@ -554,6 +578,12 @@ async def _decide_for_candidate(
     )
 
     # ---- Run the adversarial swarm (with memory context) ----
+    ckpt = get_checkpoint_store()
+    await ckpt.save(f"pilot:swarm:{personality.id}:{ticker}", step="swarm_start", state={
+        "ticker": ticker,
+        "composite_score": composite,
+        "memory_count": len(ticker_memories) if ticker_memories else 0,
+    })
     swarm_result = await _run_swarm_safe(
         personality, ticker, candidate,
         memory_context=ticker_memories,

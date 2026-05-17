@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { AlertTriangle } from 'lucide-react';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 
 /**
  * Lightweight chip that appears on a PersonalityCard when one or more open
@@ -24,9 +22,8 @@ export function DriftBadge({ personalityId, className = '', pollMs = 90_000, onC
 
     const fetchOnce = async () => {
       try {
-        const res = await axios.get(
-          `${API}/api/pilot/personalities/${personalityId}/drift`,
-          { withCredentials: true }
+        const res = await api.get(
+          `/pilot/personalities/${personalityId}/drift`
         );
         if (!cancelled) setFlags(res?.data?.items || []);
       } catch {

@@ -118,6 +118,119 @@ def expectancy(trades: List[Mapping]) -> float:
     return float(np.mean(rets)) if rets else 0.0
 
 
+# ---------------------------------------------------------------------------
+# New metric helpers
+# ---------------------------------------------------------------------------
+
+def calmar_ratio(equity: pd.Series) -> float:
+    """CAGR / max_drawdown. Returns 0.0 if drawdown is zero."""
+    c = cagr(equity)
+    dd = max_drawdown(equity)
+    if dd == 0:
+        return 0.0
+    return c / dd
+
+
+def best_trade_pct(trades: List[Mapping]) -> float:
+    if not trades:
+        return 0.0
+    pcts = [float(t.get("return_pct", 0.0)) for t in trades]
+    return float(max(pcts)) if pcts else 0.0
+
+
+def worst_trade_pct(trades: List[Mapping]) -> float:
+    if not trades:
+        return 0.0
+    pcts = [float(t.get("return_pct", 0.0)) for t in trades]
+    return float(min(pcts)) if pcts else 0.0
+
+
+def avg_bars_held(trades: List[Mapping]) -> float:
+    if not trades:
+        return 0.0
+    bars = [float(t.get("bars_held", 0)) for t in trades]
+    return float(np.mean(bars)) if bars else 0.0
+
+
+def _consecutive_streaks(trades: List[Mapping]) -> tuple:
+    """Return (max_wins, max_losses, avg_wins, avg_losses) from consecutive streaks."""
+    if not trades:
+        return 0, 0, 0.0, 0.0
+
+    win_streaks: List[int] = []
+    loss_streaks: List[int] = []
+    current_streak = 0
+    current_is_win = None
+
+    for t in trades:
+        is_win = float(t.get("pnl", 0.0)) > 0
+        if current_is_win is None:
+            current_is_win = is_win
+            current_streak = 1
+        elif is_win == current_is_win:
+            current_streak += 1
+        else:
+            (win_streaks if current_is_win else loss_streaks).append(current_streak)
+            current_is_win = is_win
+            current_streak = 1
+
+    if current_streak > 0 and current_is_win is not None:
+        (win_streaks if current_is_win else loss_streaks).append(current_streak)
+
+    max_w = max(win_streaks) if win_streaks else 0
+    max_l = max(loss_streaks) if loss_streaks else 0
+    avg_w = float(np.mean(win_streaks)) if win_streaks else 0.0
+    avg_l = float(np.mean(loss_streaks)) if loss_streaks else 0.0
+    return max_w, max_l, avg_w, avg_l
+
+
+def max_consecutive_wins(trades: List[Mapping]) -> int:
+    return _consecutive_streaks(trades)[0]
+
+
+def max_consecutive_losses(trades: List[Mapping]) -> int:
+    return _consecutive_streaks(trades)[1]
+
+
+def avg_consecutive_wins(trades: List[Mapping]) -> float:
+    return _consecutive_streaks(trades)[2]
+
+
+def avg_consecutive_losses(trades: List[Mapping]) -> float:
+    return _consecutive_streaks(trades)[3]
+
+
+# ---------------------------------------------------------------------------
+# Monthly returns (for heatmap)
+# ---------------------------------------------------------------------------
+
+def monthly_returns(equity: pd.Series) -> List[dict]:
+    """Resample equity curve to month-end and return pct change per month.
+
+    Returns a list of ``{"year": int, "month": int, "return_pct": float}``.
+    """
+    if equity is None or len(equity) < 2:
+        return []
+    try:
+        monthly = equity.resample("ME").last().dropna()
+        if monthly.empty:
+            return []
+        pct = monthly.pct_change().dropna()
+        result = []
+        for ts, ret in pct.items():
+            val = float(ret)
+            if math.isnan(val) or math.isinf(val):
+                val = 0.0
+            result.append({
+                "year": int(ts.year),
+                "month": int(ts.month),
+                "return_pct": round(val, 6),
+            })
+        return result
+    except Exception:
+        return []
+
+
 @dataclass
 class MetricSummary:
     total_return: float
@@ -131,6 +244,14 @@ class MetricSummary:
     avg_trade_pnl: float
     expectancy: float
     num_trades: int
+    calmar_ratio: float
+    best_trade_pct: float
+    worst_trade_pct: float
+    avg_bars_held: float
+    max_consecutive_wins: int
+    max_consecutive_losses: int
+    avg_consecutive_wins: float
+    avg_consecutive_losses: float
 
     def as_dict(self) -> dict:
         return {
@@ -145,6 +266,14 @@ class MetricSummary:
             "avg_trade_pnl": self.avg_trade_pnl,
             "expectancy": self.expectancy,
             "num_trades": self.num_trades,
+            "calmar_ratio": self.calmar_ratio,
+            "best_trade_pct": self.best_trade_pct,
+            "worst_trade_pct": self.worst_trade_pct,
+            "avg_bars_held": self.avg_bars_held,
+            "max_consecutive_wins": self.max_consecutive_wins,
+            "max_consecutive_losses": self.max_consecutive_losses,
+            "avg_consecutive_wins": self.avg_consecutive_wins,
+            "avg_consecutive_losses": self.avg_consecutive_losses,
         }
 
 
@@ -154,6 +283,9 @@ def compute_metrics(equity: pd.Series, trades: List[Mapping]) -> MetricSummary:
         total = 0.0
     else:
         total = float(equity.iloc[-1] / equity.iloc[0] - 1.0)
+
+    streaks = _consecutive_streaks(trades)
+
     return MetricSummary(
         total_return=total,
         cagr=cagr(equity),
@@ -166,4 +298,12 @@ def compute_metrics(equity: pd.Series, trades: List[Mapping]) -> MetricSummary:
         avg_trade_pnl=avg_trade(trades),
         expectancy=expectancy(trades),
         num_trades=len(trades),
+        calmar_ratio=calmar_ratio(equity),
+        best_trade_pct=best_trade_pct(trades),
+        worst_trade_pct=worst_trade_pct(trades),
+        avg_bars_held=avg_bars_held(trades),
+        max_consecutive_wins=streaks[0],
+        max_consecutive_losses=streaks[1],
+        avg_consecutive_wins=streaks[2],
+        avg_consecutive_losses=streaks[3],
     )
