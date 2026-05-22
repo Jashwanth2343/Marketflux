@@ -84,7 +84,7 @@ export default function NewsCard({ article, compact = false }) {
           </p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className="text-[10px] font-mono text-muted-foreground">{article.source}</span>
-            <span className="text-[rgba(255,255,255,0.2)] text-[10px]">·</span>
+            <span className="text-slate-400 dark:text-[rgba(255,255,255,0.2)] text-[10px]">·</span>
             <span className="text-[10px] font-mono text-muted-foreground/50 flex items-center gap-0.5">
               <Clock className="w-2.5 h-2.5" /> {timeAgo(article.published_at)}
             </span>
@@ -151,7 +151,7 @@ export default function NewsCard({ article, compact = false }) {
         <div className="flex items-center justify-between pt-2 border-t border-[rgba(255,255,255,0.05)] mt-auto">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] font-mono text-muted-foreground">{article.source}</span>
-            <span className="text-[rgba(255,255,255,0.2)]">·</span>
+            <span className="text-slate-400 dark:text-[rgba(255,255,255,0.2)]">·</span>
             <span className="text-[10px] font-mono text-muted-foreground/50 flex items-center gap-0.5">
               <Clock className="w-2.5 h-2.5" /> {timeAgo(article.published_at)}
             </span>

@@ -85,8 +85,8 @@ export default function TopNav() {
     };
 
   return (
-    <div className="w-full flex flex-col z-50 sticky top-0 backdrop-blur-md border-b border-border/60"
-      style={{ background: 'rgba(9,14,11,0.92)' }}>
+    <div className="topnav-root w-full flex flex-col z-50 sticky top-0 backdrop-blur-md border-b border-border/60"
+      style={{ background: isDark ? 'rgba(9,14,11,0.92)' : 'rgba(255,255,255,0.92)' }}>
       <TickerTapeWidget isDark={isDark} />
 
       {/* Main Nav */}
@@ -216,7 +216,7 @@ export default function TopNav() {
       {mobileOpen && (
         <div
           className="lg:hidden absolute top-full left-0 w-full border-b border-border/60 p-4 flex flex-col gap-3 shadow-2xl z-50"
-          style={{ background: 'rgba(9,14,11,0.97)', backdropFilter: 'blur(20px)' }}
+          style={{ background: isDark ? 'rgba(9,14,11,0.97)' : 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)' }}
         >
           <div className="w-full">
             <SearchBar />

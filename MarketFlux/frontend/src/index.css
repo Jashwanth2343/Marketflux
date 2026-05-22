@@ -164,3 +164,70 @@ td .text-foreground {
     letter-spacing: 0.08em !important;
     font-weight: 700 !important;
 }
+
+/* =====================================================
+   LIGHT-MODE SAFETY NET
+   Many components hardcode dark-only colors (neon accents,
+   white overlays/borders, near-black panels) instead of
+   theme tokens, leaving them washed out or illegible in
+   light mode. Every rule here is scoped to light mode
+   (html:not(.dark)) and relies on selector specificity
+   rather than !important, so dark mode is left untouched.
+   ===================================================== */
+
+/* Faint white overlays/borders are "lift on dark"; in light
+   mode they vanish (white on white). Map them to a faint dark
+   so panels keep their definition. Leading-space / first-token
+   selectors avoid clobbering hover:/focus:/md: variant states. */
+html:not(.dark) [class^="bg-white/"],
+html:not(.dark) [class*=" bg-white/"],
+html:not(.dark) [class^="bg-[rgba(255,255,255,"],
+html:not(.dark) [class*=" bg-[rgba(255,255,255,"] {
+    background-color: rgba(15, 23, 42, 0.04);
+}
+
+html:not(.dark) [class^="border-white/"],
+html:not(.dark) [class*=" border-white/"],
+html:not(.dark) [class^="border-[rgba(255,255,255,"],
+html:not(.dark) [class*=" border-[rgba(255,255,255,"] {
+    border-color: rgba(15, 23, 42, 0.12);
+}
+
+/* Neon brand colors are unreadable on white -> darker variants.
+   These stay visible on dark surfaces too, so they are safe to
+   apply globally in light mode. */
+html:not(.dark) [class*="text-[#00FF41]"] {
+    color: #059669;
+}
+
+html:not(.dark) [class*="text-[#00F3FF]"] {
+    color: #0891b2;
+}
+
+html:not(.dark) [class*="text-[#FFB000]"] {
+    color: #b45309;
+}
+
+/* Solid near-black custom tooltip panel on Stock Detail -> card */
+html:not(.dark) [class*="bg-[#0A0A0A]"] {
+    background-color: hsl(var(--card));
+}
+
+/* TopNav hardcodes white text for a dark bar; its bar is now
+   theme-aware, so its white text needs to darken in light mode. */
+html:not(.dark) .topnav-root [class*="text-[rgba(255,255,255,"] {
+    color: #334155;
+}
+
+/* Scrollbar follows the active theme */
+html:not(.dark) ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
