@@ -157,17 +157,24 @@ export default function StockDetail() {
 
       try {
         // PROBLEM 1: Parallelize all initial data calls
-        const [stockRes, newsRes, watchRes, initialChart] = await Promise.all([
+        const [stockRes, newsRes, watchRes, initialChart] = await Promise.allSettled([
           api.get(`/market/stock/${ticker}/rich`),
           api.get(`/news/ticker/${ticker}`),
           api.get('/watchlist'),
           loadChartForPeriod(period, true)
         ]);
 
-        setStock(stockRes.data);
-        setNews(newsRes.data.articles || []);
-        setIsWatched((watchRes.data.tickers || []).includes(ticker.toUpperCase()));
-        setChart(initialChart);
+        if (stockRes.status === 'fulfilled') setStock(stockRes.value.data);
+        else console.error('Stock fetch error:', stockRes.reason);
+
+        if (newsRes.status === 'fulfilled') setNews(newsRes.value.data.articles || []);
+        else console.error('News fetch error:', newsRes.reason);
+
+        if (watchRes.status === 'fulfilled') {
+          setIsWatched((watchRes.value.data.tickers || []).includes(ticker.toUpperCase()));
+        }
+
+        if (initialChart.status === 'fulfilled') setChart(initialChart.value);
       } catch (e) {
         console.error('Data fetch error:', e);
       } finally {

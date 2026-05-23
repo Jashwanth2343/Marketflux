@@ -10,7 +10,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    supabase.auth.getSession().then(({ data }) => {
+      const s = data?.session ?? null;
       setSession(s);
       if (s?.user) {
         setUser(_mapSupabaseUser(s.user));
@@ -77,7 +78,8 @@ export function AuthProvider({ children }) {
   };
 
   const checkAuth = useCallback(async () => {
-    const { data: { session: s } } = await supabase.auth.getSession();
+    const { data } = await supabase.auth.getSession().catch(() => ({ data: null }));
+    const s = data?.session ?? null;
     if (s?.user) {
       setSession(s);
       setUser(_mapSupabaseUser(s.user));

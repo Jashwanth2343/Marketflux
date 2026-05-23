@@ -22,3 +22,4 @@ psycopg[binary]>=3.2.3
 pgvector>=0.3.5
 asyncpg>=0.29.0
 alpaca-py>=0.26.0
+supabase>=2.0.0
