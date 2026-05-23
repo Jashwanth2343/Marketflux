@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Wallet, TrendingUp, TrendingDown, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import alpacaApi from '@/lib/alpacaApi';
+import api from '@/lib/api';
 
 function fmt(v) {
     if (v == null || !Number.isFinite(Number(v))) return '—';
@@ -13,7 +14,7 @@ function pct(v) {
     return `${(Number(v) * 100).toFixed(2)}%`;
 }
 
-export default function AccountSummary() {
+export default function AccountSummary({ refreshSignal = 0, source = 'alpaca' }) {
     const [account, setAccount] = useState(null);
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -23,10 +24,14 @@ export default function AccountSummary() {
         setLoading(true);
         setError(null);
         try {
-            const [acct, pos] = await Promise.all([
-                alpacaApi.getAccount(),
-                alpacaApi.getPositions(),
-            ]);
+            // The copilot source uses no-auth read endpoints on the shared paper
+            // account, so the panel works even when the user isn't logged in.
+            const [acct, pos] = source === 'copilot'
+                ? await Promise.all([
+                    api.get('/copilot/account').then((r) => r.data),
+                    api.get('/copilot/positions').then((r) => r.data),
+                ])
+                : await Promise.all([alpacaApi.getAccount(), alpacaApi.getPositions()]);
             setAccount(acct?.item || acct);
             const posList = pos?.items || pos;
             setPositions(Array.isArray(posList) ? posList : []);
@@ -35,13 +40,21 @@ export default function AccountSummary() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [source]);
 
     useEffect(() => {
         refresh();
         const interval = setInterval(refresh, 30000);
         return () => clearInterval(interval);
     }, [refresh]);
+
+    // Force an immediate refresh when a trade executes (signal bumped by parent).
+    useEffect(() => {
+        if (refreshSignal > 0) {
+            const t = setTimeout(refresh, 800);
+            return () => clearTimeout(t);
+        }
+    }, [refreshSignal, refresh]);
 
     if (loading && !account) {
         return (
@@ -65,8 +78,11 @@ export default function AccountSummary() {
 
     const equity = Number(account?.equity || 0);
     const cash = Number(account?.cash || 0);
-    const pl = Number(account?.unrealized_pl || account?.profit_loss || 0);
-    const plPct = Number(account?.unrealized_plpc || account?.profit_loss_pct || 0);
+    // The account payload often omits aggregate P&L — derive it from positions.
+    const posPl = positions.reduce((s, p) => s + Number(p.unrealized_pl || 0), 0);
+    const posCost = positions.reduce((s, p) => s + Number(p.cost_basis || 0), 0);
+    const pl = Number(account?.unrealized_pl || account?.profit_loss) || posPl;
+    const plPct = Number(account?.unrealized_plpc || account?.profit_loss_pct) || (posCost ? posPl / posCost : 0);
     const dayPl = Number(account?.equity) - Number(account?.last_equity || account?.equity);
 
     return (

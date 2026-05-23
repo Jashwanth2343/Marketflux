@@ -27,7 +27,11 @@ def _get_trading_client():
     if not api_key or not secret_key:
         return None
 
-    from alpaca.trading.client import TradingClient
+    try:
+        from alpaca.trading.client import TradingClient
+    except ImportError as exc:
+        logger.error(f"alpaca-py is not installed: {exc}. Run: pip install alpaca-py")
+        return None
 
     _trading_client = TradingClient(
         api_key=api_key,
@@ -39,6 +43,28 @@ def _get_trading_client():
 
 def is_alpaca_configured() -> bool:
     return bool(os.getenv("APCA_API_KEY_ID") and os.getenv("APCA_API_SECRET_KEY"))
+
+
+# ---------------------------------------------------------------------------
+# Market clock
+# ---------------------------------------------------------------------------
+
+def get_clock() -> Optional[Dict[str, Any]]:
+    """Return market open/closed state and the next open/close timestamps."""
+    client = _get_trading_client()
+    if not client:
+        return None
+    try:
+        clock = client.get_clock()
+        return {
+            "is_open": bool(clock.is_open),
+            "timestamp": str(clock.timestamp) if clock.timestamp else None,
+            "next_open": str(clock.next_open) if clock.next_open else None,
+            "next_close": str(clock.next_close) if clock.next_close else None,
+        }
+    except Exception as exc:
+        logger.error(f"Alpaca get_clock failed: {exc}")
+        return None
 
 
 # ---------------------------------------------------------------------------

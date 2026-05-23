@@ -2,16 +2,16 @@ import { lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plane, Wand2, ListChecks, Wallet } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 
+const CopilotAgent = lazy(() => import('@/components/copilot/CopilotAgent'));
 const StrategyTerminal = lazy(() => import('@/components/StrategyTerminal'));
 const TradingCopilotPanel = lazy(() => import('@/components/copilot/TradingCopilotPanel'));
 const AccountSummary = lazy(() => import('@/components/copilot/AccountSummary'));
 
 const tabs = [
-    { value: 'copilot', label: 'Trading Copilot', icon: Plane },
+    { value: 'copilot', label: 'Copilot Agent', icon: Plane },
     { value: 'studio', label: 'Strategy Studio', icon: Wand2 },
-    { value: 'proposals', label: 'Proposals', icon: ListChecks },
+    { value: 'proposals', label: 'Auto-Pilot', icon: ListChecks },
     { value: 'portfolio', label: 'Paper Portfolio', icon: Wallet },
 ];
 
@@ -66,7 +66,7 @@ export default function Copilot() {
 
                 <TabsContent value="copilot" className="mt-0">
                     <Suspense fallback={<LoadingSpinner />}>
-                        <TradingCopilotPanel />
+                        <CopilotAgent />
                     </Suspense>
                 </TabsContent>
                 <TabsContent value="studio" className="mt-0">
@@ -75,27 +75,14 @@ export default function Copilot() {
                     </Suspense>
                 </TabsContent>
                 <TabsContent value="proposals" className="mt-0">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center max-w-lg mx-auto">
-                        <ListChecks className="w-12 h-12 text-primary mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-foreground mb-2">Trade proposals</h3>
-                        <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                            Pending proposals, consent, and generation controls live under{' '}
-                            <span className="font-mono text-foreground">Trading Copilot</span>.
-                        </p>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="font-mono text-xs uppercase tracking-wider"
-                            onClick={() => handleTabChange('copilot')}
-                        >
-                            Open Trading Copilot
-                        </Button>
-                    </div>
+                    <Suspense fallback={<LoadingSpinner />}>
+                        <TradingCopilotPanel />
+                    </Suspense>
                 </TabsContent>
                 <TabsContent value="portfolio" className="mt-0">
                     <Suspense fallback={<LoadingSpinner />}>
-                        <div className="max-w-2xl">
-                            <AccountSummary />
+                        <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                            <AccountSummary source="copilot" />
                         </div>
                     </Suspense>
                 </TabsContent>

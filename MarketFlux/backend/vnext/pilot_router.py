@@ -450,19 +450,26 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
             reason=payload.reason,
         )
 
-        # Look up the user's Alpaca account_id and execute in the background.
-        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+        # Execute against the shared Alpaca PAPER account. After the Trading API
+        # migration there is no per-user account_id, so gate dispatch on whether
+        # the broker is configured — NOT on a (now-absent) per-user account id,
+        # which previously made approvals silently no-op.
+        from .alpaca_client import is_alpaca_configured
 
-        if alpaca_account_id:
-            # Persist the account_id on the proposal so the audit trail is complete
-            await db["pilot_trade_proposals"].update_one(
-                {"id": proposal_id},
-                {"$set": {"alpaca_account_id": alpaca_account_id}},
-            )
+        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")  # legacy/optional
+
+        dispatch = is_alpaca_configured()
+        if dispatch:
+            if alpaca_account_id:
+                # Keep the audit trail complete when a legacy id exists.
+                await db["pilot_trade_proposals"].update_one(
+                    {"id": proposal_id},
+                    {"$set": {"alpaca_account_id": alpaca_account_id}},
+                )
             background.add_task(_safe_execute, db, proposal_id, user["user_id"], alpaca_account_id)
 
-        return {"item": updated.to_dict() if updated else None, "execution_dispatched": bool(alpaca_account_id)}
+        return {"item": updated.to_dict() if updated else None, "execution_dispatched": dispatch}
 
     @router.post("/proposals/{proposal_id}/reject")
     async def proposals_reject(proposal_id: str, request: Request, payload: ProposalDecisionRequest):
