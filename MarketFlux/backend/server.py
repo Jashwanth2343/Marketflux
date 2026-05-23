@@ -266,6 +266,10 @@ async def _verify_supabase_token(token: str) -> Optional[Dict]:
         logger.debug(f"Supabase token verification failed: {exc}")
         return None
 
+# Free (signed-out) AI message allowance per IP per day. Signed-in users are unlimited.
+# Single source of truth — the /ai/usage endpoint and the frontend counter both derive from this.
+FREE_DAILY_AI_LIMIT = 3
+
 async def check_and_increment_ai_usage(request: Request) -> bool:
     user = await get_current_user(request)
     if user:
@@ -301,7 +305,7 @@ async def check_and_increment_ai_usage(request: Request) -> bool:
         upsert=True,
         return_document=True
     )
-    if daily_doc and daily_doc.get("count", 0) > 50:
+    if daily_doc and daily_doc.get("count", 0) > FREE_DAILY_AI_LIMIT:
         return False
 
     return True
@@ -893,7 +897,7 @@ async def ai_usage(request: Request):
     daily_key = f"{client_ip}_day_{today}"
     usage = await db.ai_usage.find_one({"ip": daily_key}, {"_id": 0})
     count = usage.get("count", 0) if usage else 0
-    return {"remaining": max(0, 50 - count), "unlimited": False}
+    return {"remaining": max(0, FREE_DAILY_AI_LIMIT - count), "limit": FREE_DAILY_AI_LIMIT, "unlimited": False}
 
 @api_router.post("/ai/summarize")
 async def ai_summarize(request: Request):

@@ -306,7 +306,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [aiUsage, setAiUsage] = useState({ remaining: 3, unlimited: false });
+  const [aiUsage, setAiUsage] = useState({ remaining: 3, limit: 3, unlimited: false });
   const [isResizing, setIsResizing] = useState(false);
   const [thinkingSteps, setThinkingSteps] = useState([]);
   const [followUpQuestions, setFollowUpQuestions] = useState([]);
@@ -617,7 +617,6 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
       }
     } finally {
       setLoading(false);
-      saveToChatHistory(messages, sessionId.current);
     }
   };
 
@@ -693,7 +692,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
               </button>
               {!aiUsage.unlimited && (
                 <span className="text-[10px] font-mono text-muted-foreground ml-1">
-                  {aiUsage.remaining}/3
+                  {aiUsage.remaining}/{aiUsage.limit ?? 3}
                 </span>
               )}
               <button data-testid="chatbot-close" onClick={() => setIsChatOpen(false)} className="ml-1">
