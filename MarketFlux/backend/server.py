@@ -1613,6 +1613,11 @@ async def startup():
     asyncio.create_task(periodic_news_fetch())
     asyncio.create_task(pilot_expire_sweep())
     asyncio.create_task(pilot_nightly_reflection_loop())
+    try:
+        import copilot_standing
+        asyncio.create_task(copilot_standing.scheduler_loop(db))
+    except Exception as exc:
+        logger.warning(f"copilot standing-agent scheduler not started: {exc}")
     logger.info("MarketFlux backend started")
 
 @app.on_event("shutdown")

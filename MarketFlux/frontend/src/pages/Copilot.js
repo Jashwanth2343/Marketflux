@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const CopilotAgent = lazy(() => import('@/components/copilot/CopilotAgent'));
 const StrategyTerminal = lazy(() => import('@/components/StrategyTerminal'));
-const TradingCopilotPanel = lazy(() => import('@/components/copilot/TradingCopilotPanel'));
+const StandingAgents = lazy(() => import('@/components/copilot/StandingAgents'));
 const AccountSummary = lazy(() => import('@/components/copilot/AccountSummary'));
 
 const tabs = [
@@ -76,7 +76,7 @@ export default function Copilot() {
                 </TabsContent>
                 <TabsContent value="proposals" className="mt-0">
                     <Suspense fallback={<LoadingSpinner />}>
-                        <TradingCopilotPanel />
+                        <StandingAgents />
                     </Suspense>
                 </TabsContent>
                 <TabsContent value="portfolio" className="mt-0">

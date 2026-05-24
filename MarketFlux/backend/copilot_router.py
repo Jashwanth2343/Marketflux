@@ -28,6 +28,21 @@ class CopilotChatRequest(BaseModel):
     confirm: bool = True  # confirm-before-execute (safe default); false = autonomous
 
 
+class StandingAgentCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    instruction: str = Field(min_length=5, max_length=1500)
+    interval_minutes: int = Field(default=60, ge=5, le=10080)
+    model: Optional[str] = None
+
+
+class StandingAgentUpdate(BaseModel):
+    name: Optional[str] = None
+    instruction: Optional[str] = None
+    interval_minutes: Optional[int] = None
+    status: Optional[str] = None
+    model: Optional[str] = None
+
+
 def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRouter:
     router = APIRouter(prefix="/api/copilot", tags=["copilot"])
 
@@ -135,6 +150,45 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         user_id = await _resolve_user_id(request)
         ok = await copilot_memory.delete(user_id, mem_id)
         return {"ok": ok}
+
+    # ------------------------------------------------------------------
+    # Standing agents (scheduled autonomous runs)
+    # ------------------------------------------------------------------
+    @router.get("/agents")
+    async def standing_list(request: Request):
+        import copilot_standing
+        user_id = await _resolve_user_id(request)
+        return {"items": await copilot_standing.list_agents(db, user_id),
+                "max_active": copilot_standing.MAX_ACTIVE_PER_USER}
+
+    @router.post("/agents")
+    async def standing_create(payload: StandingAgentCreate, request: Request):
+        import copilot_standing
+        user_id = await _resolve_user_id(request)
+        res = await copilot_standing.create_agent(
+            db, user_id, name=payload.name, instruction=payload.instruction,
+            interval_minutes=payload.interval_minutes, model=payload.model)
+        if not res.get("ok"):
+            raise HTTPException(400, res.get("error", "Could not create agent."))
+        return res
+
+    @router.put("/agents/{agent_id}")
+    async def standing_update(agent_id: str, payload: StandingAgentUpdate, request: Request):
+        import copilot_standing
+        user_id = await _resolve_user_id(request)
+        return await copilot_standing.update_agent(db, user_id, agent_id, payload.model_dump(exclude_none=True))
+
+    @router.delete("/agents/{agent_id}")
+    async def standing_delete(agent_id: str, request: Request):
+        import copilot_standing
+        user_id = await _resolve_user_id(request)
+        return await copilot_standing.delete_agent(db, user_id, agent_id)
+
+    @router.post("/agents/{agent_id}/run")
+    async def standing_run_now(agent_id: str, request: Request):
+        import copilot_standing
+        user_id = await _resolve_user_id(request)
+        return await copilot_standing.run_now(db, user_id, agent_id)
 
     @router.get("/trades")
     async def copilot_trades(request: Request, limit: int = 25):
