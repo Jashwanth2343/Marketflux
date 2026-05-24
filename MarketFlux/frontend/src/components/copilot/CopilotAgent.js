@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/api';
 import AccountSummary from '@/components/copilot/AccountSummary';
+import CopilotMemory from '@/components/copilot/CopilotMemory';
 import RichMarkdown from '@/components/RichMarkdown';
 
 const SUGGESTIONS = [
@@ -118,6 +119,7 @@ export default function CopilotAgent() {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [accountSignal, setAccountSignal] = useState(0);
+    const [memorySignal, setMemorySignal] = useState(0);
     const sessionId = useRef(`copilot_${Date.now()}`);
     const scrollRef = useRef(null);
     const abortRef = useRef(null);
@@ -207,6 +209,7 @@ export default function CopilotAgent() {
                     patchLastAssistant((m) => ({ ...m, content: m.content + (event.content || '') }));
                 } else if (event.type === 'done') {
                     patchLastAssistant((m) => ({ ...m, streaming: false }));
+                    setMemorySignal((s) => s + 1);
                     if (event.error) toast.error('Copilot error', { description: event.error });
                 }
             };
@@ -361,6 +364,7 @@ export default function CopilotAgent() {
                 <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-4 shadow-xl shadow-black/30">
                     <AccountSummary refreshSignal={accountSignal} source="copilot" />
                 </div>
+                <CopilotMemory refreshSignal={memorySignal} />
                 <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent p-4">
                     <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.16em] text-muted-foreground mb-3">
                         <Sparkles className="w-3.5 h-3.5 text-primary" /> Capabilities

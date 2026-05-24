@@ -30,6 +30,7 @@ from google.generativeai.types import HarmBlockThreshold, HarmCategory
 
 import agent_tools
 import copilot_trading_tools as trading
+import copilot_memory
 from copilot_code_tool import run_python
 from ai_service import GEMINI_FLASH, configure_gemini
 
@@ -52,6 +53,14 @@ training data — only numbers returned by your tools are real.
 You research markets AND execute trades. You are not a chatbot that gives generic
 advice — you are a hands-on operator. When the user wants to act, you ACT through
 your trading tools, then report exactly what happened.
+
+== MEMORY ==
+You have long-term memory of this user across sessions. Anything relevant you've
+learned before appears under "RELEVANT LONG-TERM MEMORY" in the context below.
+Treat it as standing instructions — honor their stated preferences, risk limits,
+and constraints (e.g. "never short", "max 10% per position") in every
+recommendation and trade. New durable facts the user shares are saved
+automatically; you don't need to do anything to remember them.
 
 == YOUR TOOLS ==
 Research: stock snapshots, fundamentals, analyst targets, technical indicators,
@@ -367,7 +376,14 @@ async def run_copilot_agent(
 
     chat = model.start_chat(history=gemini_history)
 
-    context = await _live_context()
+    # Pull live account state and relevant long-term memory in parallel.
+    ctx_tasks = [_live_context()]
+    if db is not None:
+        ctx_tasks.append(copilot_memory.memory_context_block(user_id, message))
+    ctx_results = await asyncio.gather(*ctx_tasks)
+    live_ctx = ctx_results[0]
+    mem_ctx = ctx_results[1] if len(ctx_results) > 1 else ""
+    context = "\n\n".join(p for p in (mem_ctx, live_ctx) if p)
     user_prompt = f"{context}\n\nUser: {message}" if context else message
 
     tool_calls = 0
@@ -480,6 +496,8 @@ async def run_copilot_agent(
                 })
             except Exception as exc:
                 logger.error(f"copilot db save failed: {exc}")
+            # Extract + persist long-term memory in the background (never blocks).
+            copilot_memory.schedule_add_turn(user_id, message, final_text)
 
     except Exception as exc:
         logger.critical(f"copilot agent crashed: {exc}", exc_info=True)

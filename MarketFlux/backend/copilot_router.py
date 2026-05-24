@@ -90,6 +90,28 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         positions = await asyncio.to_thread(get_positions)
         return {"items": positions, "total": len(positions)}
 
+    @router.get("/memory")
+    async def copilot_memory_list(request: Request):
+        """What the agent remembers about this user (long-term, cross-session)."""
+        import copilot_memory
+        user_id = await _resolve_user_id(request)
+        items = await copilot_memory.get_all(user_id)
+        return {"items": items}
+
+    @router.delete("/memory")
+    async def copilot_memory_clear(request: Request):
+        import copilot_memory
+        user_id = await _resolve_user_id(request)
+        ok = await copilot_memory.delete_all(user_id)
+        return {"ok": ok}
+
+    @router.delete("/memory/{mem_id}")
+    async def copilot_memory_forget(mem_id: str, request: Request):
+        import copilot_memory
+        user_id = await _resolve_user_id(request)
+        ok = await copilot_memory.delete(user_id, mem_id)
+        return {"ok": ok}
+
     @router.get("/trades")
     async def copilot_trades(request: Request, limit: int = 25):
         """Recent trades the agent has executed (for the activity history)."""

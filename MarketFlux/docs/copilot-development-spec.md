@@ -392,6 +392,6 @@ Prevent redundant API calls and reduce latency:
 - **1.3 Streaming Responses** — DONE. Token streaming + live step labels via `/api/copilot/chat/stream`.
 - **1.2 Trade Confirmation Modal** — PARTIAL. Agent currently auto-executes paper trades with a per-order notional cap and loud trade cards; an approve/reject gate is a candidate next step.
 - **1.4 Error Handling** — PARTIAL. Tool failures surface as inline `⚠` summaries; the structured per-scenario copy table is not yet implemented.
-- **2.1 Conversational Memory** — IN PROGRESS (this PR): `remember` tool + per-user `copilot_memory` collection + auto-injection + view/clear panel.
+- **2.1 Conversational Memory** — DONE: Mem0 over Supabase pgvector (Gemini embeddings + extraction). Auto-extracts durable facts per turn, semantic recall injected into context, sidebar panel to view/clear. Verified: agent honors remembered constraints (declined a short that violated "never short" + "under 10%").
 - **2.4 Backtest Engine** — Existing `backtest/` engine + Backtest tab; NL→rules parsing not wired to the Studio.
 - **Compute** — BONUS (not in brief): sandboxed `run_python` tool for sizing/risk math.
