@@ -109,6 +109,13 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         positions = await asyncio.to_thread(get_positions)
         return {"items": positions, "total": len(positions)}
 
+    @router.get("/positions/enriched")
+    async def copilot_positions_enriched():
+        """Positions enriched with sector, analyst consensus, % of equity, and a
+        short price history for a sparkline."""
+        import copilot_enrich
+        return await copilot_enrich.enrich_positions()
+
     @router.post("/trades/{pid}/approve")
     async def copilot_trade_approve(pid: str, request: Request):
         """Execute a staged trade after explicit user approval (confirm mode)."""

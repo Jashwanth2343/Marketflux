@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Activity, Map, BarChart2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Map, BarChart2, Plane, FlaskConical, Wallet, Bot } from 'lucide-react';
 
 import NewsCard from '@/components/NewsCard';
 import MarketHeatmap from '@/components/MarketHeatmap';
@@ -183,6 +183,30 @@ export default function Dashboard() {
           </div>
         )}
       </Card>
+
+      {/* Quick actions — jump straight into the agentic tools */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { to: '/copilot', label: 'Ask Copilot', icon: Plane, desc: 'Chat & trade' },
+          { to: '/backtest', label: 'Run Backtest', icon: FlaskConical, desc: 'Test a strategy' },
+          { to: '/copilot?tab=proposals', label: 'Auto-Pilot', icon: Bot, desc: 'Standing agents' },
+          { to: '/portfolio', label: 'Portfolio', icon: Wallet, desc: 'Positions & risk' },
+        ].map(({ to, label, icon: Icon, desc }) => (
+          <Link
+            key={to}
+            to={to}
+            className="group flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-4 py-3 transition-all hover:border-primary/40 hover:bg-primary/[0.06]"
+          >
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+              <Icon className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">{label}</div>
+              <div className="text-[11px] font-mono text-muted-foreground truncate">{desc}</div>
+            </div>
+          </Link>
+        ))}
+      </div>
 
       {/* Main Grid: 4 columns on large screens */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

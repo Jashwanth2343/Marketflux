@@ -14,6 +14,18 @@ function pct(v) {
     return `${(Number(v) * 100).toFixed(2)}%`;
 }
 
+function Sparkline({ data, up }) {
+    if (!Array.isArray(data) || data.length < 2) return null;
+    const w = 54, h = 16;
+    const min = Math.min(...data), max = Math.max(...data), range = (max - min) || 1;
+    const pts = data.map((v, i) => `${((i / (data.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h).toFixed(1)}`).join(' ');
+    return (
+        <svg width={w} height={h} className="flex-shrink-0">
+            <polyline points={pts} fill="none" stroke={up ? 'rgb(74 222 128)' : 'rgb(248 113 113)'} strokeWidth="1.25" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
 export default function AccountSummary({ refreshSignal = 0, source = 'alpaca' }) {
     const [account, setAccount] = useState(null);
     const [positions, setPositions] = useState([]);
@@ -29,7 +41,7 @@ export default function AccountSummary({ refreshSignal = 0, source = 'alpaca' })
             const [acct, pos] = source === 'copilot'
                 ? await Promise.all([
                     api.get('/copilot/account').then((r) => r.data),
-                    api.get('/copilot/positions').then((r) => r.data),
+                    api.get('/copilot/positions/enriched').then((r) => r.data),
                 ])
                 : await Promise.all([alpacaApi.getAccount(), alpacaApi.getPositions()]);
             setAccount(acct?.item || acct);
@@ -128,20 +140,35 @@ export default function AccountSummary({ refreshSignal = 0, source = 'alpaca' })
                     <div className="space-y-1.5">
                         {positions.map((p) => {
                             const positionPl = Number(p.unrealized_pl || 0);
+                            const plPctPos = p.unrealized_pl_pct != null ? Number(p.unrealized_pl_pct) : null;
                             return (
-                                <div key={p.symbol} className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-                                    <div>
-                                        <span className="text-sm font-mono font-semibold text-primary">{p.symbol}</span>
-                                        <span className="text-xs font-mono text-muted-foreground ml-2">
+                                <div key={p.symbol} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="text-sm font-mono font-semibold text-primary">{p.symbol}</span>
+                                            {p.sector && (
+                                                <span className="truncate rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground">{p.sector}</span>
+                                            )}
+                                        </div>
+                                        {Array.isArray(p.spark) && p.spark.length > 1 && (
+                                            <Sparkline data={p.spark} up={positionPl >= 0} />
+                                        )}
+                                    </div>
+                                    <div className="mt-1 flex items-center justify-between text-xs font-mono">
+                                        <span className="text-muted-foreground">
                                             {p.qty} @ {fmt(p.avg_entry_price)}
+                                            {p.pct_of_equity != null && <span className="ml-1.5 opacity-70">· {p.pct_of_equity}% eq</span>}
+                                        </span>
+                                        <span className={`font-semibold ${positionPl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {positionPl >= 0 ? <TrendingUp className="w-3 h-3 inline mr-0.5" /> : <TrendingDown className="w-3 h-3 inline mr-0.5" />}
+                                            {fmt(positionPl)}{plPctPos != null && ` (${plPctPos}%)`}
                                         </span>
                                     </div>
-                                    <div className="text-right">
-                                        <span className={`text-xs font-mono font-semibold ${positionPl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                            {positionPl >= 0 ? <TrendingUp className="w-3 h-3 inline mr-1" /> : <TrendingDown className="w-3 h-3 inline mr-1" />}
-                                            {fmt(positionPl)}
-                                        </span>
-                                    </div>
+                                    {p.analyst && (
+                                        <div className="mt-0.5 text-[10px] font-mono text-muted-foreground">
+                                            analyst: <span className="capitalize text-foreground/80">{p.analyst}</span>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
