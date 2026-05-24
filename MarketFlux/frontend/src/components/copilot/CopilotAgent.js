@@ -67,29 +67,51 @@ function ToolRow({ item }) {
     );
 }
 
-function TradeCard({ t }) {
+function TradeCard({ t, onAction }) {
     const buy = t.side === 'buy';
     const isCancel = t.action === 'cancel_all';
     const Icon = isCancel ? XCircle : buy ? ArrowUpCircle : ArrowDownCircle;
-    const tone = isCancel ? 'text-muted-foreground border-white/15 from-white/[0.04]'
+    const pending = t.pending && !t.resolved;
+    const rejected = t.resolved === 'rejected';
+    const tone = rejected || isCancel ? 'text-muted-foreground border-white/15 from-white/[0.04]'
         : buy ? 'text-primary border-primary/40 from-primary/15'
             : 'text-amber-400 border-amber-500/40 from-amber-500/15';
-    const verb = isCancel ? 'Cancelled all open orders'
-        : t.action === 'close' ? `Closed ${t.symbol}`
-            : `${buy ? 'Bought' : 'Sold'} ${t.qty} ${t.symbol}`;
+    // Past tense once acted on; imperative while pending approval.
+    const acted = t.resolved === 'executed' || (!t.pending);
+    const verb = isCancel ? (acted ? 'Cancelled all open orders' : 'Cancel all open orders')
+        : t.action === 'close' ? `${acted ? 'Closed' : 'Close'} ${t.symbol}`
+            : `${acted ? (buy ? 'Bought' : 'Sold') : (buy ? 'Buy' : 'Sell')} ${t.qty} ${t.symbol}`;
+    const badge = rejected ? 'rejected'
+        : t.resolved === 'executed' ? (t.status || 'executed')
+            : pending ? 'needs approval' : t.status;
     return (
-        <div className={`flex items-center gap-3 rounded-xl border bg-gradient-to-r to-transparent px-3.5 py-2.5 animate-in fade-in zoom-in-95 duration-300 ${tone}`}>
-            <Icon className="w-5 h-5 flex-shrink-0" />
-            <div className="font-mono text-sm">
-                <span className="font-semibold tracking-tight">{verb}</span>
-                {t.price && <span className="ml-2 opacity-80">@ ${t.price}</span>}
-                {t.status && <span className="ml-2 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider opacity-80">{t.status}</span>}
+        <div className={`rounded-xl border bg-gradient-to-r to-transparent px-3.5 py-2.5 animate-in fade-in zoom-in-95 duration-300 ${tone}`}>
+            <div className="flex items-center gap-3">
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                <div className="flex-1 font-mono text-sm">
+                    <span className="font-semibold tracking-tight">{verb}</span>
+                    {t.order_type === 'limit' && t.limit_price ? <span className="ml-2 opacity-80">@ ${t.limit_price}</span> : null}
+                    {t.price && <span className="ml-2 opacity-80">@ ${t.price}</span>}
+                    {badge && <span className="ml-2 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider opacity-80">{badge}</span>}
+                </div>
             </div>
+            {pending && (
+                <div className="mt-2.5 flex gap-2">
+                    <Button size="sm" onClick={() => onAction?.(t.proposal_id, 'approve')} disabled={!!t.resolving}
+                        className="h-8 flex-1 rounded-lg gap-1.5">
+                        {t.resolving === 'approve' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => onAction?.(t.proposal_id, 'reject')} disabled={!!t.resolving}
+                        className="h-8 rounded-lg gap-1.5 border-white/15">
+                        <XCircle className="w-3.5 h-3.5" /> Reject
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }
 
-function ActivityTimeline({ items }) {
+function ActivityTimeline({ items, onTradeAction }) {
     if (!items?.length) return null;
     return (
         <div className="relative mb-3 space-y-2 pl-4">
@@ -97,7 +119,7 @@ function ActivityTimeline({ items }) {
             {items.map((it, i) => {
                 if (it.kind === 'thinking') return <ThinkingRow key={i} text={it.message} />;
                 if (it.kind === 'tool') return <ToolRow key={i} item={it} />;
-                if (it.kind === 'trade') return <TradeCard key={i} t={it} />;
+                if (it.kind === 'trade') return <TradeCard key={i} t={it} onAction={onTradeAction} />;
                 return null;
             })}
         </div>
@@ -122,6 +144,7 @@ export default function CopilotAgent() {
     const [memorySignal, setMemorySignal] = useState(0);
     const [models, setModels] = useState([]);
     const [model, setModel] = useState(() => localStorage.getItem('copilot_model') || 'gemini-2.5-flash');
+    const [confirm, setConfirm] = useState(() => localStorage.getItem('copilot_confirm') !== 'false');
     const sessionId = useRef(`copilot_${Date.now()}`);
     const scrollRef = useRef(null);
     const abortRef = useRef(null);
@@ -143,6 +166,44 @@ export default function CopilotAgent() {
         setModel(key);
         localStorage.setItem('copilot_model', key);
     }, []);
+
+    const toggleConfirm = useCallback(() => {
+        setConfirm((c) => { localStorage.setItem('copilot_confirm', String(!c)); return !c; });
+    }, []);
+
+    // Update a staged trade card (in any message) by its proposal id.
+    const patchTradeByProposal = useCallback((pid, updates) => {
+        setMessages((prev) => prev.map((m) => {
+            if (m.role !== 'assistant' || !m.activity) return m;
+            return { ...m, activity: m.activity.map((it) =>
+                (it.kind === 'trade' && it.proposal_id === pid) ? { ...it, ...updates } : it) };
+        }));
+    }, []);
+
+    const handleTradeAction = useCallback(async (pid, action) => {
+        if (!pid) return;
+        patchTradeByProposal(pid, { resolving: action });
+        try {
+            const { data } = await api.post(`/copilot/trades/${pid}/${action}`);
+            if (action === 'approve') {
+                const res = data?.item || {};
+                if (res.ok) {
+                    patchTradeByProposal(pid, { resolved: 'executed', status: res.status || 'accepted', price: res.filled_avg_price, resolving: null });
+                    toast.success('Trade approved & sent', { description: 'Paper account' });
+                    setAccountSignal((s) => s + 1);
+                } else {
+                    patchTradeByProposal(pid, { resolving: null });
+                    toast.error('Execution failed', { description: res.error || 'Broker rejected the order' });
+                }
+            } else {
+                patchTradeByProposal(pid, { resolved: 'rejected', resolving: null });
+                toast('Trade rejected');
+            }
+        } catch (err) {
+            patchTradeByProposal(pid, { resolving: null });
+            toast.error('Action failed', { description: err?.message });
+        }
+    }, [patchTradeByProposal]);
 
     // Pick up a strategy handed off from the Strategy Studio.
     useEffect(() => {
@@ -183,7 +244,7 @@ export default function CopilotAgent() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ message: msg, session_id: sessionId.current, model }),
+                body: JSON.stringify({ message: msg, session_id: sessionId.current, model, confirm }),
                 signal: controller.signal,
             });
             if (!res.ok || !res.body) throw new Error(`Request failed (${res.status})`);
@@ -216,11 +277,18 @@ export default function CopilotAgent() {
                     });
                 } else if (event.type === 'trade') {
                     patchLastAssistant((m) => ({ ...m, activity: [...m.activity, { kind: 'trade', ...event }] }));
-                    const verb = event.action === 'cancel_all' ? 'Cancelled all orders'
-                        : event.action === 'close' ? `Closed ${event.symbol}`
-                            : `${event.side === 'buy' ? 'Bought' : 'Sold'} ${event.qty} ${event.symbol}`;
-                    toast.success(verb, { description: `Status: ${event.status || 'submitted'} · paper account` });
-                    setAccountSignal((s) => s + 1);
+                    if (event.pending) {
+                        const what = event.action === 'cancel_all' ? 'Cancel all orders'
+                            : event.action === 'close' ? `Close ${event.symbol}`
+                                : `${event.side === 'buy' ? 'Buy' : 'Sell'} ${event.qty} ${event.symbol}`;
+                        toast('Trade staged — approve below', { description: what });
+                    } else {
+                        const verb = event.action === 'cancel_all' ? 'Cancelled all orders'
+                            : event.action === 'close' ? `Closed ${event.symbol}`
+                                : `${event.side === 'buy' ? 'Bought' : 'Sold'} ${event.qty} ${event.symbol}`;
+                        toast.success(verb, { description: `Status: ${event.status || 'submitted'} · paper account` });
+                        setAccountSignal((s) => s + 1);
+                    }
                 } else if (event.type === 'token') {
                     patchLastAssistant((m) => ({ ...m, content: m.content + (event.content || '') }));
                 } else if (event.type === 'done') {
@@ -254,7 +322,7 @@ export default function CopilotAgent() {
             setLoading(false);
             abortRef.current = null;
         }
-    }, [input, loading, model, patchLastAssistant]);
+    }, [input, loading, model, confirm, patchLastAssistant]);
 
     const stop = () => { abortRef.current?.abort(); abortRef.current = null; setLoading(false); patchLastAssistant((m) => ({ ...m, streaming: false })); };
 
@@ -280,6 +348,17 @@ export default function CopilotAgent() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={toggleConfirm}
+                            title={confirm ? 'Confirm mode: trades need your one-click approval' : 'Autonomous mode: the agent executes paper trades directly'}
+                            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                                confirm ? 'border-primary/30 bg-primary/10 text-primary'
+                                    : 'border-amber-500/40 bg-amber-500/10 text-amber-400'
+                            }`}
+                        >
+                            {confirm ? <ShieldCheck className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
+                            {confirm ? 'Confirm' : 'Auto'}
+                        </button>
                         <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] pl-2.5 pr-1.5 py-1" title="Model">
                             <Cpu className="w-3.5 h-3.5 text-primary" />
                             <select
@@ -338,7 +417,7 @@ export default function CopilotAgent() {
                             <div key={m.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-1 duration-300">
                                 <AgentAvatar />
                                 <div className="min-w-0 flex-1 pt-0.5">
-                                    <ActivityTimeline items={m.activity} />
+                                    <ActivityTimeline items={m.activity} onTradeAction={handleTradeAction} />
                                     {m.content ? (
                                         <RichMarkdown>{m.content}</RichMarkdown>
                                     ) : m.streaming && !m.activity?.length ? (

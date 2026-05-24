@@ -209,8 +209,16 @@ def _openai_tool_schemas() -> List[dict]:
     return schemas
 
 
-async def _exec_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute a tool by name (shared by the Gemini and OpenAI-compatible loops)."""
+async def _exec_tool(name: str, args: Dict[str, Any], db=None, user_id: str = "",
+                     confirm_mode: bool = False) -> Dict[str, Any]:
+    """Execute a tool by name (shared by the Gemini and OpenAI-compatible loops).
+
+    In confirm_mode, execution tools are STAGED for user approval rather than run.
+    """
+    if confirm_mode and name in trading.EXECUTION_TOOLS and db is not None:
+        import copilot_trades
+        return await copilot_trades.stage(db, user_id, name, args)
+
     func = _TOOL_MAP.get(name) or getattr(agent_tools, name, None)
     if func is None:
         return {"ok": False, "error": f"unknown tool {name}"}
@@ -327,6 +335,8 @@ def _tool_label(name: str, args: Dict[str, Any]) -> str:
 def _result_summary(name: str, result: Dict[str, Any]) -> str:
     if not isinstance(result, dict):
         return "done"
+    if result.get("staged"):
+        return "staged — awaiting your approval"
     if result.get("ok") is False or result.get("error"):
         return f"⚠ {result.get('error', 'failed')}"
     if name == "get_account_summary":
@@ -346,6 +356,19 @@ def _result_summary(name: str, result: Dict[str, Any]) -> str:
 
 
 def _trade_event_payload(name: str, args: Dict[str, Any], result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    # Staged (confirm mode) — render an Approve/Reject card.
+    if isinstance(result, dict) and result.get("staged"):
+        return {
+            "action": result.get("action"),
+            "symbol": result.get("symbol"),
+            "side": result.get("side"),
+            "qty": result.get("qty"),
+            "order_type": result.get("order_type"),
+            "limit_price": result.get("limit_price"),
+            "status": "awaiting approval",
+            "pending": True,
+            "proposal_id": result.get("proposal_id"),
+        }
     if not (isinstance(result, dict) and result.get("ok") and result.get("executed")):
         return None
     if name == "place_order":
@@ -407,6 +430,7 @@ async def run_copilot_agent(
     user_id: str = "",
     session_id: str = "",
     model: Optional[str] = None,
+    confirm: bool = True,
 ) -> AsyncGenerator[str, None]:
     """Run one turn of the trading copilot, streaming SSE events.
 
@@ -420,6 +444,16 @@ async def run_copilot_agent(
     yield _sse("thinking", step="plan", message=f"Reading your portfolio and planning… (via {resolved.label})")
 
     system_prompt = _system_prompt()
+    if confirm:
+        system_prompt += (
+            "\n\n== TRADE CONFIRMATION IS ON ==\n"
+            "Trades need the user's one-click approval. CRITICAL: you MUST still CALL the "
+            "place_order / close_position / cancel_all_open_orders tools exactly as normal — "
+            "the tool call itself is what stages the trade for approval (it does NOT hit the "
+            "broker until the user approves in the UI). NEVER claim a trade is 'staged', "
+            "'placed', or 'queued' unless you actually called the tool in this turn. After "
+            "calling it, tell the user what you staged and why; say it's pending their approval."
+        )
 
     # Live account state + relevant long-term memory, fetched in parallel (shared).
     ctx_tasks = [_live_context()]
@@ -433,9 +467,9 @@ async def run_copilot_agent(
     holder: Dict[str, Any] = {"final_text": ""}
     try:
         if resolved.provider == "gemini":
-            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder)
+            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm)
         else:
-            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder)
+            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm)
         async for ev in sub:
             yield ev
 
@@ -470,7 +504,7 @@ async def _finalize(db, user_id: str, session_id: str, message: str, final_text:
     copilot_memory.schedule_add_turn(user_id, message, final_text)
 
 
-async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder):
+async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False):
     """Native Gemini function-calling loop."""
     model = _build_model(system_prompt, model_name=resolved.model_id)
     gemini_history: List[Dict[str, Any]] = []
@@ -506,13 +540,13 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
             tool_calls += 1
             yield _sse("tool_call", name=name, label=_tool_label(name, args),
                        args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
-            result = await _exec_tool(name, args)
+            result = await _exec_tool(name, args, db, user_id, confirm)
             yield _sse("tool_result", name=name, ok=bool(result.get("ok", True)),
                        summary=_result_summary(name, result))
             tp = _trade_event_payload(name, args, result)
             if tp:
                 yield _sse("trade", **tp)
-                if db is not None:
+                if db is not None and not tp.get("pending"):
                     await _log_trade(db, user_id, tp)
             function_responses.append({"function_response": {"name": name, "response": result}})
         if not function_responses:
@@ -536,7 +570,7 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
     holder["final_text"] = final_text
 
 
-async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder):
+async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False):
     """OpenAI-compatible tool-calling loop (OpenRouter / NVIDIA NIM)."""
     from openai import AsyncOpenAI
 
@@ -597,13 +631,13 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
             tool_calls += 1
             yield _sse("tool_call", name=name, label=_tool_label(name, args),
                        args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
-            result = await _exec_tool(name, args)
+            result = await _exec_tool(name, args, db, user_id, confirm)
             yield _sse("tool_result", name=name, ok=bool(result.get("ok", True)),
                        summary=_result_summary(name, result))
             tp = _trade_event_payload(name, args, result)
             if tp:
                 yield _sse("trade", **tp)
-                if db is not None:
+                if db is not None and not tp.get("pending"):
                     await _log_trade(db, user_id, tp)
             messages.append({"role": "tool", "tool_call_id": tc.id,
                              "content": json.dumps(result, default=str)[:8000]})

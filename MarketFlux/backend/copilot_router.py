@@ -25,6 +25,7 @@ class CopilotChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     session_id: Optional[str] = None
     model: Optional[str] = None
+    confirm: bool = True  # confirm-before-execute (safe default); false = autonomous
 
 
 def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRouter:
@@ -64,6 +65,7 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
                 user_id=user_id,
                 session_id=session_id,
                 model=payload.model,
+                confirm=payload.confirm,
             ),
             media_type="text/event-stream",
             headers={
@@ -91,6 +93,20 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         from vnext.alpaca_client import get_positions
         positions = await asyncio.to_thread(get_positions)
         return {"items": positions, "total": len(positions)}
+
+    @router.post("/trades/{pid}/approve")
+    async def copilot_trade_approve(pid: str, request: Request):
+        """Execute a staged trade after explicit user approval (confirm mode)."""
+        import copilot_trades
+        user_id = await _resolve_user_id(request)
+        result = await copilot_trades.execute_pending(db, user_id, pid)
+        return {"item": result}
+
+    @router.post("/trades/{pid}/reject")
+    async def copilot_trade_reject(pid: str, request: Request):
+        import copilot_trades
+        user_id = await _resolve_user_id(request)
+        return await copilot_trades.reject_pending(db, user_id, pid)
 
     @router.get("/models")
     async def copilot_models_list():
