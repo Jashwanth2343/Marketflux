@@ -20,6 +20,7 @@ Everything is PAPER trading. Educational simulation, not investment advice.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 from datetime import datetime, timezone
@@ -31,6 +32,7 @@ from google.generativeai.types import HarmBlockThreshold, HarmCategory
 import agent_tools
 import copilot_trading_tools as trading
 import copilot_memory
+import copilot_models
 from copilot_code_tool import run_python
 from ai_service import GEMINI_FLASH, configure_gemini
 
@@ -165,7 +167,7 @@ _TOOL_MAP["get_market_overview"] = agent_tools.get_market_overview_tool
 _TOOL_MAP["get_company_profile"] = agent_tools.get_company_profile_tool
 
 
-def _build_model(system_instruction: str):
+def _build_model(system_instruction: str, model_name: str = GEMINI_FLASH):
     configure_gemini()
     safety = {
         HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -174,11 +176,56 @@ def _build_model(system_instruction: str):
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
     }
     return genai.GenerativeModel(
-        model_name=GEMINI_FLASH,
+        model_name=model_name,
         system_instruction=system_instruction,
         safety_settings=safety,
         tools=_ALL_TOOLS,
     )
+
+
+# OpenAI-compatible tool schemas, generated once by introspecting the Python tools.
+_OPENAI_TOOLS_CACHE: Optional[List[dict]] = None
+
+
+def _openai_tool_schemas() -> List[dict]:
+    global _OPENAI_TOOLS_CACHE
+    if _OPENAI_TOOLS_CACHE is not None:
+        return _OPENAI_TOOLS_CACHE
+    type_map = {float: "number", int: "integer", bool: "boolean", str: "string"}
+    schemas = []
+    for fn in _ALL_TOOLS:
+        props: Dict[str, Any] = {}
+        required: List[str] = []
+        for pname, p in inspect.signature(fn).parameters.items():
+            props[pname] = {"type": type_map.get(p.annotation, "string")}
+            if p.default is inspect.Parameter.empty:
+                required.append(pname)
+        schemas.append({"type": "function", "function": {
+            "name": fn.__name__,
+            "description": (fn.__doc__ or "").strip()[:1024],
+            "parameters": {"type": "object", "properties": props, "required": required},
+        }})
+    _OPENAI_TOOLS_CACHE = schemas
+    return schemas
+
+
+async def _exec_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute a tool by name (shared by the Gemini and OpenAI-compatible loops)."""
+    func = _TOOL_MAP.get(name) or getattr(agent_tools, name, None)
+    if func is None:
+        return {"ok": False, "error": f"unknown tool {name}"}
+    try:
+        if asyncio.iscoroutinefunction(func):
+            result = await asyncio.wait_for(func(**args), timeout=40.0)
+        else:
+            result = await asyncio.wait_for(asyncio.to_thread(func, **args), timeout=40.0)
+    except asyncio.TimeoutError:
+        result = {"ok": False, "error": f"{name} timed out"}
+    except Exception as exc:
+        logger.error(f"copilot tool {name} failed: {exc}")
+        result = {"ok": False, "error": f"{name} failed: {exc}"}
+    result = _sanitize(result)
+    return result if isinstance(result, dict) else {"result": result}
 
 
 # ---------------------------------------------------------------------------
@@ -359,24 +406,22 @@ async def run_copilot_agent(
     db=None,
     user_id: str = "",
     session_id: str = "",
+    model: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
-    """Run one turn of the trading copilot, streaming SSE events."""
-    yield _sse("thinking", step="plan", message="Reading your portfolio and planning…")
+    """Run one turn of the trading copilot, streaming SSE events.
+
+    Dispatches to Gemini (native function-calling) or an OpenAI-compatible
+    provider (OpenRouter / NIM) based on the selected model. Tools, system
+    prompt, transparency events, memory, and trade logging are identical across
+    both backends — only the LLM-call mechanics differ.
+    """
+    resolved = copilot_models.resolve(model)
+    yield _sse("model", key=resolved.key, label=resolved.label, provider=resolved.provider)
+    yield _sse("thinking", step="plan", message=f"Reading your portfolio and planning… (via {resolved.label})")
 
     system_prompt = _system_prompt()
-    model = _build_model(system_prompt)
 
-    # Seed prior conversation turns.
-    gemini_history: List[Dict[str, Any]] = []
-    for h in (history or [])[-8:]:
-        msg, resp = h.get("message", ""), h.get("response", "")
-        if isinstance(msg, str) and isinstance(resp, str) and msg.strip() and resp.strip():
-            gemini_history.append({"role": "user", "parts": [msg]})
-            gemini_history.append({"role": "model", "parts": [resp]})
-
-    chat = model.start_chat(history=gemini_history)
-
-    # Pull live account state and relevant long-term memory in parallel.
+    # Live account state + relevant long-term memory, fetched in parallel (shared).
     ctx_tasks = [_live_context()]
     if db is not None:
         ctx_tasks.append(copilot_memory.memory_context_block(user_id, message))
@@ -384,125 +429,192 @@ async def run_copilot_agent(
     live_ctx = ctx_results[0]
     mem_ctx = ctx_results[1] if len(ctx_results) > 1 else ""
     context = "\n\n".join(p for p in (mem_ctx, live_ctx) if p)
-    user_prompt = f"{context}\n\nUser: {message}" if context else message
 
-    tool_calls = 0
-    called_signatures: set = set()
-    final_text = ""
-
+    holder: Dict[str, Any] = {"final_text": ""}
     try:
-        response = await asyncio.to_thread(chat.send_message, user_prompt)
+        if resolved.provider == "gemini":
+            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder)
+        else:
+            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder)
+        async for ev in sub:
+            yield ev
 
-        iteration = 0
-        while tool_calls < MAX_TOOL_CALLS and iteration < MAX_TOOL_CALLS + 4:
-            iteration += 1
-            calls = _function_calls(response)
-            if not calls:
-                break
-
-            function_responses = []
-            for fc in calls:
-                if tool_calls >= MAX_TOOL_CALLS:
-                    break
-                name = fc.name
-                args = dict(fc.args) if fc.args else {}
-
-                signature = f"{name}:{json.dumps(args, sort_keys=True, default=str)}"
-                # Allow execution tools to repeat; dedupe only read tools.
-                if signature in called_signatures and name not in trading.EXECUTION_TOOLS:
-                    function_responses.append({"function_response": {
-                        "name": name, "response": {"note": "already fetched"}}})
-                    continue
-                called_signatures.add(signature)
-                tool_calls += 1
-
-                yield _sse("tool_call", name=name, label=_tool_label(name, args),
-                           args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
-
-                func = _TOOL_MAP.get(name) or getattr(agent_tools, name, None)
-                if func is None:
-                    result = {"ok": False, "error": f"unknown tool {name}"}
-                else:
-                    try:
-                        if asyncio.iscoroutinefunction(func):
-                            result = await asyncio.wait_for(func(**args), timeout=40.0)
-                        else:
-                            result = await asyncio.wait_for(
-                                asyncio.to_thread(func, **args), timeout=40.0)
-                    except asyncio.TimeoutError:
-                        result = {"ok": False, "error": f"{name} timed out"}
-                    except Exception as exc:
-                        logger.error(f"copilot tool {name} failed: {exc}")
-                        result = {"ok": False, "error": f"{name} failed: {exc}"}
-
-                result = _sanitize(result)
-                if not isinstance(result, dict):
-                    result = {"result": result}
-
-                yield _sse("tool_result", name=name, ok=bool(result.get("ok", True)),
-                           summary=_result_summary(name, result))
-
-                trade_payload = _trade_event_payload(name, args, result)
-                if trade_payload:
-                    yield _sse("trade", **trade_payload)
-                    if db is not None:
-                        await _log_trade(db, user_id, trade_payload)
-
-                function_responses.append({"function_response": {
-                    "name": name, "response": result}})
-
-            if not function_responses:
-                break
-
-            response = await asyncio.to_thread(
-                chat.send_message, {"role": "function", "parts": function_responses})
-
-        # If we hit the ceiling with calls still pending, force a wrap-up.
-        if tool_calls >= MAX_TOOL_CALLS and _function_calls(response):
-            yield _sse("thinking", step="finalize", message="Wrapping up with what I have…")
-            response = await asyncio.to_thread(
-                chat.send_message,
-                "Tool limit reached. Stop calling tools and give your final answer now, "
-                "summarizing any trades you executed.")
-
-        final_text = _text_of(response)
-        if not final_text:
-            try:
-                response = await asyncio.to_thread(
-                    chat.send_message,
-                    "Provide your final answer now in markdown. Summarize any actions taken.")
-                final_text = _text_of(response)
-            except Exception:
-                pass
-        if not final_text:
-            final_text = ("I gathered the data and acted where possible, but couldn't compose a "
-                          "summary. Check the activity log above for what ran.")
+        final_text = holder.get("final_text") or (
+            "I gathered the data and acted where possible, but couldn't compose a "
+            "summary. Check the activity log above for what ran.")
 
         yield _sse("thinking", step="write", message="Writing it up…")
         for i in range(0, len(final_text), 60):
             yield _sse("token", content=final_text[i:i + 60])
             await asyncio.sleep(0.004)
-
         yield _sse("done")
-
-        if db is not None:
-            try:
-                await db.copilot_messages.insert_one({
-                    "user_id": user_id,
-                    "session_id": session_id,
-                    "message": message,
-                    "response": final_text,
-                    "created_at": datetime.now(timezone.utc),
-                })
-            except Exception as exc:
-                logger.error(f"copilot db save failed: {exc}")
-            # Extract + persist long-term memory in the background (never blocks).
-            copilot_memory.schedule_add_turn(user_id, message, final_text)
+        await _finalize(db, user_id, session_id, message, final_text)
 
     except Exception as exc:
         logger.critical(f"copilot agent crashed: {exc}", exc_info=True)
         yield _sse("token", content=f"\n\n⚠ The copilot hit an error: {exc}")
         yield _sse("done", error=str(exc))
+
+
+async def _finalize(db, user_id: str, session_id: str, message: str, final_text: str) -> None:
+    """Persist the turn + schedule the background memory write (shared)."""
+    if db is None:
+        return
+    try:
+        await db.copilot_messages.insert_one({
+            "user_id": user_id, "session_id": session_id, "message": message,
+            "response": final_text, "created_at": datetime.now(timezone.utc),
+        })
+    except Exception as exc:
+        logger.error(f"copilot db save failed: {exc}")
+    copilot_memory.schedule_add_turn(user_id, message, final_text)
+
+
+async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder):
+    """Native Gemini function-calling loop."""
+    model = _build_model(system_prompt, model_name=resolved.model_id)
+    gemini_history: List[Dict[str, Any]] = []
+    for h in (history or [])[-8:]:
+        msg, resp = h.get("message", ""), h.get("response", "")
+        if isinstance(msg, str) and isinstance(resp, str) and msg.strip() and resp.strip():
+            gemini_history.append({"role": "user", "parts": [msg]})
+            gemini_history.append({"role": "model", "parts": [resp]})
+    chat = model.start_chat(history=gemini_history)
+    user_prompt = f"{context}\n\nUser: {message}" if context else message
+
+    tool_calls = 0
+    called_signatures: set = set()
+    response = await asyncio.to_thread(chat.send_message, user_prompt)
+
+    iteration = 0
+    while tool_calls < MAX_TOOL_CALLS and iteration < MAX_TOOL_CALLS + 4:
+        iteration += 1
+        calls = _function_calls(response)
+        if not calls:
+            break
+        function_responses = []
+        for fc in calls:
+            if tool_calls >= MAX_TOOL_CALLS:
+                break
+            name = fc.name
+            args = dict(fc.args) if fc.args else {}
+            signature = f"{name}:{json.dumps(args, sort_keys=True, default=str)}"
+            if signature in called_signatures and name not in trading.EXECUTION_TOOLS:
+                function_responses.append({"function_response": {"name": name, "response": {"note": "already fetched"}}})
+                continue
+            called_signatures.add(signature)
+            tool_calls += 1
+            yield _sse("tool_call", name=name, label=_tool_label(name, args),
+                       args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
+            result = await _exec_tool(name, args)
+            yield _sse("tool_result", name=name, ok=bool(result.get("ok", True)),
+                       summary=_result_summary(name, result))
+            tp = _trade_event_payload(name, args, result)
+            if tp:
+                yield _sse("trade", **tp)
+                if db is not None:
+                    await _log_trade(db, user_id, tp)
+            function_responses.append({"function_response": {"name": name, "response": result}})
+        if not function_responses:
+            break
+        response = await asyncio.to_thread(chat.send_message, {"role": "function", "parts": function_responses})
+
+    if tool_calls >= MAX_TOOL_CALLS and _function_calls(response):
+        yield _sse("thinking", step="finalize", message="Wrapping up with what I have…")
+        response = await asyncio.to_thread(
+            chat.send_message,
+            "Tool limit reached. Stop calling tools and give your final answer now, summarizing any trades.")
+
+    final_text = _text_of(response)
+    if not final_text:
+        try:
+            response = await asyncio.to_thread(
+                chat.send_message, "Provide your final answer now in markdown. Summarize any actions taken.")
+            final_text = _text_of(response)
+        except Exception:
+            pass
+    holder["final_text"] = final_text
+
+
+async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder):
+    """OpenAI-compatible tool-calling loop (OpenRouter / NVIDIA NIM)."""
+    from openai import AsyncOpenAI
+
+    headers = {"HTTP-Referer": "https://marketflux.local", "X-Title": "MarketFlux Copilot"} \
+        if resolved.provider == "openrouter" else None
+    client = AsyncOpenAI(api_key=resolved.api_key, base_url=resolved.base_url,
+                         default_headers=headers, timeout=120.0)
+    tools = _openai_tool_schemas()
+
+    messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+    for h in (history or [])[-8:]:
+        u, a = h.get("message", ""), h.get("response", "")
+        if isinstance(u, str) and u.strip():
+            messages.append({"role": "user", "content": u})
+        if isinstance(a, str) and a.strip():
+            messages.append({"role": "assistant", "content": a})
+    messages.append({"role": "user", "content": f"{context}\n\nUser: {message}" if context else message})
+
+    async def _complete(msgs, with_tools=True):
+        kwargs: Dict[str, Any] = dict(model=resolved.model_id, messages=msgs, temperature=0.2, max_tokens=1600)
+        if with_tools:
+            kwargs.update(tools=tools, tool_choice="auto")
+        return await client.chat.completions.create(**kwargs)
+
+    called: set = set()
+    tool_calls = 0
+    for _ in range(MAX_TOOL_CALLS + 4):
+        try:
+            resp = await _complete(messages)
+        except Exception as exc:
+            logger.error(f"openai-compat ({resolved.label}) failed: {exc}")
+            holder["final_text"] = (
+                f"⚠ **{resolved.label}** returned an error: {str(exc)[:300]}\n\n"
+                "It may not support tool-calling on this account. Pick another model from the selector.")
+            return
+        msg = resp.choices[0].message
+        tcs = getattr(msg, "tool_calls", None) or []
+        if not tcs:
+            holder["final_text"] = msg.content or ""
+            return
+        messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": [
+            {"id": tc.id, "type": "function",
+             "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in tcs]})
+        for tc in tcs:
+            name = tc.function.name
+            try:
+                args = json.loads(tc.function.arguments or "{}")
+            except Exception:
+                args = {}
+            if tool_calls >= MAX_TOOL_CALLS:
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps({"note": "tool limit reached"})})
+                continue
+            signature = f"{name}:{json.dumps(args, sort_keys=True, default=str)}"
+            if signature in called and name not in trading.EXECUTION_TOOLS:
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps({"note": "already fetched"})})
+                continue
+            called.add(signature)
+            tool_calls += 1
+            yield _sse("tool_call", name=name, label=_tool_label(name, args),
+                       args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
+            result = await _exec_tool(name, args)
+            yield _sse("tool_result", name=name, ok=bool(result.get("ok", True)),
+                       summary=_result_summary(name, result))
+            tp = _trade_event_payload(name, args, result)
+            if tp:
+                yield _sse("trade", **tp)
+                if db is not None:
+                    await _log_trade(db, user_id, tp)
+            messages.append({"role": "tool", "tool_call_id": tc.id,
+                             "content": json.dumps(result, default=str)[:8000]})
+
+    if not holder.get("final_text"):
+        try:
+            messages.append({"role": "user", "content": "Stop using tools and give your final answer now in markdown."})
+            resp = await _complete(messages, with_tools=False)
+            holder["final_text"] = resp.choices[0].message.content or ""
+        except Exception:
+            holder["final_text"] = "I gathered data but couldn't compose a final summary."
 
 
 async def _log_trade(db, user_id: str, payload: Dict[str, Any]) -> None:

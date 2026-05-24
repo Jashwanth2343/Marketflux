@@ -395,3 +395,8 @@ Prevent redundant API calls and reduce latency:
 - **2.1 Conversational Memory** — DONE: Mem0 over Supabase pgvector (Gemini embeddings + extraction). Auto-extracts durable facts per turn, semantic recall injected into context, sidebar panel to view/clear. Verified: agent honors remembered constraints (declined a short that violated "never short" + "under 10%").
 - **2.4 Backtest Engine** — Existing `backtest/` engine + Backtest tab; NL→rules parsing not wired to the Studio.
 - **Compute** — BONUS (not in brief): sandboxed `run_python` tool for sizing/risk math.
+- **Multi-model picker** — BONUS: the agent runs on Gemini (native function-calling)
+  or any OpenAI-compatible provider (OpenRouter → GPT-4o / Claude / Qwen / DeepSeek;
+  NVIDIA NIM → Nemotron) via a shared tool-calling loop. Header dropdown gated by
+  which provider keys are present (`GET /api/copilot/models`). Lets the user trade
+  off cost/quality per their plan to add cheaper provider keys later.

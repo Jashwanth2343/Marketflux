@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 class CopilotChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     session_id: Optional[str] = None
+    model: Optional[str] = None
 
 
 def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRouter:
@@ -62,6 +63,7 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
                 db=db,
                 user_id=user_id,
                 session_id=session_id,
+                model=payload.model,
             ),
             media_type="text/event-stream",
             headers={
@@ -89,6 +91,12 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         from vnext.alpaca_client import get_positions
         positions = await asyncio.to_thread(get_positions)
         return {"items": positions, "total": len(positions)}
+
+    @router.get("/models")
+    async def copilot_models_list():
+        """Selectable models, gated by which provider keys are configured."""
+        import copilot_models
+        return {"items": copilot_models.available_models(), "default": copilot_models.DEFAULT_KEY}
 
     @router.get("/memory")
     async def copilot_memory_list(request: Request):

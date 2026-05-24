@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { API_BASE } from '@/lib/api';
+import api, { API_BASE } from '@/lib/api';
 import AccountSummary from '@/components/copilot/AccountSummary';
 import CopilotMemory from '@/components/copilot/CopilotMemory';
 import RichMarkdown from '@/components/RichMarkdown';
@@ -120,6 +120,8 @@ export default function CopilotAgent() {
     const [loading, setLoading] = useState(false);
     const [accountSignal, setAccountSignal] = useState(0);
     const [memorySignal, setMemorySignal] = useState(0);
+    const [models, setModels] = useState([]);
+    const [model, setModel] = useState(() => localStorage.getItem('copilot_model') || 'gemini-2.5-flash');
     const sessionId = useRef(`copilot_${Date.now()}`);
     const scrollRef = useRef(null);
     const abortRef = useRef(null);
@@ -127,6 +129,20 @@ export default function CopilotAgent() {
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }, [messages]);
+
+    // Load the selectable models (gated by which provider keys are configured).
+    useEffect(() => {
+        api.get('/copilot/models').then(({ data }) => {
+            const items = data?.items || [];
+            setModels(items);
+            setModel((cur) => (items.some((m) => m.key === cur) ? cur : (data?.default || 'gemini-2.5-flash')));
+        }).catch(() => { /* keep default */ });
+    }, []);
+
+    const onModelChange = useCallback((key) => {
+        setModel(key);
+        localStorage.setItem('copilot_model', key);
+    }, []);
 
     // Pick up a strategy handed off from the Strategy Studio.
     useEffect(() => {
@@ -167,7 +183,7 @@ export default function CopilotAgent() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ message: msg, session_id: sessionId.current }),
+                body: JSON.stringify({ message: msg, session_id: sessionId.current, model }),
                 signal: controller.signal,
             });
             if (!res.ok || !res.body) throw new Error(`Request failed (${res.status})`);
@@ -238,7 +254,7 @@ export default function CopilotAgent() {
             setLoading(false);
             abortRef.current = null;
         }
-    }, [input, loading, patchLastAssistant]);
+    }, [input, loading, model, patchLastAssistant]);
 
     const stop = () => { abortRef.current?.abort(); abortRef.current = null; setLoading(false); patchLastAssistant((m) => ({ ...m, streaming: false })); };
 
@@ -263,9 +279,26 @@ export default function CopilotAgent() {
                             <div className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">Autonomous · Paper</div>
                         </div>
                     </div>
-                    <span className="hidden sm:flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                        <ShieldCheck className="w-3.5 h-3.5" /> not advice
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] pl-2.5 pr-1.5 py-1" title="Model">
+                            <Cpu className="w-3.5 h-3.5 text-primary" />
+                            <select
+                                value={model}
+                                onChange={(e) => onModelChange(e.target.value)}
+                                className="max-w-[150px] cursor-pointer bg-transparent pr-1 text-[11px] font-mono text-foreground outline-none"
+                            >
+                                {models.length === 0 && <option value={model}>{model}</option>}
+                                {models.map((m) => (
+                                    <option key={m.key} value={m.key} className="bg-[#0a0a0a] text-foreground">
+                                        {m.label}{m.experimental ? ' · beta' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <span className="hidden sm:flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                            <ShieldCheck className="w-3.5 h-3.5" /> not advice
+                        </span>
+                    </div>
                 </div>
 
                 {/* Messages */}
