@@ -63,7 +63,7 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
 
     @router.post("/chat/stream")
     async def copilot_chat_stream(payload: CopilotChatRequest, request: Request):
-        message = "".join(c for c in payload.message if c.isprintable())
+        message = "".join(c for c in payload.message if c.isprintable() or c in "\n\t\r")
         user_id = await _resolve_user_id(request)
         session_id = payload.session_id or str(uuid.uuid4())
 

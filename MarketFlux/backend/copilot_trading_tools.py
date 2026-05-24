@@ -211,6 +211,16 @@ def place_order(
             limit_price=limit_price, time_in_force=time_in_force,
         )
     else:
+        current_price = _estimate_price(symbol)
+        if current_price > 0:
+            est_notional = quantity * current_price
+            if est_notional > MAX_ORDER_NOTIONAL:
+                return _err(
+                    f"Estimated market order notional ~${est_notional:,.0f} exceeds the "
+                    f"per-order safety cap of ${MAX_ORDER_NOTIONAL:,.0f}. Reduce the size.",
+                    notional=round(est_notional, 2),
+                    cap=MAX_ORDER_NOTIONAL,
+                )
         order = alpaca_client.submit_market_order(
             symbol=symbol, qty=quantity, side=side, time_in_force=time_in_force,
         )
@@ -268,6 +278,23 @@ def cancel_all_open_orders() -> dict:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _estimate_price(symbol: str) -> float:
+    """Best-effort current price for notional cap checks on market orders."""
+    for pos in alpaca_client.get_positions():
+        if pos.get("symbol", "").upper() == symbol:
+            try:
+                return float(pos["current_price"])
+            except (KeyError, TypeError, ValueError):
+                pass
+    try:
+        import yfinance as yf
+        tick = yf.Ticker(symbol)
+        info = tick.fast_info
+        return float(getattr(info, "last_price", 0) or 0)
+    except Exception:
+        return 0.0
+
 
 def _pct(raw) -> float:
     """Alpaca returns unrealized_plpc as a fraction string (e.g. '0.0123'). To %."""

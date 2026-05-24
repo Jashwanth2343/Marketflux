@@ -38,12 +38,23 @@ BLOCKED_NAMES = {
     "open", "eval", "exec", "compile", "__import__", "input", "breakpoint",
     "globals", "locals", "vars", "getattr", "setattr", "delattr",
     "memoryview", "help", "exit", "quit", "object",
+    "__builtins__", "builtins",
 }
 
 TIMEOUT_SECONDS = 12
 MAX_OUTPUT_CHARS = 6000
 
+_SAFE_BUILTINS = (
+    "abs all any bin bool bytearray bytes chr complex dict divmod enumerate "
+    "filter float format frozenset hash hex id int isinstance issubclass "
+    "iter len list map max min next oct ord pow print range repr reversed "
+    "round set slice sorted str sum tuple type zip"
+)
+
 _PRELUDE = (
+    "import builtins as _b\n"
+    f"__builtins__ = {{n: getattr(_b, n) for n in '{_SAFE_BUILTINS}'.split()}}\n"
+    "del _b\n"
     "import math, statistics, json, datetime\n"
     "import numpy as np\n"
     "import pandas as pd\n"

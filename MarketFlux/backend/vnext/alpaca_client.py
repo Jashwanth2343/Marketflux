@@ -21,8 +21,8 @@ def _get_trading_client():
     if _trading_client is not None:
         return _trading_client
 
-    api_key = os.getenv("APCA_API_KEY_ID")
-    secret_key = os.getenv("APCA_API_SECRET_KEY")
+    api_key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_BROKER_API_KEY")
+    secret_key = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_BROKER_API_SECRET")
 
     if not api_key or not secret_key:
         return None
@@ -42,7 +42,9 @@ def _get_trading_client():
 
 
 def is_alpaca_configured() -> bool:
-    return bool(os.getenv("APCA_API_KEY_ID") and os.getenv("APCA_API_SECRET_KEY"))
+    key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_BROKER_API_KEY")
+    secret = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_BROKER_API_SECRET")
+    return bool(key and secret)
 
 
 # ---------------------------------------------------------------------------

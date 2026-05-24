@@ -37,7 +37,7 @@ BROWSER=none REACT_APP_BACKEND_URL=http://localhost:8001 npx craco start --confi
 
 4. **Python PATH**: pip installs to `~/.local/bin` which isn't on PATH by default. Always `export PATH="$HOME/.local/bin:$PATH"` before running uvicorn.
 
-5. **HuggingFace models**: FinBERT and sentence-transformers require internet access to download. The server gracefully degrades without them (sentiment shows "LOADING", agent embeddings disabled).
+5. **HuggingFace models**: sentence-transformers requires internet access to download on first run. The server gracefully degrades without it (agent embeddings disabled).
 
 6. **NaN in market data**: yfinance occasionally returns NaN values that crash JSON serialization. The `sanitize_for_json` helper handles this, but if you see 500 errors with "Out of range float values", it's this issue.
 
@@ -46,8 +46,8 @@ BROWSER=none REACT_APP_BACKEND_URL=http://localhost:8001 npx craco start --confi
 | Secret | Features it unlocks |
 |--------|-------------------|
 | `GEMINI_API_KEY` | AI Chat, Stock Digests, AI Screener, Pilot signal scoring, Autoresearch |
-| `ALPACA_BROKER_API_KEY` | Paper trading execution, account management, Paper Portfolio tab |
-| `ALPACA_BROKER_API_SECRET` | (paired with above) |
+| `APCA_API_KEY_ID` | Paper trading execution, account management, Paper Portfolio tab |
+| `APCA_API_SECRET_KEY` | (paired with above) |
 | `OPENROUTER_API_KEY` or `NVIDIA_NIM_API_KEY` | Strategy Studio / Strategy Terminal |
 
 Without these keys, all non-AI features still work: market data, charts, news, watchlist, portfolio tracking, search.
