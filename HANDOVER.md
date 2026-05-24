@@ -24,7 +24,7 @@ persist beyond the working container. Recreate them in your real
 deployment / local checkout.
 
 - `frontend/.env.local`
-  - `REACT_APP_SUPABASE_URL` = project URL (`https://etanlxohfiwhdwkbqyzq.supabase.co`)
+  - `REACT_APP_SUPABASE_URL` = your project URL (`https://<project-ref>.supabase.co`, from the Supabase dashboard)
   - `REACT_APP_SUPABASE_ANON_KEY` = anon JWT (the long `eyJ...` key — public/safe)
 - `backend/.env`
   - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY` (service key is secret)
@@ -38,10 +38,9 @@ Note: this project is **Create React App + craco**, so frontend env vars use the
 - Frontend dev server compiles, serves HTTP 200, and the real Supabase URL is
   inlined into the JS bundle — confirming `createClient` now receives valid args.
   The import-time crash is gone.
-- **Not verified:** the live auth round-trip. This sandbox's network policy
-  blocks `*.supabase.co`, so actual sign-in must be confirmed from a browser
-  where Supabase is reachable. The backend also can't be run here (network +
-  still imports MongoDB).
+- **Not verified:** the live auth round-trip. Confirm actual sign-in from a
+  browser with network access to your Supabase project. The backend additionally
+  still imports MongoDB, so it requires a reachable Mongo instance to run.
 
 ## Things to know before testing login
 
@@ -52,8 +51,8 @@ Note: this project is **Create React App + craco**, so frontend env vars use the
    confirm via the emailed link before sign-in works.
 3. Set `REACT_APP_SUPABASE_URL` / `REACT_APP_SUPABASE_ANON_KEY` in your host's
    build environment for deployment (the local `.env.local` won't ship).
-4. **Security:** the `sb_secret_...` service key was shared in plaintext during
-   this session — consider rotating it in the Supabase dashboard.
+4. **Security:** rotate the `SUPABASE_SERVICE_KEY` in the Supabase dashboard if
+   it may have been exposed.
 
 ## Outstanding / next steps
 
