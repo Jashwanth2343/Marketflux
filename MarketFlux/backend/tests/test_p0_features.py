@@ -6,7 +6,11 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://flux-preview-1.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+pytestmark = pytest.mark.skipif(
+    not BASE_URL,
+    reason='Set REACT_APP_BACKEND_URL to run backend integration tests.',
+)
 
 
 class TestSearchStocksEndpoint:

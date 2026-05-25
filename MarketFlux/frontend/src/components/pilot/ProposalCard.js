@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react';
-import axios from 'axios';
 import { toast } from 'sonner';
 import { Check, X, Eye, Loader2, CheckCircle2 } from 'lucide-react';
 
@@ -14,8 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 const STATUS_POLL_INTERVAL_MS = 2000;
 const MAX_STATUS_POLL_ATTEMPTS = 15;
 const STATUS_POLLING_STATES = new Set(['pending', 'approved']);
@@ -107,9 +105,7 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
 
   const refreshProposal = async () => {
     try {
-      const res = await axios.get(`${API}/api/pilot/proposals/${local.id}`, {
-        withCredentials: true,
-      });
+      const res = await api.get(`/pilot/proposals/${local.id}`);
       const item = res?.data?.item;
       if (item) {
         setLocal(item);
@@ -136,10 +132,9 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
     if (busy) return;
     setBusy(true);
     try {
-      const res = await axios.post(
-        `${API}/api/pilot/proposals/${local.id}/approve`,
-        {},
-        { withCredentials: true }
+      const res = await api.post(
+        `/pilot/proposals/${local.id}/approve`,
+        {}
       );
       const item = res?.data?.item;
       if (item) {
@@ -188,10 +183,9 @@ export function ProposalCard({ proposal, onDetails, onChanged, onDismiss }) {
   const reject = async () => {
     setBusy(true);
     try {
-      const res = await axios.post(
-        `${API}/api/pilot/proposals/${local.id}/reject`,
-        {},
-        { withCredentials: true }
+      const res = await api.post(
+        `/pilot/proposals/${local.id}/reject`,
+        {}
       );
       const item = res?.data?.item;
       if (item) {

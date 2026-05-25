@@ -355,11 +355,11 @@ function AiStrategyBuilder({ onApply }) {
     const [loading, setLoading] = useState(false);
     const [preview, setPreview] = useState(null);
 
-    // Pick up a strategy handed off from the Strategy Studio ("Backtest" button).
     useEffect(() => {
         const seed = sessionStorage.getItem('backtest_seed');
         if (seed) { setDesc(seed); sessionStorage.removeItem('backtest_seed'); }
     }, []);
+
 
     const handleParse = useCallback(async () => {
         if (!desc.trim()) return;

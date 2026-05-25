@@ -2,11 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { Plane, Loader2, RefreshCw, Inbox, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import axios from 'axios';
 import { ProposalCard } from '@/components/pilot/ProposalCard';
 import { GlassBoxTrade } from '@/components/pilot/GlassBoxTrade';
 import AccountSummary from '@/components/copilot/AccountSummary';
-import { API_BASE } from '@/lib/api';
+import api from '@/lib/api';
 
 export default function TradingCopilotPanel() {
     const [consentStatus, setConsentStatus] = useState(null);
@@ -21,9 +20,9 @@ export default function TradingCopilotPanel() {
     const fetchAll = useCallback(async () => {
         setLoading(true);
         const settled = await Promise.allSettled([
-            axios.get(`${API_BASE}/api/pilot/consent`, { withCredentials: true }),
-            axios.get(`${API_BASE}/api/pilot/proposals`, { withCredentials: true, params: { status: 'pending', limit: 20 } }),
-            axios.get(`${API_BASE}/api/pilot/personalities`, { withCredentials: true }),
+            api.get('/pilot/consent'),
+            api.get('/pilot/proposals', { params: { status: 'pending', limit: 20 } }),
+            api.get('/pilot/personalities'),
         ]);
         if (settled.every((s) => s.status === 'rejected')) {
             toast.error('Failed to load copilot data');
@@ -45,11 +44,11 @@ export default function TradingCopilotPanel() {
 
     const grantConsent = async () => {
         try {
-            await axios.post(`${API_BASE}/api/pilot/consent`, {
+            await api.post('/pilot/consent', {
                 accept_paper_only: true,
                 accept_not_advice: true,
                 accept_audit_logging: true,
-            }, { withCredentials: true });
+            });
             toast.success('Copilot consent granted');
             fetchAll();
         } catch (err) {
@@ -60,7 +59,7 @@ export default function TradingCopilotPanel() {
     const generateProposal = async (personalityId) => {
         setGenerating(true);
         try {
-            await axios.post(`${API_BASE}/api/pilot/personalities/${personalityId}/propose`, {}, { withCredentials: true });
+            await api.post(`/pilot/personalities/${personalityId}/propose`, {});
             toast.success('Proposal generation started');
             setTimeout(fetchAll, 3000);
         } catch (err) {

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import axios from 'axios';
 import { toast } from 'sonner';
 import { Loader2, Octagon } from 'lucide-react';
 
@@ -14,8 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 
 export function KillSwitchButton({
   personalityId,
@@ -36,10 +34,9 @@ export function KillSwitchButton({
     }
     setBusy(true);
     try {
-      const res = await axios.post(
-        `${API}/api/pilot/personalities/${personalityId}/kill`,
-        {},
-        { withCredentials: true }
+      const res = await api.post(
+        `/pilot/personalities/${personalityId}/kill`,
+        {}
       );
       const data = res?.data || {};
       const expired = Array.isArray(data.expired_proposal_ids) ? data.expired_proposal_ids.length : 0;

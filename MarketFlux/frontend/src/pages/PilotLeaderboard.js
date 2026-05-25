@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { Trophy, TrendingUp, TrendingDown, Loader2, RefreshCw, Plane } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 
 const WINDOWS = [
   { label: '7d', value: 7 },
@@ -147,7 +145,7 @@ export default function PilotLeaderboard() {
   const fetchRows = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/api/pilot/leaderboard?days=${days}&limit=50`);
+      const res = await api.get('/pilot/leaderboard', { params: { days, limit: 50 } });
       setRows(res?.data?.items || []);
       if (res?.data?.disclaimer) setDisclaimer(res.data.disclaimer);
     } catch {

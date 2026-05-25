@@ -1,60 +1,96 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 import api from '@/lib/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const res = await api.get('/auth/me');
-      setUser(res.data);
-    } catch {
-      setUser(null);
-    } finally {
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const s = data?.session ?? null;
+      setSession(s);
+      if (s?.user) {
+        setUser(_mapSupabaseUser(s.user));
+      }
       setLoading(false);
-    }
+    }).catch(() => {
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      setUser(s?.user ? _mapSupabaseUser(s.user) : null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    // CRITICAL: If returning from OAuth callback, skip the /me check.
-    // AuthCallback will exchange the session_id and establish the session first.
-    if (window.location.hash?.includes('session_id=')) {
-      setLoading(false);
-      return;
-    }
-    checkAuth();
-  }, [checkAuth]);
+    if (!session?.access_token) return;
+    api.defaults.headers.common['Authorization'] = `Bearer ${session.access_token}`;
+  }, [session]);
 
   const login = async (email, password) => {
-    const res = await api.post('/auth/login', { email, password });
-    setUser(res.data.user);
-    return res.data;
+    let result;
+    try {
+      result = await supabase.auth.signInWithPassword({ email, password });
+    } catch {
+      throw new Error('Unable to connect to auth service. Please try again.');
+    }
+    if (result.error) throw new Error(result.error.message);
+    setUser(_mapSupabaseUser(result.data.user));
+    return result.data;
   };
 
   const register = async (email, password, name) => {
-    const res = await api.post('/auth/register', { email, password, name });
-    setUser(res.data.user);
-    return res.data;
+    let result;
+    try {
+      result = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: name } },
+      });
+    } catch {
+      throw new Error('Unable to connect to auth service. Please try again.');
+    }
+    if (result.error) throw new Error(result.error.message);
+    if (result.data.user) setUser(_mapSupabaseUser(result.data.user));
+    return result.data;
   };
 
   const logout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch {}
+    await supabase.auth.signOut();
+    delete api.defaults.headers.common['Authorization'];
     setUser(null);
+    setSession(null);
   };
 
-  const loginWithGoogle = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + '/';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/' },
+    });
+    if (error) throw error;
   };
+
+  const checkAuth = useCallback(async () => {
+    const { data } = await supabase.auth.getSession().catch(() => ({ data: null }));
+    const s = data?.session ?? null;
+    if (s?.user) {
+      setSession(s);
+      setUser(_mapSupabaseUser(s.user));
+    } else {
+      setUser(null);
+      setSession(null);
+    }
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, loginWithGoogle, checkAuth }}>
+    <AuthContext.Provider value={{ user, session, setUser, loading, login, register, logout, loginWithGoogle, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );
@@ -64,4 +100,14 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
+}
+
+function _mapSupabaseUser(u) {
+  return {
+    user_id: u.id,
+    email: u.email,
+    name: u.user_metadata?.full_name || u.email?.split('@')[0] || '',
+    avatar_url: u.user_metadata?.avatar_url || null,
+    provider: u.app_metadata?.provider || 'email',
+  };
 }

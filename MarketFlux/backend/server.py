@@ -46,13 +46,21 @@ else:
     client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
 db = client[os.environ['DB_NAME']]
 
-# JWT — fail HARD at startup if secret is missing or weak
+# JWT — required unless Supabase Auth is configured as primary
 _raw_jwt_secret = os.environ.get('JWT_SECRET') or os.environ.get('JWT_SECRET_KEY')
+_supabase_url = os.environ.get('SUPABASE_URL', '')
+_supabase_service_key = os.environ.get('SUPABASE_SERVICE_KEY', '')
+_supabase_auth_enabled = bool(_supabase_url and _supabase_service_key)
+
 if not _raw_jwt_secret or len(_raw_jwt_secret) < 32:
-    raise RuntimeError(
-        "SECURITY: JWT_SECRET env var is missing or too short (must be ≥32 chars). "
-        "Generate one with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
-    )
+    if not _supabase_auth_enabled:
+        raise RuntimeError(
+            "SECURITY: JWT_SECRET env var is missing or too short (must be ≥32 chars). "
+            "Either set JWT_SECRET or configure SUPABASE_URL + SUPABASE_SERVICE_KEY."
+        )
+    import secrets as _secrets
+    _raw_jwt_secret = _raw_jwt_secret or _secrets.token_hex(32)
+
 JWT_SECRET = _raw_jwt_secret
 JWT_ALGORITHM = "HS256"
 
@@ -179,7 +187,13 @@ async def get_current_user(request: Request) -> Optional[Dict]:
     if not session_token:
         return None
 
-    # Try JWT first
+    # 1. Try Supabase Auth (primary for new users)
+    if _supabase_auth_enabled:
+        supabase_user = await _verify_supabase_token(session_token)
+        if supabase_user:
+            return supabase_user
+
+    # 2. Try legacy JWT (existing users)
     try:
         payload = jwt.decode(session_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user = await db.users.find_one({"user_id": payload["user_id"]}, {"_id": 0})
@@ -189,7 +203,7 @@ async def get_current_user(request: Request) -> Optional[Dict]:
     except jwt.InvalidTokenError:
         pass
 
-    # Try session-based auth
+    # 3. Try session-based auth (legacy)
     session = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
     if session:
         expires_at = session.get("expires_at")
@@ -204,6 +218,55 @@ async def get_current_user(request: Request) -> Optional[Dict]:
         return user
 
     return None
+
+
+async def _verify_supabase_token(token: str) -> Optional[Dict]:
+    """Verify a Supabase access token and return a user dict.
+
+    On first login via Supabase Auth, auto-provisions a user record in Mongo
+    for backward compat with existing code that reads from db.users.
+    """
+    try:
+        from vnext.supabase_client import get_service_client
+        client = get_service_client()
+        if not client:
+            return None
+
+        import asyncio as _aio
+        user_response = await _aio.to_thread(client.auth.get_user, token)
+        if not user_response or not user_response.user:
+            return None
+
+        su = user_response.user
+        user_id = str(su.id)
+        email = su.email or ""
+        name = (su.user_metadata or {}).get("full_name", email.split("@")[0])
+
+        # Ensure user exists in Mongo (backward compat)
+        existing = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        if not existing:
+            existing = {
+                "user_id": user_id,
+                "email": email,
+                "name": name,
+                "auth_type": "supabase",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$setOnInsert": existing},
+                upsert=True,
+            )
+
+        return {
+            "user_id": user_id,
+            "email": email,
+            "name": name,
+            "auth_type": "supabase",
+        }
+    except Exception as exc:
+        logger.debug(f"Supabase token verification failed: {exc}")
+        return None
 
 async def check_and_increment_ai_usage(request: Request) -> bool:
     user = await get_current_user(request)

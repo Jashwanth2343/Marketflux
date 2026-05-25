@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { toast } from 'sonner';
 import { Loader2, RefreshCw, BookOpen, Sparkles } from 'lucide-react';
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 
 function formatDate(iso) {
   if (!iso) return '';
@@ -139,9 +137,9 @@ export function JournalPanel({ open, onOpenChange, personality }) {
     if (!personality?.id) return;
     setLoading(true);
     try {
-      const res = await axios.get(
-        `${API}/api/pilot/personalities/${personality.id}/journal?limit=30`,
-        { withCredentials: true }
+      const res = await api.get(
+        `/pilot/personalities/${personality.id}/journal`,
+        { params: { limit: 30 } }
       );
       setEntries(res?.data?.items || []);
     } catch (err) {
@@ -156,10 +154,9 @@ export function JournalPanel({ open, onOpenChange, personality }) {
     if (!personality?.id) return;
     setGenerating(true);
     try {
-      const res = await axios.post(
-        `${API}/api/pilot/personalities/${personality.id}/journal/generate`,
-        {},
-        { withCredentials: true }
+      const res = await api.post(
+        `/pilot/personalities/${personality.id}/journal/generate`,
+        {}
       );
       if (res?.data?.item) {
         toast.success(`${personality.name} wrote today's entry.`);

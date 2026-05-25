@@ -110,6 +110,15 @@ def _alpaca_is_configured():
 # ---------------------------------------------------------------------------
 # Imports from the pilot subpackage
 # ---------------------------------------------------------------------------
+from .checkpoints import get_checkpoint_store
+from .memory import (
+    record_debate_insight,
+    record_trade_outcome,
+    retrieve_context,
+    retrieve_for_ticker,
+    retrieve_lessons,
+    get_current_regime,
+)
 from .personality import Personality, get_personality, set_paused
 from .trade_proposals import (
     PROPOSAL_COLLECTION,
@@ -232,9 +241,22 @@ async def propose_trades(
 
     await _activity(db, personality_id, "cycle_start", f"Scanning {len(personality.universe)} tickers.")
 
+    # ---- Checkpoint: start workflow thread ----
+    ckpt = get_checkpoint_store()
+    thread_id = ckpt.new_thread(
+        personality_id=personality_id,
+        user_id=user_id,
+        workflow_type="propose_trades",
+    )
+
     # ---- 1. Universe scan ----
     candidates = await _scan_universe(personality, db)
+    await ckpt.save(thread_id, step="universe_scan", state={
+        "candidate_count": len(candidates or []),
+        "universe_size": len(personality.universe),
+    })
     if not candidates:
+        await ckpt.complete(thread_id, result={"outcome": "no_candidates"})
         await _activity(db, personality_id, "no_candidates", "Universe scan returned nothing.")
         return _ok(personality_id=personality_id, proposals=[], scanned=len(personality.universe))
 
@@ -244,6 +266,7 @@ async def propose_trades(
     qualifying = qualifying[:max_candidates]
 
     if not qualifying:
+        await ckpt.complete(thread_id, result={"outcome": "no_qualifying"})
         await _activity(
             db,
             personality_id,
@@ -259,6 +282,10 @@ async def propose_trades(
         f"{len(qualifying)} candidates above floor {floor:.0f}.",
         payload={"tickers": [c["ticker"] for c in qualifying]},
     )
+    await ckpt.save(thread_id, step="candidates_selected", state={
+        "tickers": [c["ticker"] for c in qualifying],
+        "floor": floor,
+    })
 
     # ---- 2. Per-candidate decision pipeline ----
     proposals: List[TradeProposal] = []
@@ -281,6 +308,11 @@ async def propose_trades(
             continue
         proposals.append(proposal)
 
+    await ckpt.complete(thread_id, result={
+        "outcome": "proposals_created",
+        "count": len(proposals),
+        "proposal_ids": [p.id for p in proposals],
+    })
     await _activity(
         db,
         personality_id,
@@ -304,8 +336,8 @@ async def execute_approved(
     """Submit a previously approved proposal to Alpaca paper.
 
     Returns {ok, proposal} or {ok: False, error, ...}.
-    alpaca_account_id is accepted for API compat but ignored (Trading API
-    uses the single paper account).
+    alpaca_account_id is accepted for backward compat but ignored —
+    TradingClient operates on the single configured paper account.
     """
     proposal = await get_proposal(db, proposal_id)
     if proposal is None:
@@ -334,17 +366,16 @@ async def execute_approved(
         )
         open_trades, portfolio_holdings = _policy_context_from_executed_proposals(executed)
 
-        if _alpaca_is_configured():
-            get_positions = _alpaca_get_positions()
-            list_orders = _alpaca_list_orders()
-            live_positions, live_open_orders = await asyncio.gather(
-                asyncio.to_thread(get_positions),
-                asyncio.to_thread(list_orders, "open", 200),
-            )
-            open_trades, portfolio_holdings = _policy_context_from_alpaca(
-                positions=live_positions or [],
-                open_orders=live_open_orders or [],
-            )
+        get_positions = _alpaca_get_positions()
+        list_orders_fn = _alpaca_list_orders()
+        live_positions, live_open_orders = await asyncio.gather(
+            asyncio.to_thread(get_positions),
+            asyncio.to_thread(list_orders_fn, "open", 200),
+        )
+        open_trades, portfolio_holdings = _policy_context_from_alpaca(
+            positions=live_positions or [],
+            open_orders=live_open_orders or [],
+        )
 
         live_check = evaluate_paper_trade(
             ticker=proposal.ticker,
@@ -369,7 +400,7 @@ async def execute_approved(
     except Exception as exc:
         logger.warning(f"pilot_engine: policy re-check raised, proceeding anyway: {exc}")
 
-    # Submit order
+    # Submit order (TradingClient — no account_id needed)
     submit = _alpaca_submit_market_order()
     try:
         order = await asyncio.to_thread(
@@ -411,6 +442,22 @@ async def execute_approved(
         fill_price=fill_price,
         fill_qty=float(order.get("qty") or proposal.qty),
     )
+
+    # Record execution into memory (outcome will be updated on close/reflection)
+    try:
+        await record_trade_outcome(
+            db,
+            personality_id=proposal.personality_id,
+            user_id=user_id,
+            ticker=proposal.ticker,
+            side=proposal.side,
+            entry_price=fill_price or proposal.quote_price,
+            thesis=proposal.thesis or "",
+            conviction=proposal.conviction or 0,
+        )
+    except Exception as exc:
+        logger.debug(f"memory: record_trade_outcome failed: {exc}")
+
     return _ok(proposal=refreshed.to_dict() if refreshed else None, order=order)
 
 
@@ -454,9 +501,10 @@ async def emergency_stop(
             expired_ids.append(p.id)
 
     # Cancel any in-flight Alpaca orders for this personality.
+    # The broker is the source of truth for whether an order can be cancelled.
     cancelled: List[str] = []
     if _alpaca_is_configured():
-        cancel_order = _alpaca_cancel_order()
+        cancel_order_fn = _alpaca_cancel_order()
         all_for_personality = await list_proposals(
             db,
             user_id=user_id,
@@ -469,7 +517,7 @@ async def emergency_stop(
                 continue
             seen_alpaca_order_ids.add(p.alpaca_order_id)
             try:
-                success = await asyncio.to_thread(cancel_order, p.alpaca_order_id)
+                success = await asyncio.to_thread(cancel_order_fn, p.alpaca_order_id)
                 if success:
                     cancelled.append(p.alpaca_order_id)
             except Exception as exc:
@@ -522,8 +570,30 @@ async def _decide_for_candidate(
 
     await _activity(db, personality.id, "swarm_running", f"Debating {ticker}…")
 
-    # ---- Run the adversarial swarm ----
-    swarm_result = await _run_swarm_safe(personality, ticker, candidate)
+    # ---- Retrieve institutional memory for this ticker ----
+    ticker_memories = await retrieve_for_ticker(
+        db, personality_id=personality.id, user_id=user_id, ticker=ticker, limit=8
+    )
+    lessons = await retrieve_lessons(
+        db, personality_id=personality.id, user_id=user_id, limit=5
+    )
+    regime_ctx = await get_current_regime(
+        db, personality_id=personality.id, user_id=user_id
+    )
+
+    # ---- Run the adversarial swarm (with memory context) ----
+    ckpt = get_checkpoint_store()
+    await ckpt.save(f"pilot:swarm:{personality.id}:{ticker}", step="swarm_start", state={
+        "ticker": ticker,
+        "composite_score": composite,
+        "memory_count": len(ticker_memories) if ticker_memories else 0,
+    })
+    swarm_result = await _run_swarm_safe(
+        personality, ticker, candidate,
+        memory_context=ticker_memories,
+        lessons=lessons,
+        regime=regime_ctx,
+    )
     if swarm_result is None:
         return None
     verdict_struct = _parse_verdict(swarm_result.get("final_strategy") or "")
@@ -648,8 +718,24 @@ async def _decide_for_candidate(
     if dry_run:
         return proposal
 
-    proposal.alpaca_account_id = None  # set by router from user record
-    return await create_proposal(db, proposal)
+    proposal.alpaca_account_id = None
+    created = await create_proposal(db, proposal)
+
+    # Record debate insight into memory for future reference
+    try:
+        await record_debate_insight(
+            db,
+            personality_id=personality.id,
+            user_id=user_id,
+            ticker=ticker,
+            insight=verdict_struct.get("thesis", "")[:500],
+            conviction=int(verdict_struct.get("conviction", 0)),
+            verdict=verdict_struct.get("verdict", ""),
+        )
+    except Exception as exc:
+        logger.debug(f"memory: record_debate_insight failed: {exc}")
+
+    return created
 
 
 # ===========================================================================
@@ -659,6 +745,10 @@ async def _run_swarm_safe(
     personality: Personality,
     ticker: str,
     candidate: Dict[str, Any],
+    *,
+    memory_context: Optional[List[Dict[str, Any]]] = None,
+    lessons: Optional[List[Dict[str, Any]]] = None,
+    regime: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     try:
         run_swarm = _strategy_swarm_run()
@@ -666,13 +756,27 @@ async def _run_swarm_safe(
         logger.error(f"strategy_swarm unavailable: {exc}")
         return None
 
+    # Build memory section for the swarm prompt
+    memory_section = ""
+    if regime:
+        memory_section += f"\n## Current Market Regime\n{regime.get('content', 'Unknown')}\n"
+    if memory_context:
+        memory_section += "\n## Institutional Memory (recent context for this ticker)\n"
+        for m in memory_context[:5]:
+            memory_section += f"- {m.get('content', '')}\n"
+    if lessons:
+        memory_section += "\n## Permanent Lessons & Rules\n"
+        for l in lessons[:5]:
+            memory_section += f"- {l.get('content', '')}\n"
+
     prompt = (
         f"You are advising portfolio manager '{personality.name}'.\n"
         f"Mandate: {personality.mandate}\n\n"
         f"Ticker under review: {ticker}\n"
         f"Composite signal score (range -100..+100): {candidate.get('composite_score'):.1f} "
         f"({candidate.get('signal_label') or 'unlabeled'})\n"
-        f"Category breakdown: {candidate.get('categories') or {}}\n\n"
+        f"Category breakdown: {candidate.get('categories') or {}}\n"
+        f"{memory_section}\n"
         f"Decide whether to LONG, SHORT, or PASS, with conviction 1-10, entry price, "
         f"target, stop, sizing, thesis, invalidation, and dissent."
     )

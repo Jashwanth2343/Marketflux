@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import axios from 'axios';
 import { toast } from 'sonner';
 import { Loader2, Play, Pause, Copy, Zap, BookOpen, Eye, EyeOff } from 'lucide-react';
 
@@ -8,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import { KillSwitchButton } from '@/components/pilot/KillSwitchButton';
 import { JournalPanel } from '@/components/pilot/JournalPanel';
 import { DriftBadge } from '@/components/pilot/DriftBadge';
-
-const API = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+import api from '@/lib/api';
 
 const GLYPHS = {
   circle: (color) => (
@@ -84,8 +82,7 @@ export function PersonalityCard({
       // next === true means user wants paused (off the switch). Switch shows ENABLED state when running.
       // We use the new state: "checked" on the Switch represents "running" (not paused).
       // So when the user toggles to running (checked=true), we hit resume.
-      const url = `${API}/api/pilot/personalities/${personality.id}/${endpoint}`;
-      const res = await axios.post(url, {}, { withCredentials: true });
+      const res = await api.post(`/pilot/personalities/${personality.id}/${endpoint}`, {});
       const updated = res?.data?.item;
       if (updated) onUpdated?.(updated);
       toast.success(`${personality.name} ${next ? 'paused' : 'resumed'}.`);
@@ -114,10 +111,9 @@ export function PersonalityCard({
     }
     setProposing(true);
     try {
-      const res = await axios.post(
-        `${API}/api/pilot/personalities/${personality.id}/propose`,
-        { max_candidates: 5, dry_run: false },
-        { withCredentials: true }
+      const res = await api.post(
+        `/pilot/personalities/${personality.id}/propose`,
+        { max_candidates: 5, dry_run: false }
       );
       const data = res?.data || {};
       if (data.ok === false) {
@@ -153,10 +149,9 @@ export function PersonalityCard({
     setTogglingVis(true);
     try {
       const next = !personality.public_visibility;
-      const res = await axios.post(
-        `${API}/api/pilot/personalities/${personality.id}/visibility`,
-        { public: next },
-        { withCredentials: true }
+      const res = await api.post(
+        `/pilot/personalities/${personality.id}/visibility`,
+        { public: next }
       );
       const updated = res?.data?.item;
       if (updated) onUpdated?.(updated);
@@ -177,10 +172,9 @@ export function PersonalityCard({
     e?.stopPropagation?.();
     setCloning(true);
     try {
-      const res = await axios.post(
-        `${API}/api/pilot/personalities/${personality.id}/clone`,
-        {},
-        { withCredentials: true }
+      const res = await api.post(
+        `/pilot/personalities/${personality.id}/clone`,
+        {}
       );
       const item = res?.data?.item;
       toast.success(`Cloned ${personality.name}. Edit your copy any time.`);

@@ -57,6 +57,13 @@ from .pilot.reflection import (
     list_drift_flags,
     list_journal_entries,
 )
+from .pilot.memory import (
+    get_memory_stats,
+    record_lesson,
+    record_regime_context,
+    record_user_note,
+    retrieve_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -375,23 +382,11 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
         # For seed personalities, the kill targets proposals scoped to this user —
         # emergency_stop must filter by both personality_id and user_id internally.
 
-        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "alpaca_account_id": 1})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-        if alpaca_account_id is None:
-            logger.warning(
-                "personalities_kill called for user %s with no alpaca_account_id; "
-                "emergency_stop will proceed without cancelling broker orders.",
-                user["user_id"],
-            )
-
         # Kill switch must work even without prior consent — safety first.
-        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
         return await emergency_stop(
             db,
             personality_id,
             user["user_id"],
-            alpaca_account_id=alpaca_account_id,
         )
 
     # ------------------------------------------------------------------
@@ -450,24 +445,10 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
             reason=payload.reason,
         )
 
-        # Execute against the shared Alpaca PAPER account. After the Trading API
-        # migration there is no per-user account_id, so gate dispatch on whether
-        # the broker is configured — NOT on a (now-absent) per-user account id,
-        # which previously made approvals silently no-op.
         from .alpaca_client import is_alpaca_configured
-
-        user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")  # legacy/optional
-
         dispatch = is_alpaca_configured()
         if dispatch:
-            if alpaca_account_id:
-                # Keep the audit trail complete when a legacy id exists.
-                await db["pilot_trade_proposals"].update_one(
-                    {"id": proposal_id},
-                    {"$set": {"alpaca_account_id": alpaca_account_id}},
-                )
-            background.add_task(_safe_execute, db, proposal_id, user["user_id"], alpaca_account_id)
+            background.add_task(_safe_execute, db, proposal_id, user["user_id"])
 
         return {"item": updated.to_dict() if updated else None, "execution_dispatched": dispatch}
 
@@ -588,12 +569,96 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
             ),
         }
 
+    # ------------------------------------------------------------------
+    # Memory (institutional knowledge layer)
+    # ------------------------------------------------------------------
+    @router.get("/memory/{personality_id}")
+    async def memory_retrieve(
+        personality_id: str,
+        request: Request,
+        ticker: Optional[str] = None,
+        category: Optional[str] = None,
+        limit: int = 20,
+    ):
+        user = await require_user(request)
+        categories = [category] if category else None
+        items = await retrieve_context(
+            db,
+            personality_id=personality_id,
+            user_id=user["user_id"],
+            ticker=ticker,
+            categories=categories,
+            limit=min(limit, 100),
+        )
+        return {"items": items, "total": len(items)}
+
+    @router.get("/memory/{personality_id}/stats")
+    async def memory_stats(personality_id: str, request: Request):
+        user = await require_user(request)
+        stats = await get_memory_stats(db, personality_id=personality_id, user_id=user["user_id"])
+        return stats
+
+    @router.post("/memory/{personality_id}/note")
+    async def memory_add_note(personality_id: str, request: Request):
+        user = await require_user(request)
+        body = await request.json()
+        note = body.get("note", "").strip()
+        ticker = body.get("ticker")
+        if not note:
+            raise HTTPException(422, "note field is required.")
+        entry_id = await record_user_note(
+            db,
+            personality_id=personality_id,
+            user_id=user["user_id"],
+            note=note,
+            ticker=ticker,
+        )
+        return {"id": entry_id, "message": "Note saved to permanent memory."}
+
+    @router.post("/memory/{personality_id}/lesson")
+    async def memory_add_lesson(personality_id: str, request: Request):
+        user = await require_user(request)
+        body = await request.json()
+        lesson = body.get("lesson", "").strip()
+        ticker = body.get("ticker")
+        source = body.get("source", "user")
+        if not lesson:
+            raise HTTPException(422, "lesson field is required.")
+        entry_id = await record_lesson(
+            db,
+            personality_id=personality_id,
+            user_id=user["user_id"],
+            lesson=lesson,
+            ticker=ticker,
+            source=source,
+        )
+        return {"id": entry_id, "message": "Lesson saved to permanent memory."}
+
+    @router.post("/memory/{personality_id}/regime")
+    async def memory_set_regime(personality_id: str, request: Request):
+        user = await require_user(request)
+        body = await request.json()
+        label = body.get("regime_label", "").strip()
+        details = body.get("details", "")
+        tickers = body.get("tickers_affected")
+        if not label:
+            raise HTTPException(422, "regime_label field is required.")
+        entry_id = await record_regime_context(
+            db,
+            personality_id=personality_id,
+            user_id=user["user_id"],
+            regime_label=label,
+            details=details,
+            tickers_affected=tickers,
+        )
+        return {"id": entry_id, "message": f"Regime '{label}' recorded."}
+
     return router
 
 
-async def _safe_execute(db, proposal_id: str, user_id: str, alpaca_account_id: str) -> None:
+async def _safe_execute(db, proposal_id: str, user_id: str) -> None:
     """Background task wrapper that swallows + logs exceptions."""
     try:
-        await execute_approved(db, proposal_id, user_id, alpaca_account_id=alpaca_account_id)
+        await execute_approved(db, proposal_id, user_id)
     except Exception as exc:
         logger.exception(f"pilot background execute failed for proposal {proposal_id}: {exc}")
