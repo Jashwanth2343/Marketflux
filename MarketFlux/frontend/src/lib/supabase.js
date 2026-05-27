@@ -3,10 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Supabase is not configured. Create frontend/.env.local from .env.example and set ' +
-    'REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY, then restart the dev server.'
+const supabaseConfigured = supabaseUrl && supabaseAnonKey &&
+  !supabaseUrl.includes('your-project') && !supabaseAnonKey.includes('your-anon-key');
+
+if (!supabaseConfigured) {
+  console.warn(
+    '[MarketFlux] Supabase not configured — auth disabled. Set ' +
+    'REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in frontend/.env.local to enable.'
   );
 }
 
@@ -46,6 +49,6 @@ const safeFetch = async (input, init) => {
   return response;
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  global: { fetch: safeFetch },
-});
+export const supabase = supabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, { global: { fetch: safeFetch } })
+  : null;

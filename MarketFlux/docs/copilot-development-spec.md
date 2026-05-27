@@ -403,3 +403,202 @@ Prevent redundant API calls and reduce latency:
   NVIDIA NIM → Nemotron) via a shared tool-calling loop. Header dropdown gated by
   which provider keys are present (`GET /api/copilot/models`). Lets the user trade
   off cost/quality per their plan to add cheaper provider keys later.
+
+---
+
+## GSTACK REVIEW REPORT
+<!-- /autoplan restore point: ~/.gstack/projects/Jashwanth2343-Marketflux/fix-craco-babel-stack-env-port-autoplan-restore-20260527-094736.md -->
+
+**Generated:** 2026-05-27 | **Branch:** fix/craco-babel-stack-env-port | **Reviewer:** /autoplan (Claude subagent + primary)  
+**Scope:** CEO + Design + Eng + DX (4-phase review) | **Codex:** unavailable (binary not found)
+
+---
+
+### What I Reviewed
+
+The diff against `main` adds ~4,600 lines across 40 files: the complete MarketFlux Trading Copilot — autonomous paper-trading agent (Gemini SSE + function-calling), confirm-before-trade mode, Mem0 memory, standing/scheduled agents, position enrichment, multi-provider model picker, and dashboard quick-actions. The branch is named `fix/craco-babel-stack-env-port` but the actual scope is a full feature build. The `copilot-development-spec.md` (this file) acts as the plan document.
+
+---
+
+### CEO Dual Voices — Consensus Table
+
+```
+CEO DUAL VOICES — CONSENSUS TABLE:
+═══════════════════════════════════════════════════════════════
+  Dimension                           Claude  Claude   Consensus
+                                      Primary  Sub
+  ──────────────────────────────────── ─────── ─────── ─────────
+  1. Premises valid?                   ✓ Yes   ✓ Yes   CONFIRMED
+  2. Right problem to solve?           ⚠ Sort  ✗ No    DISAGREE
+  3. Scope calibration correct?        ✓ Yes   ⚠ Sort  CONFIRMED
+  4. Alternatives sufficiently         ⚠ Sort  ✗ No    DISAGREE
+     explored?
+  5. Competitive/market risks          ⚠ Weak  ✗ No    DISAGREE
+     covered?
+  6. 6-month trajectory sound?         ✓ Yes   ⚠ Sort  CONFIRMED
+═══════════════════════════════════════════════════════════════
+CONFIRMED = both agree. DISAGREE = models differ → surfaced at gate.
+```
+
+---
+
+### NOT in Scope (auto-deferred)
+
+- Regulatory/FINRA path for live trading → TODOS.md
+- Competitive matrix vs Public.com, Composer.trade, Robinhood Strategies → TODOS.md  
+- API namespace consolidation (/api/pilot → /api/copilot) → TODOS.md (medium effort)
+- Per-user Alpaca sub-accounts via broker mode → already scaffolded, not wired to copilot
+- SSE event sequence IDs (Last-Event-ID reconnect) → TODOS.md
+
+---
+
+### What Already Exists (CEO: existing code leverage map)
+
+| Sub-problem | Existing code |
+|---|---|
+| Trade staging | `copilot_trades.py:stage()` — solid propose/approve/reject flow |
+| Memory recall | `copilot_memory.py:memory_context_block()` — Mem0 + pgvector, fire-and-forget writes |
+| Streaming events | `copilot_agent.py:_sse()` — consistent SSE shape across all event types |
+| Account isolation | `alpaca_client.py` — broker mode per-user sub-accounts already scaffolded |
+| Sandboxed compute | `copilot_code_tool.py` — AST allowlist + subprocess isolation + clean env |
+| Standing agent scheduler | `copilot_standing.scheduler_loop()` — asyncio ticker, per-user cap enforced |
+
+---
+
+### Dream State Delta
+
+```
+CURRENT STATE (this PR):
+  Paper trading copilot ← SSE streaming ← Gemini function-calling
+  Memory (Mem0/pgvector) ← Standing agents ← Trade staging
+
+THIS PLAN LEAVES US AT:
+  Full-featured beta: streaming + confirm gate + memory + scheduling
+  Missing: SSE reconnect, pending trade TTL, auth gaps
+
+12-MONTH IDEAL:
+  Live trading via Alpaca broker sub-accounts (per-user)
+  Memory as the primary retention driver (copilot knows your goals)
+  Standing agents as the "set it and forget it" moat vs Robinhood/Public
+  NL backtest with explicit bias disclaimers
+```
+
+---
+
+### Error & Rescue Registry
+
+| Error scenario | Current handling | Gap |
+|---|---|---|
+| Market closed | Mentioned in system prompt | Agent message only, no UI callout |
+| Alpaca API timeout | `asyncio.wait_for(timeout=40s)` in `_exec_tool` | Returns `ok:False`, renders as ⚠ inline |
+| LLM API error | `except Exception` → SSE error token | No retry button in UI |
+| Invalid ticker | Agent handles in response text | No symbol suggestion UI |
+| Insufficient funds | Alpaca rejects, agent surfaces | Not structured per spec §1.4 |
+| SSE stream disconnect | **NOT HANDLED** — stream dies silently | Client left in `streaming:true` forever |
+| Pending trade expiry | **NOT HANDLED** — no TTL | Stale trades can execute days later |
+| double-click approve | **NOT HANDLED** — race condition | Two broker calls for same trade |
+| Anonymous user writes | Falls back to "local-copilot" | All anon users share one trade namespace |
+
+---
+
+### Failure Modes Registry
+
+| Failure | Severity | Status |
+|---|---|---|
+| `"local-copilot"` trade namespace collision | CRITICAL | Open |
+| `execute_pending` race condition (double-spend) | CRITICAL | Open |
+| Pending trades no TTL | HIGH | Open |
+| SSE stream silent disconnect | CRITICAL | Open |
+| Standing agent session_id reuse | HIGH | Open |
+| Confirm/Auto toggle unexplained on first open | CRITICAL | Open |
+| Error state swallowed mid-stream | CRITICAL | Open |
+| Standing agent session accumulation | HIGH | Open |
+| `confirm: false` accepted for anonymous users | HIGH | Open |
+| No rate limit on `/api/copilot/chat/stream` | HIGH | Open |
+
+---
+
+### Architecture ASCII Diagram (Eng)
+
+```
+Browser / React
+├── CopilotAgent.js ── fetch(SSE) ──────────────────────────────┐
+│   ├── AccountSummary.js ── axios → GET /copilot/account        │
+│   ├── CopilotMemory.js ── axios → GET/DELETE /copilot/memory   │
+│   └── StandingAgents.js ── axios → GET/POST/PUT/DELETE         │
+│                                    /copilot/agents              │
+│                                                                 ▼
+├── TradingCopilotPanel.js ── axios → /api/pilot/*         FastAPI /api/copilot/*
+│   └── [NAMESPACE COLLISION]                               │
+│                                                           ├── copilot_router.py
+└── [Two separate auth paths: cookie+creds (axios)         │   ├── POST /chat/stream ─→ copilot_agent.py
+    vs fetch+credentials (SSE fetch)]                      │   │   ├── _run_gemini() or _run_openai()
+                                                           │   │   ├── _exec_tool() [confirm gate]
+                                                           │   │   └── copilot_trades.stage() [RACE RISK]
+                                                           │   ├── POST /trades/{id}/approve
+                                                           │   │   └── execute_pending() [NO MUTEX]
+                                                           │   └── /agents/* → copilot_standing.py
+                                                           │       └── scheduler_loop() [asyncio tick]
+                                                           │
+                                                           ├── Alpaca Paper Account [SHARED across all users]
+                                                           ├── MongoDB: copilot_messages, copilot_pending_trades
+                                                           │   (no TTL), copilot_standing_agents
+                                                           └── Mem0/pgvector: copilot_memories (per user_id)
+```
+
+---
+
+### Test Coverage Gap (Eng §3)
+
+```
+Flow → Test coverage:
+  Chat stream (SSE events) → NONE (no test_copilot_*.py)
+  Trade staging → NONE
+  Trade approval (idempotency) → NONE
+  Standing agent run → NONE
+  Memory recall inject → NONE
+  Auth fallback "local-copilot" → NONE
+  Error path (stream disconnect) → NONE
+```
+
+**All new copilot features have zero automated test coverage.** Existing tests (`test_router.py`, `test_mood.py`) cover pre-copilot features only.
+
+---
+
+### DX Consensus Table
+
+```
+DX DUAL VOICES — CONSENSUS TABLE:
+═══════════════════════════════════════════════════════════════
+  Dimension                           Score  Status
+  ──────────────────────────────────── ───── ─────────────────
+  1. Getting started < 5 min?          3/10  Fail — TTHW ~45min
+  2. API/CLI naming guessable?         5/10  /pilot vs /copilot
+  3. Error messages actionable?        4/10  ⚠ inline, no retry
+  4. Docs findable & complete?         4/10  Module docstring only
+  5. SSE reconnect protocol            2/10  CRITICAL gap
+  6. Auth contract for SSE             4/10  Two paths, inconsistent
+═══════════════════════════════════════════════════════════════
+```
+
+---
+
+### Decision Audit Trail
+
+| # | Phase | Decision | Classification | Principle | Rationale | Rejected |
+|---|-------|----------|---------------|-----------|-----------|---------|
+| 1 | CEO | Accept all premises | Mechanical | P6 (bias to action) | Premises confirmed by code reading | — |
+| 2 | CEO | Defer live trading path | Mechanical | P3 (pragmatic) | Regulatory problem, not engineering | Rush to live |
+| 3 | CEO | Flag NL backtest as HIGH concern | Mechanical | P1 (completeness) | Misleading results without guardrails = liability | Ignore |
+| 4 | CEO | Keep multi-model picker as USER CHALLENGE | User Challenge | — | User built it intentionally; both models say remove from UI | — |
+| 5 | CEO | Add competitive matrix to TODOS.md | Mechanical | P2 (boil lakes) | Zero competitive analysis is a strategic blind spot | Ignore |
+| 6 | Design | Confirm/Auto toggle explanation → CRITICAL | Mechanical | P1 (completeness) | First-open UX gap breaks the core security model | Ignore |
+| 7 | Design | Error state fix → auto-approve | Mechanical | P1 (completeness) | Silent errors leave users in broken state | Accept broken |
+| 8 | Design | Pending trade persistence → HIGH concern | Mechanical | P1 (completeness) | Ephemeral state breaks core feature promise | Ignore |
+| 9 | Eng | find_one_and_update atomic mutex | Mechanical | P5 (explicit over clever) | Race condition = two broker calls | Optimistic lock |
+| 10 | Eng | TTL index on copilot_pending_trades | Mechanical | P2 (boil lakes) | Unbounded collection + stale execution risk | Soft-expire only |
+| 11 | Eng | 401 on unauthenticated writes | Mechanical | P5 (explicit) | "local-copilot" shared namespace is a critical auth bug | Keep fallback |
+| 12 | Eng | Strip run_python from standing agents | Mechanical | P5 (explicit over clever) | Reduce prompt-injection surface; compute not needed in scheduled runs | Keep for all agents |
+| 13 | DX | SSE reconnect → CRITICAL concern | Mechanical | P1 (completeness) | Stream dies silently, no retry protocol | Ignore |
+| 14 | DX | Two auth paths → flag HIGH | Mechanical | P5 (explicit) | Silent auth failure when JWT introduced | Accept inconsistency |
+| 15 | ALL | Branch rename → flag | Mechanical | P3 (pragmatic) | Fix/x naming for feature work is misleading at review/revert time | Ignore |
