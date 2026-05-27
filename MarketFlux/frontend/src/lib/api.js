@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const ENV_API_BASE = process.env.REACT_APP_BACKEND_URL?.trim();
-const DEFAULT_API_BASE = 'http://localhost:8001';
+const DEFAULT_API_BASE = 'http://localhost:8000';
 const API_BASE = (ENV_API_BASE && ENV_API_BASE.length > 0 ? ENV_API_BASE : DEFAULT_API_BASE).replace(/\/$/, '');
 
 const api = axios.create({

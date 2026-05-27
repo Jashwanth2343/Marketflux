@@ -120,7 +120,7 @@ def run_walk_forward(
     """
     start_dt = pd.Timestamp(start)
     end_dt = pd.Timestamp(end)
-    range_months = (end_dt.year - start_dt.year) * 12 + (end_dt.month - start_dt.month)
+    range_months = (end_dt.year - start_dt.year) * 12 + (end_dt.month - start_dt.month) + 1
     min_required = train_months + test_months
     if range_months < min_required:
         raise ValueError(

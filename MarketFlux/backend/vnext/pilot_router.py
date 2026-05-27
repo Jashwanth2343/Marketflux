@@ -445,10 +445,12 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
             reason=payload.reason,
         )
 
-        # Dispatch execution in background (TradingClient uses configured paper account)
-        background.add_task(_safe_execute, db, proposal_id, user["user_id"])
+        from .alpaca_client import is_alpaca_configured
+        dispatch = is_alpaca_configured()
+        if dispatch:
+            background.add_task(_safe_execute, db, proposal_id, user["user_id"])
 
-        return {"item": updated.to_dict() if updated else None, "execution_dispatched": True}
+        return {"item": updated.to_dict() if updated else None, "execution_dispatched": dispatch}
 
     @router.post("/proposals/{proposal_id}/reject")
     async def proposals_reject(proposal_id: str, request: Request, payload: ProposalDecisionRequest):

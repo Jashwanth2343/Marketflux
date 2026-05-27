@@ -126,7 +126,7 @@ def calmar_ratio(equity: pd.Series) -> float:
     """CAGR / max_drawdown. Returns 0.0 if drawdown is zero."""
     c = cagr(equity)
     dd = max_drawdown(equity)
-    if dd == 0:
+    if abs(dd) < 1e-12:
         return 0.0
     return c / dd
 

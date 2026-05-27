@@ -149,7 +149,31 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         _require_configured()
         user = await require_user(request)
 
-        if payload.order_type == "limit":
+        if is_broker_mode():
+            account_id = await _get_or_create_broker_account(user)
+            if payload.order_type == "limit":
+                if payload.limit_price is None or payload.limit_price <= 0:
+                    raise HTTPException(422, "limit_price is required for limit orders.")
+                order = await asyncio.to_thread(
+                    broker_submit_market_order,
+                    account_id=account_id,
+                    symbol=payload.symbol,
+                    qty=payload.qty,
+                    side=payload.side,
+                    time_in_force=payload.time_in_force,
+                    order_type="limit",
+                    limit_price=payload.limit_price,
+                )
+            else:
+                order = await asyncio.to_thread(
+                    broker_submit_market_order,
+                    account_id=account_id,
+                    symbol=payload.symbol,
+                    qty=payload.qty,
+                    side=payload.side,
+                    time_in_force=payload.time_in_force,
+                )
+        elif payload.order_type == "limit":
             if payload.limit_price is None or payload.limit_price <= 0:
                 raise HTTPException(422, "limit_price is required for limit orders.")
             order = await asyncio.to_thread(
@@ -158,16 +182,6 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
                 qty=payload.qty,
                 side=payload.side,
                 limit_price=payload.limit_price,
-                time_in_force=payload.time_in_force,
-            )
-        elif is_broker_mode():
-            account_id = await _get_or_create_broker_account(user)
-            order = await asyncio.to_thread(
-                broker_submit_market_order,
-                account_id=account_id,
-                symbol=payload.symbol,
-                qty=payload.qty,
-                side=payload.side,
                 time_in_force=payload.time_in_force,
             )
         else:
@@ -244,7 +258,7 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         user = await require_user(request)
         if is_broker_mode():
             account_id = await _get_or_create_broker_account(user)
-            result = await asyncio.to_thread(broker_close_position, account_id, payload.symbol)
+            result = await asyncio.to_thread(broker_close_position, account_id, payload.symbol, payload.qty)
         else:
             result = await asyncio.to_thread(close_position, payload.symbol, payload.qty)
         if not result:

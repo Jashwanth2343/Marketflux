@@ -192,21 +192,18 @@ async def build_paper_portfolio(user: Optional[Dict[str, Any]], db=None) -> Dict
     alpaca_positions = []
     alpaca_account_info = None
 
-    if is_alpaca_configured() and user_id and db is not None:
-        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-        if alpaca_account_id:
-            try:
-                alpaca_positions, alpaca_account_info = await asyncio.gather(
-                    asyncio.to_thread(get_positions, alpaca_account_id),
-                    asyncio.to_thread(get_account, alpaca_account_id),
-                )
-            except Exception as exc:
-                import logging
+    if is_alpaca_configured() and user_id:
+        try:
+            alpaca_positions, alpaca_account_info = await asyncio.gather(
+                asyncio.to_thread(get_positions),
+                asyncio.to_thread(get_account),
+            )
+        except Exception as exc:
+            import logging
 
-                logging.getLogger(__name__).error(
-                    f"Failed loading Alpaca portfolio data for account {alpaca_account_id}: {exc}"
-                )
+            logging.getLogger(__name__).error(
+                f"Failed loading Alpaca portfolio data: {exc}"
+            )
 
     positions = [
         {

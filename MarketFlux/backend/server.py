@@ -58,7 +58,8 @@ if not _raw_jwt_secret or len(_raw_jwt_secret) < 32:
             "SECURITY: JWT_SECRET env var is missing or too short (must be ≥32 chars). "
             "Either set JWT_SECRET or configure SUPABASE_URL + SUPABASE_SERVICE_KEY."
         )
-    _raw_jwt_secret = _raw_jwt_secret or "supabase-auth-primary-no-legacy-jwt"
+    import secrets as _secrets
+    _raw_jwt_secret = _raw_jwt_secret or _secrets.token_hex(32)
 
 JWT_SECRET = _raw_jwt_secret
 JWT_ALGORITHM = "HS256"
@@ -231,7 +232,8 @@ async def _verify_supabase_token(token: str) -> Optional[Dict]:
         if not client:
             return None
 
-        user_response = client.auth.get_user(token)
+        import asyncio as _aio
+        user_response = await _aio.to_thread(client.auth.get_user, token)
         if not user_response or not user_response.user:
             return None
 
@@ -1650,6 +1652,16 @@ async def startup():
     except Exception:
         pass
 
+    # TTL index on copilot_pending_trades: auto-expire staged trade proposals
+    # after 1 hour. After market conditions change, stale proposals should not
+    # be executable. The application-layer staleness guard in copilot_trades.py
+    # is the primary check; this index is the database-layer backstop.
+    try:
+        await db.copilot_pending_trades.create_index("created_at", expireAfterSeconds=3600)
+        logger.info("copilot_pending_trades TTL index: 1 hour")
+    except Exception as exc:
+        logger.warning(f"Failed creating copilot_pending_trades TTL index: {exc}")
+
     try:
         from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
 
@@ -1674,6 +1686,11 @@ async def startup():
     asyncio.create_task(periodic_news_fetch())
     asyncio.create_task(pilot_expire_sweep())
     asyncio.create_task(pilot_nightly_reflection_loop())
+    try:
+        import copilot_standing
+        asyncio.create_task(copilot_standing.scheduler_loop(db))
+    except Exception as exc:
+        logger.warning(f"copilot standing-agent scheduler not started: {exc}")
     logger.info("MarketFlux backend started")
 
 @app.on_event("shutdown")
@@ -1725,6 +1742,7 @@ from vnext.fundos_router import build_fundos_router
 from vnext.alpaca_router import build_alpaca_router
 from vnext.pilot_router import build_pilot_router
 from backtest.router import build_backtest_router
+from copilot_router import build_copilot_router
 
 app.include_router(build_vnext_router(db, get_current_user))
 app.include_router(build_adapter_router(db, get_current_user))
@@ -1732,3 +1750,4 @@ app.include_router(build_fundos_router(db, get_current_user))
 app.include_router(build_alpaca_router(db, get_current_user))
 app.include_router(build_pilot_router(db, get_current_user))
 app.include_router(build_backtest_router(get_current_user))
+app.include_router(build_copilot_router(db, get_current_user))

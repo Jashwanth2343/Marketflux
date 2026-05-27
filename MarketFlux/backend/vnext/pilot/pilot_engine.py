@@ -467,7 +467,11 @@ async def emergency_stop(
     user_id: str,
     alpaca_account_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Kill switch. Pauses the personality and cancels its pending Alpaca orders."""
+    """Kill switch. Pauses the personality and cancels its pending Alpaca orders.
+
+    alpaca_account_id is accepted for API compat but ignored (Trading API
+    uses the single paper account).
+    """
     personality = await get_personality(db, personality_id)
     if personality is None:
         return _err("personality_not_found", personality_id=personality_id)

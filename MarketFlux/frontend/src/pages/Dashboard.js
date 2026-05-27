@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Activity, Map, BarChart2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Map, BarChart2, Plane, FlaskConical, Wallet, Bot, Brain, ArrowRight, Zap, Shield, ChevronDown, ChevronUp } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 import NewsCard from '@/components/NewsCard';
 import MarketHeatmap from '@/components/MarketHeatmap';
@@ -15,7 +16,6 @@ function formatPrice(val) {
 
 function ChangeDisplay({ change, percent, isVolatility = false }) {
   const isPositive = percent >= 0;
-  // VIX increasing is generally "bad" (red), decreasing is "good" (green)
   let colorClass = isPositive ? 'text-[#00FF88] flash-up' : 'text-[#FF4444] flash-down';
   if (isVolatility) {
     colorClass = isPositive ? 'text-[#FF4444] flash-down' : 'text-[#00FF88] flash-up';
@@ -32,15 +32,13 @@ function ChangeDisplay({ change, percent, isVolatility = false }) {
 
 function SpeedometerGauge({ score, mood }) {
   const normalizedScore = Math.max(0, Math.min(100, Number(score ?? 50)));
-  // Determine label and color based on score
   let label = 'NEUTRAL';
-  let color = '#eab308'; // yellow
+  let color = '#eab308';
   if (normalizedScore < 25) { label = 'EXTREME FEAR'; color = '#ef4444'; }
   else if (normalizedScore < 45) { label = 'FEAR'; color = '#f97316'; }
   else if (normalizedScore > 75) { label = 'EXTREME GREED'; color = '#22c55e'; }
   else if (normalizedScore > 55) { label = 'GREED'; color = '#84cc16'; }
 
-  // Needle rotation (-90 is left/0, +90 is right/100)
   const angle = -90 + (normalizedScore / 100) * 180;
 
   return (
@@ -55,35 +53,52 @@ function SpeedometerGauge({ score, mood }) {
             <stop offset="100%" stopColor="#22c55e" />
           </linearGradient>
         </defs>
-
-        {/* Track background */}
         <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.06)" className="dark:stroke-[rgba(255,255,255,0.06)] stroke-slate-200" strokeWidth="12" strokeLinecap="round" />
-
-        {/* Colored Gradient Arc */}
         <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#speedGradient)" strokeWidth="12" strokeLinecap="round" />
-
-        {/* Needle */}
         <g transform={`rotate(${angle} 100 100)`} className="transition-transform duration-1000 ease-out">
           <line x1="100" y1="100" x2="100" y2="25" stroke="var(--color-accent, #00ff88)" strokeWidth="3" strokeLinecap="round" />
           <circle cx="100" cy="100" r="4" fill="var(--color-accent, #00ff88)" />
         </g>
-
-        {/* Zone Labels */}
         <text x="20" y="115" fontSize="9" fill="#ef4444" textAnchor="middle" className="font-mono font-bold tracking-wider">FEAR</text>
         <text x="100" y="115" fontSize="9" fill="#eab308" textAnchor="middle" className="font-mono font-bold tracking-wider">NEUTRAL</text>
         <text x="180" y="115" fontSize="9" fill="#22c55e" textAnchor="middle" className="font-mono font-bold tracking-wider">GREED</text>
-
-        {/* Score Text inside arc */}
         <text x="100" y="80" fontSize="36" fontWeight="800" fill={color} textAnchor="middle" className="font-sans drop-shadow-sm">{normalizedScore}</text>
         <text x="100" y="95" fontSize="11" fill={color} textAnchor="middle" letterSpacing="0.1em" className="font-mono font-bold">{label}</text>
       </svg>
-
-      {/* The Badge logic that existed before is moved up to CardHeader in original container, but we keep this clean here. */}
     </div>
   );
 }
 
+const CAPABILITIES = [
+  {
+    to: '/copilot',
+    label: 'AI Trading Copilot',
+    icon: Plane,
+    desc: 'Chat with an AI agent that can research stocks, analyze your portfolio, and execute paper trades autonomously.',
+    tag: 'Most Popular',
+  },
+  {
+    to: '/backtest',
+    label: 'Strategy Backtester',
+    icon: FlaskConical,
+    desc: 'Test trading strategies against historical data with walk-forward analysis, Monte Carlo simulations, and AI critique.',
+  },
+  {
+    to: '/intelligence',
+    label: 'Market Intelligence',
+    icon: Brain,
+    desc: 'Real-time news, AI-powered stock screening, macro analysis, and investment thesis builder.',
+  },
+  {
+    to: '/portfolio',
+    label: 'Portfolio & Risk',
+    icon: Wallet,
+    desc: 'Track positions, monitor risk exposure, and get AI-driven rebalancing suggestions.',
+  },
+];
+
 export default function Dashboard() {
+  const { user } = useAuth();
   const [indices, setIndices] = useState({});
   const [indicesAsOf, setIndicesAsOf] = useState(null);
   const [movers, setMovers] = useState({ gainers: [], losers: [] });
@@ -93,6 +108,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('gainers');
   const [heatmapData, setHeatmapData] = useState(null);
   const [isMarketOpen, setIsMarketOpen] = useState(null);
+  const [showMarketDetail, setShowMarketDetail] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -139,18 +155,120 @@ export default function Dashboard() {
     return () => { mounted = false; clearInterval(interval); };
   }, []);
 
-  const moodData = [
-    { name: 'Bullish', value: mood.bullish || 1, color: '#00FF41' },
-    { name: 'Bearish', value: mood.bearish || 1, color: '#FF3333' },
-    { name: 'Neutral', value: mood.neutral || 1, color: '#FFB000' },
-  ];
-
   const indexList = Object.values(indices);
   const activeMovers = activeTab === 'gainers' ? movers.gainers || [] : movers.losers || [];
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 min-h-screen" data-testid="dashboard-page">
-      {/* Market Indices Ticker */}
+    <div className="p-4 lg:p-6 space-y-5 min-h-screen" data-testid="dashboard-page">
+
+      {/* ── Hero: Product Identity ── */}
+      <section className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-[rgba(0,255,65,0.04)] via-card/60 to-card/40">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(0,255,65,0.06),transparent_60%)]" />
+        <div className="relative px-5 py-6 sm:px-8 sm:py-8 lg:py-10">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            {/* Left — Identity */}
+            <div className="max-w-xl">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-5 h-5 text-[#00FF41]" />
+                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#00FF41]/80">
+                  AI-Powered Trading Platform
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight mb-3">
+                {user ? `Welcome back${user.name ? `, ${user.name.split(' ')[0]}` : ''}` : 'Your AI Trading Command Center'}
+              </h1>
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">
+                {user
+                  ? 'Your portfolio, market intelligence, and AI copilot — all in one place. Here\'s what\'s happening in the markets today.'
+                  : 'MarketFlux combines real-time market data, AI-powered analysis, and autonomous paper trading into one platform. Research stocks, backtest strategies, and let AI manage a paper portfolio — all without risking real money.'
+                }
+              </p>
+              {!user && (
+                <div className="flex items-center gap-3 mt-5">
+                  <Link
+                    to="/copilot"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200"
+                    style={{
+                      background: '#00FF41',
+                      color: '#000',
+                      boxShadow: '0 0 20px rgba(0,255,65,0.15)',
+                    }}
+                  >
+                    <Plane className="w-4 h-4" />
+                    Try the AI Copilot
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                  <Link
+                    to="/backtest"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground border border-border/60 hover:border-primary/30 hover:text-foreground transition-all"
+                  >
+                    <FlaskConical className="w-4 h-4" />
+                    Run a Backtest
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Right — Key stats strip (logged-in) or trust signals (logged-out) */}
+            {user ? (
+              <div className="flex items-center gap-4 lg:gap-6 flex-wrap">
+                {[
+                  { label: 'Market', value: isMarketOpen ? 'Open' : 'Closed', color: isMarketOpen ? '#00FF41' : '#888' },
+                  { label: 'Fear/Greed', value: mood.fng_index ? `${mood.fng_index}/100` : '--', color: mood.fng_index > 55 ? '#22c55e' : mood.fng_index < 45 ? '#ef4444' : '#eab308' },
+                  { label: 'VIX', value: indices['VIX']?.price?.toFixed(1) || indices['^VIX']?.price?.toFixed(1) || '--', color: '#FFB000' },
+                ].map(s => (
+                  <div key={s.label} className="text-center min-w-[70px]">
+                    <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground mb-1">{s.label}</div>
+                    <div className="text-lg font-bold font-mono" style={{ color: s.color }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5 lg:min-w-[220px]">
+                {[
+                  { icon: Zap, text: 'Real-time market data & AI analysis' },
+                  { icon: Bot, text: 'Autonomous paper trading agent' },
+                  { icon: Shield, text: 'Paper-only — zero financial risk' },
+                ].map(({ icon: Icon, text }) => (
+                  <div key={text} className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                    <Icon className="w-3.5 h-3.5 text-[#00FF41]/70 flex-shrink-0" />
+                    <span>{text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Capabilities Grid ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {CAPABILITIES.map(({ to, label, icon: Icon, desc, tag }) => (
+          <Link
+            key={to}
+            to={to}
+            className="group relative flex flex-col gap-2 rounded-xl border border-border/50 bg-card/50 px-4 py-4 transition-all hover:border-primary/40 hover:bg-primary/[0.06] hover:shadow-[0_0_20px_rgba(0,255,65,0.04)]"
+          >
+            {tag && (
+              <span className="absolute top-2.5 right-2.5 text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#00FF41]/10 text-[#00FF41] border border-[#00FF41]/20">
+                {tag}
+              </span>
+            )}
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+                <Icon className="w-4 h-4" />
+              </span>
+              <span className="text-sm font-semibold text-foreground">{label}</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-2">{desc}</p>
+            <span className="text-[10px] font-mono text-primary/60 group-hover:text-primary flex items-center gap-1 mt-auto">
+              Explore <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      {/* ── Market Indices Ticker ── */}
       <Card className="rounded-xl dark:border-border/50 border-border shadow-md dark:bg-card/50 bg-card overflow-hidden">
         <div className="flex overflow-x-auto py-3 px-4 gap-6">
           {loading && indexList.length === 0 ? (
@@ -184,150 +302,159 @@ export default function Dashboard() {
         )}
       </Card>
 
-      {/* Main Grid: 4 columns on large screens */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* ── Market Deep Dive toggle ── */}
+      <button
+        onClick={() => setShowMarketDetail(!showMarketDetail)}
+        className="w-full flex items-center justify-center gap-2 py-2 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {showMarketDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        {showMarketDetail ? 'Collapse market detail' : 'Show heatmap, movers & sentiment'}
+      </button>
 
-        {/* Left Column: Top Movers (Gainers / Losers Tabs) */}
-        <Card className="rounded-xl dark:border-border/50 border-border shadow-md dark:bg-card/50 bg-card xl:col-span-1 flex flex-col h-[400px]">
-          <CardHeader className="pb-0 pt-0 px-0 border-b dark:border-border/50 border-border">
-            <div className="flex items-center justify-between px-4 py-2 border-b dark:border-border/20 border-border">
-              <span className="text-xs font-mono uppercase tracking-wider font-bold">Top Movers</span>
-              {isMarketOpen !== null && (
-                <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${isMarketOpen ? 'bg-[#00FF41]/20 text-[#00FF41]' : 'bg-muted text-muted-foreground'}`}>
-                  {isMarketOpen ? '● MARKET OPEN' : 'MARKET CLOSED'}
-                </span>
-              )}
-            </div>
-            <div className="flex w-full">
-              <button
-                onClick={() => setActiveTab('gainers')}
-                className={`flex-1 py-3 text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'gainers' ? 'border-b-2 dark:border-[#00FF41] border-[#059669] dark:text-[#00FF41] text-[#059669]' : 'text-muted-foreground hover:dark:bg-muted/30 hover:bg-muted'}`}
-              >
-                <TrendingUp className="w-3 h-3" /> Gainers
-              </button>
-              <button
-                onClick={() => setActiveTab('losers')}
-                className={`flex-1 py-3 text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'losers' ? 'border-b-2 border-[#FF3333] text-[#FF3333]' : 'text-muted-foreground hover:dark:bg-muted/30 hover:bg-muted'}`}
-              >
-                <TrendingDown className="w-3 h-3" /> Losers
-              </button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
-            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: activeTab === 'gainers' ? '#00FF41 transparent' : '#FF3333 transparent' }}>
-              {activeMovers.map((stock) => (
-                <Link
-                  key={stock.symbol}
-                  to={`/stock/${stock.symbol}`}
-                  state={{ initialData: stock }}
-                  className={`flex items-center justify-between py-2.5 px-4 border-b border-border/10 transition-colors ${activeTab === 'gainers' ? 'hover:dark:bg-[#00FF41]/10 hover:bg-[#059669]/10' : 'hover:dark:bg-[#FF3333]/10 hover:bg-[#FF3333]/10'}`}
+      {showMarketDetail && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+
+          {/* Top Movers */}
+          <Card className="rounded-xl dark:border-border/50 border-border shadow-md dark:bg-card/50 bg-card xl:col-span-1 flex flex-col h-[400px]">
+            <CardHeader className="pb-0 pt-0 px-0 border-b dark:border-border/50 border-border">
+              <div className="flex items-center justify-between px-4 py-2 border-b dark:border-border/20 border-border">
+                <span className="text-xs font-mono uppercase tracking-wider font-bold">Top Movers</span>
+                {isMarketOpen !== null && (
+                  <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${isMarketOpen ? 'bg-[#00FF41]/20 text-[#00FF41]' : 'bg-muted text-muted-foreground'}`}>
+                    {isMarketOpen ? '● MARKET OPEN' : 'MARKET CLOSED'}
+                  </span>
+                )}
+              </div>
+              <div className="flex w-full">
+                <button
+                  onClick={() => setActiveTab('gainers')}
+                  className={`flex-1 py-3 text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'gainers' ? 'border-b-2 dark:border-[#00FF41] border-[#059669] dark:text-[#00FF41] text-[#059669]' : 'text-muted-foreground hover:dark:bg-muted/30 hover:bg-muted'}`}
                 >
-                  <div className="min-w-0 pr-2">
-                    <span className="font-mono text-xs font-bold text-foreground block truncate">{stock.symbol}</span>
-                    <span className="text-[9px] text-muted-foreground truncate block">{stock.name}</span>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <span className="font-data text-xs text-foreground block">${formatPrice(stock.price)}</span>
-                    <span className={`font-data text-[10px] ${activeTab === 'gainers' ? 'dark:text-[#00FF41] text-[#059669]' : 'text-[#FF3333]'}`}>
-                      {activeTab === 'gainers' ? '+' : ''}{stock.change_percent?.toFixed(2)}%
-                    </span>
-                  </div>
-                </Link>
-              ))}
-              {loading && activeMovers.length === 0 && (
-                <div className="space-y-0">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="flex items-center justify-between py-2.5 px-4 border-b border-border/10 animate-pulse">
-                      <div className="space-y-1">
-                        <div className="h-2.5 w-12 bg-muted rounded" />
-                        <div className="h-2 w-20 bg-muted/60 rounded" />
-                      </div>
-                      <div className="space-y-1 text-right">
-                        <div className="h-2.5 w-14 bg-muted rounded" />
-                        <div className="h-2 w-10 bg-muted/60 rounded ml-auto" />
-                      </div>
+                  <TrendingUp className="w-3 h-3" /> Gainers
+                </button>
+                <button
+                  onClick={() => setActiveTab('losers')}
+                  className={`flex-1 py-3 text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'losers' ? 'border-b-2 border-[#FF3333] text-[#FF3333]' : 'text-muted-foreground hover:dark:bg-muted/30 hover:bg-muted'}`}
+                >
+                  <TrendingDown className="w-3 h-3" /> Losers
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: activeTab === 'gainers' ? '#00FF41 transparent' : '#FF3333 transparent' }}>
+                {activeMovers.map((stock) => (
+                  <Link
+                    key={stock.symbol}
+                    to={`/stock/${stock.symbol}`}
+                    state={{ initialData: stock }}
+                    className={`flex items-center justify-between py-2.5 px-4 border-b border-border/10 transition-colors ${activeTab === 'gainers' ? 'hover:dark:bg-[#00FF41]/10 hover:bg-[#059669]/10' : 'hover:dark:bg-[#FF3333]/10 hover:bg-[#FF3333]/10'}`}
+                  >
+                    <div className="min-w-0 pr-2">
+                      <span className="font-mono text-xs font-bold text-foreground block truncate">{stock.symbol}</span>
+                      <span className="text-[9px] text-muted-foreground truncate block">{stock.name}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-              {activeMovers.length === 0 && !loading && (
-                <div className="flex flex-col h-full items-center justify-center gap-2 text-center px-4">
-                  <span className="text-2xl">📊</span>
-                  <p className="text-xs font-mono text-muted-foreground">Market data unavailable</p>
-                  <p className="text-[10px] text-muted-foreground/50 font-mono">Check back during market hours</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                    <div className="text-right flex-shrink-0">
+                      <span className="font-data text-xs text-foreground block">${formatPrice(stock.price)}</span>
+                      <span className={`font-data text-[10px] ${activeTab === 'gainers' ? 'dark:text-[#00FF41] text-[#059669]' : 'text-[#FF3333]'}`}>
+                        {activeTab === 'gainers' ? '+' : ''}{stock.change_percent?.toFixed(2)}%
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+                {loading && activeMovers.length === 0 && (
+                  <div className="space-y-0">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="flex items-center justify-between py-2.5 px-4 border-b border-border/10 animate-pulse">
+                        <div className="space-y-1">
+                          <div className="h-2.5 w-12 bg-muted rounded" />
+                          <div className="h-2 w-20 bg-muted/60 rounded" />
+                        </div>
+                        <div className="space-y-1 text-right">
+                          <div className="h-2.5 w-14 bg-muted rounded" />
+                          <div className="h-2 w-10 bg-muted/60 rounded ml-auto" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {activeMovers.length === 0 && !loading && (
+                  <div className="flex flex-col h-full items-center justify-center gap-2 text-center px-4">
+                    <span className="text-2xl">📊</span>
+                    <p className="text-xs font-mono text-muted-foreground">Market data unavailable</p>
+                    <p className="text-[10px] text-muted-foreground/50 font-mono">Check back during market hours</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Center Columns: Market Heatmap */}
-        <Card className="rounded-xl dark:border-border/50 border-border shadow-md dark:bg-card/50 bg-card xl:col-span-2 flex flex-col h-[400px]">
-          <CardHeader className="pb-2 pt-3 px-4 border-b dark:border-border/20 border-border">
-            <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center justify-between w-full">
-              <span className="flex items-center gap-2">
-                <Map className="w-4 h-4 text-primary" />
-                Market Heatmap
-              </span>
-              {heatmapData?.last_updated && (
-                <span className="text-[10px] text-muted-foreground lowercase tracking-normal font-sans opacity-70">
-                  Updated: {new Date(heatmapData.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {/* Market Heatmap */}
+          <Card className="rounded-xl dark:border-border/50 border-border shadow-md dark:bg-card/50 bg-card xl:col-span-2 flex flex-col h-[400px]">
+            <CardHeader className="pb-2 pt-3 px-4 border-b dark:border-border/20 border-border">
+              <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center justify-between w-full">
+                <span className="flex items-center gap-2">
+                  <Map className="w-4 h-4 text-primary" />
+                  Market Heatmap
                 </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 py-4 flex-1 overflow-hidden">
-            <MarketHeatmap heatmapData={heatmapData?.sectors || heatmapData} />
-          </CardContent>
-        </Card>
-
-        {/* Right Column: Market Mood */}
-        <Card className="rounded-xl dark:border-border/50 border-border shadow-md dark:bg-card/50 bg-card xl:col-span-1 flex flex-col h-[400px]">
-          <CardHeader className="pb-2 pt-3 px-4 border-b dark:border-border/20 border-border">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
-                <BarChart2 className="w-4 h-4 text-[#FFB000]" />
-                Fear & Greed Index
+                {heatmapData?.last_updated && (
+                  <span className="text-[10px] text-muted-foreground lowercase tracking-normal font-sans opacity-70">
+                    Updated: {new Date(heatmapData.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </CardTitle>
-              {mood.fng_index !== undefined && (
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${mood.dominant === 'bullish' ? 'dark:bg-[#00FF41] bg-[#059669]/20 dark:text-[#00FF41] text-[#059669]' :
-                  mood.dominant === 'bearish' ? 'bg-[#FF3333]/20 text-[#FF3333]' : 'bg-[#FFB000]/20 text-[#FFB000]'
-                  }`}>
-                  {mood.fng_index}/100
-                </span>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="px-4 py-4 flex-1 flex flex-col">
-            <div className="flex-1 flex flex-col items-center justify-center min-h-0 mt-4 mb-2">
-              <SpeedometerGauge score={mood.fng_index || 50} mood={mood} />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4 px-1 pb-1">
-              <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
-                <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">MARKET MOMENTUM</span>
-                <span className={`text-[13px] font-bold font-sans ${mood.dominant === 'bullish' ? 'text-[#22c55e]' : 'text-[#ef4444]'}`}>
-                  {mood.dominant === 'bullish' ? '↑ Bullish' : '↓ Bearish'}
-                </span>
-              </div>
-              <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
-                <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">VOLATILITY</span>
-                <span className="text-[13px] font-bold font-sans text-foreground">
-                  {indices['VIX']?.price ? `${indices['VIX'].price.toFixed(1)}` : indices['^VIX']?.price ? `${indices['^VIX'].price.toFixed(1)}` : '--'}
-                </span>
-              </div>
-              <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
-                <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">SENTIMENT</span>
-                <span className={`text-[13px] font-bold font-sans ${mood.dominant === 'bullish' ? 'text-[#00FF41]' : mood.dominant === 'bearish' ? 'text-[#FF4444]' : 'text-[#FFB000]'}`}>
-                  {mood.fng_index ? `${mood.fng_index}/100` : '--'}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="px-4 py-4 flex-1 overflow-hidden">
+              <MarketHeatmap heatmapData={heatmapData?.sectors || heatmapData} />
+            </CardContent>
+          </Card>
 
-      </div>
+          {/* Fear & Greed */}
+          <Card className="rounded-xl dark:border-border/50 border-border shadow-md dark:bg-card/50 bg-card xl:col-span-1 flex flex-col h-[400px]">
+            <CardHeader className="pb-2 pt-3 px-4 border-b dark:border-border/20 border-border">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
+                  <BarChart2 className="w-4 h-4 text-[#FFB000]" />
+                  Fear & Greed Index
+                </CardTitle>
+                {mood.fng_index !== undefined && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${mood.dominant === 'bullish' ? 'dark:bg-[#00FF41] bg-[#059669]/20 dark:text-[#00FF41] text-[#059669]' :
+                    mood.dominant === 'bearish' ? 'bg-[#FF3333]/20 text-[#FF3333]' : 'bg-[#FFB000]/20 text-[#FFB000]'
+                    }`}>
+                    {mood.fng_index}/100
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 py-4 flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col items-center justify-center min-h-0 mt-4 mb-2">
+                <SpeedometerGauge score={mood.fng_index || 50} mood={mood} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4 px-1 pb-1">
+                <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
+                  <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">MARKET MOMENTUM</span>
+                  <span className={`text-[13px] font-bold font-sans ${mood.dominant === 'bullish' ? 'text-[#22c55e]' : 'text-[#ef4444]'}`}>
+                    {mood.dominant === 'bullish' ? '↑ Bullish' : '↓ Bearish'}
+                  </span>
+                </div>
+                <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
+                  <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">VOLATILITY</span>
+                  <span className="text-[13px] font-bold font-sans text-foreground">
+                    {indices['VIX']?.price ? `${indices['VIX'].price.toFixed(1)}` : indices['^VIX']?.price ? `${indices['^VIX'].price.toFixed(1)}` : '--'}
+                  </span>
+                </div>
+                <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
+                  <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">SENTIMENT</span>
+                  <span className={`text-[13px] font-bold font-sans ${mood.dominant === 'bullish' ? 'text-[#00FF41]' : mood.dominant === 'bearish' ? 'text-[#FF4444]' : 'text-[#FFB000]'}`}>
+                    {mood.fng_index ? `${mood.fng_index}/100` : '--'}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Latest News */}
+      {/* ── Latest News ── */}
       <Card className="rounded-xl dark:border-border/50 border-border shadow-md dark:bg-card/50 bg-card">
         <CardHeader className="pb-2 pt-3 px-4 border-b dark:border-border/20 border-border flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
@@ -341,7 +468,7 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent className="px-4 py-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {news.map((article, i) => (
+            {news.slice(0, 4).map((article, i) => (
               <div key={article.article_id || i} data-testid={`news-item-${i}`}>
                 <NewsCard article={article} compact />
               </div>
@@ -353,7 +480,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Earnings Calendar */}
+      {/* ── Earnings Calendar ── */}
       <div className="mt-4">
         <EarningsCalendarWidget />
       </div>

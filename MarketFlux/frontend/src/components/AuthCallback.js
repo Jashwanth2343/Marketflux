@@ -14,6 +14,7 @@ export default function AuthCallback() {
 
     // Supabase OAuth returns tokens in the URL hash/query after redirect.
     // The supabase-js client auto-detects and stores the session.
+    if (!supabase) { navigate('/auth', { replace: true }); return; }
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         checkAuth().then(() => navigate('/', { replace: true }));

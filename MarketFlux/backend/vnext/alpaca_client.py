@@ -21,6 +21,14 @@ _trading_client = None
 _broker_client = None
 
 
+def _first_set(*values):
+    """Return the first value that is not None (0 and 0.0 are valid)."""
+    for v in values:
+        if v is not None:
+            return v
+    return values[-1] if values else None
+
+
 def get_alpaca_mode() -> str:
     return os.getenv("ALPACA_MODE", "trading").lower()
 
@@ -34,13 +42,17 @@ def _get_trading_client():
     if _trading_client is not None:
         return _trading_client
 
-    api_key = os.getenv("APCA_API_KEY_ID")
-    secret_key = os.getenv("APCA_API_SECRET_KEY")
+    api_key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_BROKER_API_KEY")
+    secret_key = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_BROKER_API_SECRET")
 
     if not api_key or not secret_key:
         return None
 
-    from alpaca.trading.client import TradingClient
+    try:
+        from alpaca.trading.client import TradingClient
+    except ImportError as exc:
+        logger.error(f"alpaca-py trading module is not installed: {exc}. Run: pip install alpaca-py")
+        return None
 
     _trading_client = TradingClient(api_key=api_key, secret_key=secret_key, paper=True)
     return _trading_client
@@ -57,7 +69,11 @@ def _get_broker_client():
     if not api_key or not secret_key:
         return None
 
-    from alpaca.broker.client import BrokerClient
+    try:
+        from alpaca.broker.client import BrokerClient
+    except ImportError as exc:
+        logger.error(f"alpaca-py broker module is not installed: {exc}. Run: pip install alpaca-py")
+        return None
 
     _broker_client = BrokerClient(api_key=api_key, secret_key=secret_key, sandbox=True)
     return _broker_client
@@ -66,7 +82,9 @@ def _get_broker_client():
 def is_alpaca_configured() -> bool:
     if is_broker_mode():
         return bool(os.getenv("ALPACA_BROKER_API_KEY") and os.getenv("ALPACA_BROKER_API_SECRET"))
-    return bool(os.getenv("APCA_API_KEY_ID") and os.getenv("APCA_API_SECRET_KEY"))
+    key = os.getenv("APCA_API_KEY_ID") or os.getenv("ALPACA_BROKER_API_KEY")
+    secret = os.getenv("APCA_API_SECRET_KEY") or os.getenv("ALPACA_BROKER_API_SECRET")
+    return bool(key and secret)
 
 
 # ---------------------------------------------------------------------------
@@ -85,15 +103,37 @@ def get_account() -> Optional[Dict[str, Any]]:
             "cash": str(account.cash) if account.cash is not None else "0",
             "buying_power": str(account.buying_power) if account.buying_power is not None else "0",
             "equity": str(account.equity) if account.equity is not None else "0",
-            "portfolio_value": str(getattr(account, "portfolio_value", None) or account.equity or 0),
-            "last_equity": str(getattr(account, "last_equity", None) or 0),
-            "unrealized_pl": str(getattr(account, "unrealized_intraday_pl", None) or getattr(account, "unrealized_pl", None) or 0),
-            "unrealized_plpc": str(getattr(account, "unrealized_intraday_plpc", None) or getattr(account, "unrealized_plpc", None) or 0),
+            "portfolio_value": str(_first_set(getattr(account, "portfolio_value", None), account.equity, 0)),
+            "last_equity": str(_first_set(getattr(account, "last_equity", None), 0)),
+            "unrealized_pl": str(_first_set(getattr(account, "unrealized_intraday_pl", None), getattr(account, "unrealized_pl", None), 0)),
+            "unrealized_plpc": str(_first_set(getattr(account, "unrealized_intraday_plpc", None), getattr(account, "unrealized_plpc", None), 0)),
             "currency": str(getattr(account, "currency", "USD") or "USD"),
             "created_at": str(account.created_at) if account.created_at else None,
         }
     except Exception as exc:
         logger.error(f"Alpaca get_account failed: {exc}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Market Clock
+# ---------------------------------------------------------------------------
+
+def get_clock() -> Optional[Dict[str, Any]]:
+    """Return market open/closed state and the next open/close timestamps."""
+    client = _get_trading_client()
+    if not client:
+        return None
+    try:
+        clock = client.get_clock()
+        return {
+            "is_open": bool(clock.is_open),
+            "timestamp": str(clock.timestamp) if clock.timestamp else None,
+            "next_open": str(clock.next_open) if clock.next_open else None,
+            "next_close": str(clock.next_close) if clock.next_close else None,
+        }
+    except Exception as exc:
+        logger.error(f"Alpaca get_clock failed: {exc}")
         return None
 
 
@@ -489,27 +529,39 @@ def broker_submit_market_order(
     qty: float,
     side: str,
     time_in_force: str = "day",
+    order_type: str = "market",
+    limit_price: Optional[float] = None,
 ) -> Optional[Dict[str, Any]]:
-    """Submit a market order for a sub-account (broker mode)."""
+    """Submit an order for a sub-account (broker mode). Supports market and limit."""
     client = _get_broker_client()
     if not client:
         return None
 
-    from alpaca.broker.requests import MarketOrderRequest
     from alpaca.trading.enums import OrderSide
 
-    order_data = MarketOrderRequest(
-        symbol=symbol.upper(),
-        qty=qty,
-        side=OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL,
-        time_in_force=_parse_time_in_force(time_in_force),
-    )
-
     try:
+        if order_type == "limit" and limit_price is not None:
+            from alpaca.broker.requests import LimitOrderRequest
+            order_data = LimitOrderRequest(
+                symbol=symbol.upper(),
+                qty=qty,
+                side=OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL,
+                time_in_force=_parse_time_in_force(time_in_force),
+                limit_price=limit_price,
+            )
+        else:
+            from alpaca.broker.requests import MarketOrderRequest
+            order_data = MarketOrderRequest(
+                symbol=symbol.upper(),
+                qty=qty,
+                side=OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL,
+                time_in_force=_parse_time_in_force(time_in_force),
+            )
+
         order = client.submit_order_for_account(account_id=account_id, order_data=order_data)
         return _serialize_order(order)
     except Exception as exc:
-        logger.error(f"Broker submit_market_order failed: {exc}")
+        logger.error(f"Broker submit_order failed: {exc}")
         return None
 
 
@@ -565,13 +617,17 @@ def broker_cancel_order(account_id: str, order_id: str) -> bool:
         return False
 
 
-def broker_close_position(account_id: str, symbol: str) -> Optional[Dict[str, Any]]:
-    """Close a position for a sub-account (broker mode)."""
+def broker_close_position(account_id: str, symbol: str, qty: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    """Close a position for a sub-account (broker mode). Supports partial close via qty."""
     client = _get_broker_client()
     if not client:
         return None
     try:
-        order = client.close_position_for_account(account_id=account_id, symbol_or_asset_id=symbol.upper())
+        kwargs: Dict[str, Any] = {"account_id": account_id, "symbol_or_asset_id": symbol.upper()}
+        if qty is not None:
+            from alpaca.trading.requests import ClosePositionRequest
+            kwargs["close_options"] = ClosePositionRequest(qty=str(qty))
+        order = client.close_position_for_account(**kwargs)
         return _serialize_order(order)
     except Exception as exc:
         logger.error(f"Broker close_position failed for {symbol}: {exc}")

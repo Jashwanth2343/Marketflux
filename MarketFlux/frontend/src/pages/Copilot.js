@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Plane, Wand2, ListChecks, Wallet, Brain, Activity,
+  Plane, Wand2, Wallet, Brain, Activity,
   TrendingUp, TrendingDown, DollarSign, BarChart3,
   Loader2, RefreshCw, Inbox, ShieldCheck, AlertTriangle,
-  Zap, Target, Shield, Clock, ChevronRight,
+  Zap, Target, Shield, Clock,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProposalCard } from '@/components/pilot/ProposalCard';
 import { GlassBoxTrade } from '@/components/pilot/GlassBoxTrade';
 
+const CopilotAgent = lazy(() => import('@/components/copilot/CopilotAgent'));
 const StrategyTerminal = lazy(() => import('@/components/StrategyTerminal'));
 
 function fmt(v) {

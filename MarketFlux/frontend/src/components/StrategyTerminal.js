@@ -8,6 +8,10 @@ import {
   Sparkles,
   TerminalSquare,
   X,
+  Plane,
+  LineChart,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -41,7 +45,30 @@ export default function StrategyTerminal({ embedded = false }) {
   const [output, setOutput] = useState('');
   const [meta, setMeta] = useState(null);
   const [error, setError] = useState(null);
+  const [copied, setCopied] = useState(false);
   const abortRef = useRef(null);
+
+  const sendToCopilot = () => {
+    const strategy = (output || '').trim();
+    if (!strategy) return;
+    sessionStorage.setItem('copilot_handoff', strategy);
+    navigate('/copilot?tab=copilot');
+  };
+
+  const sendToBacktest = () => {
+    if (prompt?.trim()) sessionStorage.setItem('backtest_seed', prompt.trim());
+    navigate('/backtest');
+  };
+
+  const copyOutput = async () => {
+    try {
+      await navigator.clipboard.writeText(output || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
 
   const strategySummary = useMemo(() => meta?.strategy || null, [meta]);
   const { strategyId } = useParams();
@@ -117,6 +144,9 @@ export default function StrategyTerminal({ embedded = false }) {
         signal: controller.signal,
       });
 
+      if (response.status === 401) {
+        throw new Error('Sign in to run the Strategy Studio swarm.');
+      }
       if (!response.ok || !response.body) {
         throw new Error(`Terminal request failed with status ${response.status}`);
       }
@@ -370,6 +400,26 @@ export default function StrategyTerminal({ embedded = false }) {
                     </div>
                   )}
                 </div>
+
+                {output && !loading && (
+                  <div className="mt-4">
+                    <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-2">Act on this strategy</div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={sendToCopilot} className="h-10 rounded-full gap-2">
+                        <Plane className="w-4 h-4" /> Execute with Copilot
+                      </Button>
+                      <Button onClick={sendToBacktest} variant="outline" className="h-10 rounded-full border-white/10 bg-white/5 gap-2 hover:bg-white/10">
+                        <LineChart className="w-4 h-4" /> Backtest
+                      </Button>
+                      <Button onClick={copyOutput} variant="outline" className="h-10 rounded-full border-white/10 bg-white/5 gap-2 hover:bg-white/10">
+                        {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />} {copied ? 'Copied' : 'Copy'}
+                      </Button>
+                    </div>
+                    <p className="mt-2 text-[11px] font-mono text-muted-foreground">
+                      "Execute with Copilot" hands this strategy to your autonomous agent to review and place the paper trade.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

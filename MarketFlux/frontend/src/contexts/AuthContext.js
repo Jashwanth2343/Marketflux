@@ -10,6 +10,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!supabase) { setLoading(false); return; }
+
     supabase.auth.getSession().then(({ data }) => {
       const s = data?.session ?? null;
       setSession(s);
@@ -34,7 +36,10 @@ export function AuthProvider({ children }) {
     api.defaults.headers.common['Authorization'] = `Bearer ${session.access_token}`;
   }, [session]);
 
+  const _noAuth = () => { throw new Error('Auth is not configured. Set Supabase env vars and restart.'); };
+
   const login = async (email, password) => {
+    if (!supabase) _noAuth();
     let result;
     try {
       result = await supabase.auth.signInWithPassword({ email, password });
@@ -47,6 +52,7 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (email, password, name) => {
+    if (!supabase) _noAuth();
     let result;
     try {
       result = await supabase.auth.signUp({
@@ -63,13 +69,14 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    if (supabase) await supabase.auth.signOut();
     delete api.defaults.headers.common['Authorization'];
     setUser(null);
     setSession(null);
   };
 
   const loginWithGoogle = async () => {
+    if (!supabase) _noAuth();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin + '/' },
@@ -78,6 +85,7 @@ export function AuthProvider({ children }) {
   };
 
   const checkAuth = useCallback(async () => {
+    if (!supabase) return;
     const { data } = await supabase.auth.getSession().catch(() => ({ data: null }));
     const s = data?.session ?? null;
     if (s?.user) {

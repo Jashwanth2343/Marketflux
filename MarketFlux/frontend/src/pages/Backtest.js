@@ -355,6 +355,12 @@ function AiStrategyBuilder({ onApply }) {
     const [loading, setLoading] = useState(false);
     const [preview, setPreview] = useState(null);
 
+    useEffect(() => {
+        const seed = sessionStorage.getItem('backtest_seed');
+        if (seed) { setDesc(seed); sessionStorage.removeItem('backtest_seed'); }
+    }, []);
+
+
     const handleParse = useCallback(async () => {
         if (!desc.trim()) return;
         setLoading(true);
