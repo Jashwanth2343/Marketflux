@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -61,12 +61,28 @@ async def stage(db, user_id: str, name: str, args: Dict[str, Any]) -> Dict[str, 
 
 
 async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
-    """Approve + execute a staged trade against the paper account."""
-    doc = await db[COLLECTION].find_one({"id": pid, "user_id": user_id})
+    """Approve + execute a staged trade against the paper account.
+
+    Uses an atomic find_one_and_update to transition status from "pending" →
+    "executing" as a mutex, preventing double-execution on rapid double-clicks
+    or concurrent tab approvals.
+    """
+    # Staleness guard: reject proposals older than 1 hour.
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+
+    doc = await db[COLLECTION].find_one_and_update(
+        {"id": pid, "user_id": user_id, "status": "pending", "created_at": {"$gte": cutoff}},
+        {"$set": {"status": "executing"}},
+        return_document=True,
+    )
     if not doc:
-        return {"ok": False, "error": "Trade not found."}
-    if doc.get("status") != "pending":
-        return {"ok": False, "error": f"Trade already {doc.get('status')}."}
+        # Distinguish expired from not-found/already-processed.
+        existing = await db[COLLECTION].find_one({"id": pid, "user_id": user_id}, {"status": 1, "created_at": 1})
+        if not existing:
+            return {"ok": False, "error": "Trade not found."}
+        if existing.get("created_at", "") < cutoff:
+            return {"ok": False, "error": "Trade proposal expired (older than 1 hour). Ask the copilot for a fresh recommendation."}
+        return {"ok": False, "error": f"Trade already {existing.get('status', 'processed')}."}
 
     import copilot_trading_tools as t
     name, args = doc["tool"], doc.get("args", {})

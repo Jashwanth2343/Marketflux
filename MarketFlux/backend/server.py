@@ -1652,6 +1652,16 @@ async def startup():
     except Exception:
         pass
 
+    # TTL index on copilot_pending_trades: auto-expire staged trade proposals
+    # after 1 hour. After market conditions change, stale proposals should not
+    # be executable. The application-layer staleness guard in copilot_trades.py
+    # is the primary check; this index is the database-layer backstop.
+    try:
+        await db.copilot_pending_trades.create_index("created_at", expireAfterSeconds=3600)
+        logger.info("copilot_pending_trades TTL index: 1 hour")
+    except Exception as exc:
+        logger.warning(f"Failed creating copilot_pending_trades TTL index: {exc}")
+
     try:
         from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
 

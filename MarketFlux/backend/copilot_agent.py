@@ -239,8 +239,15 @@ async def _exec_tool(name: str, args: Dict[str, Any], db=None, user_id: str = ""
 # ---------------------------------------------------------------------------
 # SSE helpers
 # ---------------------------------------------------------------------------
-def _sse(event_type: str, **data) -> str:
-    return f"data: {json.dumps({'type': event_type, **data})}\n\n"
+def _sse(event_type: str, seq: int = 0, **data) -> str:
+    """Build a Server-Sent Event string.
+
+    Includes an ``id:`` field so clients can use the ``Last-Event-ID`` header
+    to resume a dropped stream.  The ``seq`` counter is injected by the
+    ``run_copilot_agent`` generator; callers that don't pass it get ``id: 0``
+    (safe default, no reconnect support for one-off helper calls).
+    """
+    return f"id: {seq}\ndata: {json.dumps({'type': event_type, **data})}\n\n"
 
 
 def _sanitize(data):
@@ -438,10 +445,19 @@ async def run_copilot_agent(
     provider (OpenRouter / NIM) based on the selected model. Tools, system
     prompt, transparency events, memory, and trade logging are identical across
     both backends — only the LLM-call mechanics differ.
+
+    Every SSE event includes an ``id:`` field (monotonically increasing per
+    turn) so clients can use ``Last-Event-ID`` to detect dropped events.
     """
+    seq: List[int] = [0]  # mutable counter shared with sub-generators
+
+    def sse(event_type: str, **data) -> str:
+        seq[0] += 1
+        return _sse(event_type, seq=seq[0], **data)
+
     resolved = copilot_models.resolve(model)
-    yield _sse("model", key=resolved.key, label=resolved.label, provider=resolved.provider)
-    yield _sse("thinking", step="plan", message=f"Reading your portfolio and planning… (via {resolved.label})")
+    yield sse("model", key=resolved.key, label=resolved.label, provider=resolved.provider)
+    yield sse("thinking", step="plan", message=f"Reading your portfolio and planning… (via {resolved.label})")
 
     system_prompt = _system_prompt()
     if confirm:
@@ -477,17 +493,17 @@ async def run_copilot_agent(
             "I gathered the data and acted where possible, but couldn't compose a "
             "summary. Check the activity log above for what ran.")
 
-        yield _sse("thinking", step="write", message="Writing it up…")
+        yield sse("thinking", step="write", message="Writing it up…")
         for i in range(0, len(final_text), 60):
-            yield _sse("token", content=final_text[i:i + 60])
+            yield sse("token", content=final_text[i:i + 60])
             await asyncio.sleep(0.004)
-        yield _sse("done")
+        yield sse("done")
         await _finalize(db, user_id, session_id, message, final_text)
 
     except Exception as exc:
         logger.critical(f"copilot agent crashed: {exc}", exc_info=True)
-        yield _sse("token", content=f"\n\n⚠ The copilot hit an error: {exc}")
-        yield _sse("done", error=str(exc))
+        yield sse("token", content=f"\n\n⚠ The copilot hit an error: {exc}")
+        yield sse("done", error=str(exc))
 
 
 async def _finalize(db, user_id: str, session_id: str, message: str, final_text: str) -> None:

@@ -20,6 +20,8 @@ from copilot_agent import run_copilot_agent
 
 logger = logging.getLogger(__name__)
 
+_ANON_ID = "local-copilot"
+
 
 class CopilotChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
@@ -48,7 +50,19 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
 
     async def _resolve_user_id(request: Request) -> str:
         user = await get_current_user(request)
-        return user["user_id"] if user else "local-copilot"
+        return user["user_id"] if user else _ANON_ID
+
+    async def _resolve_user_id_required(request: Request) -> str:
+        """Like _resolve_user_id but raises 401 for unauthenticated requests.
+
+        Used on all write endpoints (chat/stream, trade approve/reject, agents
+        CRUD) to prevent anonymous callers from sharing the 'local-copilot'
+        namespace and approving each other's staged trades.
+        """
+        user = await get_current_user(request)
+        if not user:
+            raise HTTPException(401, "Authentication required for this endpoint.")
+        return user["user_id"]
 
     @router.get("/status")
     async def copilot_status():
@@ -64,7 +78,11 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     @router.post("/chat/stream")
     async def copilot_chat_stream(payload: CopilotChatRequest, request: Request):
         message = "".join(c for c in payload.message if c.isprintable() or c in "\n\t\r")
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
+        # Enforce confirm mode for safety — autonomous mode is an opt-in
+        # that requires an authenticated user whose identity can be audited.
+        if not user_id or user_id == _ANON_ID:
+            payload = payload.model_copy(update={"confirm": True})
         session_id = payload.session_id or str(uuid.uuid4())
 
         history = await db.copilot_messages.find(
@@ -72,8 +90,15 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         ).sort("created_at", -1).limit(8).to_list(8)
         history.reverse()
 
-        return StreamingResponse(
-            run_copilot_agent(
+        async def _stream_with_disconnect_guard():
+            """Wrap the agent generator so we stop as soon as the client disconnects.
+
+            Without this guard the Gemini/OpenAI tool loop keeps running — and
+            spending API quota — after the user closes the tab or navigates away.
+            We check ``request.is_disconnected()`` before each event rather than
+            polling in a background task so there is no threading overhead.
+            """
+            gen = run_copilot_agent(
                 message=message,
                 history=history,
                 db=db,
@@ -81,7 +106,15 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
                 session_id=session_id,
                 model=payload.model,
                 confirm=payload.confirm,
-            ),
+            )
+            async for chunk in gen:
+                if await request.is_disconnected():
+                    logger.info("copilot SSE: client disconnected, aborting stream for user %s", user_id)
+                    break
+                yield chunk
+
+        return StreamingResponse(
+            _stream_with_disconnect_guard(),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -120,14 +153,14 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     async def copilot_trade_approve(pid: str, request: Request):
         """Execute a staged trade after explicit user approval (confirm mode)."""
         import copilot_trades
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         result = await copilot_trades.execute_pending(db, user_id, pid)
         return {"item": result}
 
     @router.post("/trades/{pid}/reject")
     async def copilot_trade_reject(pid: str, request: Request):
         import copilot_trades
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         return await copilot_trades.reject_pending(db, user_id, pid)
 
     @router.get("/models")
@@ -140,21 +173,21 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     async def copilot_memory_list(request: Request):
         """What the agent remembers about this user (long-term, cross-session)."""
         import copilot_memory
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         items = await copilot_memory.get_all(user_id)
         return {"items": items}
 
     @router.delete("/memory")
     async def copilot_memory_clear(request: Request):
         import copilot_memory
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         ok = await copilot_memory.delete_all(user_id)
         return {"ok": ok}
 
     @router.delete("/memory/{mem_id}")
     async def copilot_memory_forget(mem_id: str, request: Request):
         import copilot_memory
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         ok = await copilot_memory.delete(user_id, mem_id)
         return {"ok": ok}
 
@@ -171,7 +204,7 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     @router.post("/agents")
     async def standing_create(payload: StandingAgentCreate, request: Request):
         import copilot_standing
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         res = await copilot_standing.create_agent(
             db, user_id, name=payload.name, instruction=payload.instruction,
             interval_minutes=payload.interval_minutes, model=payload.model)
@@ -182,19 +215,19 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     @router.put("/agents/{agent_id}")
     async def standing_update(agent_id: str, payload: StandingAgentUpdate, request: Request):
         import copilot_standing
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         return await copilot_standing.update_agent(db, user_id, agent_id, payload.model_dump(exclude_none=True))
 
     @router.delete("/agents/{agent_id}")
     async def standing_delete(agent_id: str, request: Request):
         import copilot_standing
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         return await copilot_standing.delete_agent(db, user_id, agent_id)
 
     @router.post("/agents/{agent_id}/run")
     async def standing_run_now(agent_id: str, request: Request):
         import copilot_standing
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         return await copilot_standing.run_now(db, user_id, agent_id)
 
     @router.get("/trades")

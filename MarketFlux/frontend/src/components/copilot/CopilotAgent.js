@@ -252,6 +252,10 @@ export default function CopilotAgent() {
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
+            // Track the last received SSE event id so a reconnect could pass
+            // Last-Event-ID.  Not used for auto-reconnect here, but logged for
+            // debugging and available for future implementation.
+            let lastEventId = null;
 
             const handle = (event) => {
                 if (event.type === 'thinking') {
@@ -305,18 +309,31 @@ export default function CopilotAgent() {
                 buffer = done ? '' : lines.pop() || '';
                 for (const line of lines) {
                     const t = line.trim();
+                    // Track SSE event id for potential Last-Event-ID reconnect.
+                    if (t.startsWith('id: ')) { lastEventId = t.slice(4); continue; }
                     if (!t.startsWith('data: ')) continue;
-                    try { handle(JSON.parse(t.slice(6))); } catch { /* skip */ }
+                    try { handle(JSON.parse(t.slice(6))); } catch { /* skip malformed */ }
                 }
                 if (done) break;
             }
         } catch (err) {
             if (err.name !== 'AbortError') {
+                // Always append the error — never silently swallow it even when
+                // there is partial streamed content. The user must know the
+                // response is incomplete so they can retry.
+                const errMsg = err.message || 'The copilot could not respond.';
                 patchLastAssistant((m) => ({
-                    ...m, streaming: false,
-                    content: m.content || `⚠ ${err.message || 'The copilot could not respond.'}`,
+                    ...m,
+                    streaming: false,
+                    // Append to any partial content that already streamed.
+                    content: m.content
+                        ? `${m.content}\n\n⚠ *Connection lost — response may be incomplete. ${errMsg}*`
+                        : `⚠ ${errMsg}`,
+                    streamError: errMsg,
+                    // Store the original user message so the retry button can re-send it.
+                    retryMessage: msg,
                 }));
-                toast.error(err.message || 'Copilot request failed');
+                toast.error('Copilot request failed', { description: errMsg });
             }
         } finally {
             setLoading(false);
@@ -350,14 +367,14 @@ export default function CopilotAgent() {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={toggleConfirm}
-                            title={confirm ? 'Confirm mode: trades need your one-click approval' : 'Autonomous mode: the agent executes paper trades directly'}
+                            title={confirm ? 'Confirm before trade: the agent stages every trade and waits for your one-click approval before it hits the broker.' : 'Execute automatically: the agent places paper trades without asking. You can switch back to Confirm mode at any time.'}
                             className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
                                 confirm ? 'border-primary/30 bg-primary/10 text-primary'
                                     : 'border-amber-500/40 bg-amber-500/10 text-amber-400'
                             }`}
                         >
                             {confirm ? <ShieldCheck className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
-                            {confirm ? 'Confirm' : 'Auto'}
+                            {confirm ? 'Confirm before trade' : 'Execute automatically'}
                         </button>
                         <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] pl-2.5 pr-1.5 py-1" title="Model">
                             <Cpu className="w-3.5 h-3.5 text-primary" />
@@ -392,7 +409,22 @@ export default function CopilotAgent() {
                                 It researches the market, runs the numbers, and executes paper trades on your
                                 Alpaca account — and shows every step it takes.
                             </p>
-                            <div className="mt-7 grid w-full max-w-xl gap-2 sm:grid-cols-2">
+                            {/* First-open safety callout — surface confirm mode before first trade */}
+                            <div className={`mt-4 flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs max-w-md ${
+                                confirm
+                                    ? 'border-primary/25 bg-primary/[0.07] text-primary'
+                                    : 'border-amber-500/35 bg-amber-500/[0.07] text-amber-400'
+                            }`}>
+                                {confirm
+                                    ? <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                                    : <Zap className="w-3.5 h-3.5 flex-shrink-0" />}
+                                <span>
+                                    {confirm
+                                        ? <><strong>Confirm before trade</strong> is on — the agent will ask for your approval before any order is placed.</>
+                                        : <><strong>Execute automatically</strong> is on — the agent will place paper trades without asking. <button onClick={toggleConfirm} className="underline underline-offset-2 hover:text-foreground transition-colors">Switch to Confirm mode</button>.</>}
+                                </span>
+                            </div>
+                            <div className="mt-5 grid w-full max-w-xl gap-2 sm:grid-cols-2">
                                 {SUGGESTIONS.map(({ text, icon: Icon }) => (
                                     <button key={text} onClick={() => send(text)}
                                         className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/[0.06]">
@@ -425,6 +457,16 @@ export default function CopilotAgent() {
                                             <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" /> thinking…
                                         </div>
                                     ) : null}
+                                    {/* Retry button — shown when the stream errored out */}
+                                    {m.streamError && m.retryMessage && (
+                                        <button
+                                            onClick={() => send(m.retryMessage)}
+                                            disabled={loading}
+                                            className="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.07] px-3 py-1.5 text-xs font-mono text-amber-400 transition-colors hover:border-amber-500/50 hover:bg-amber-500/[0.12] disabled:opacity-40"
+                                        >
+                                            <Loader2 className="w-3 h-3" /> Retry last message
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )
