@@ -7,12 +7,12 @@
 ## 1. System Context
 
 ```
-React SPA (CRA+Craco :3000) ──HTTPS/Bearer──► FastAPI (uvicorn :8001)
-                                                 ├─ MongoDB (Motor)        app data + pilot mirror
+React SPA (CRA+Craco :3000) ──HTTPS/Bearer──► FastAPI (uvicorn :8000)
                                                  ├─ Supabase Postgres      auth/copilot/memory + vnext
                                                  │   └─ pgvector, RLS, pg_cron
                                                  ├─ Redis (optional)       cache
                                                  ├─ Supabase Auth (GoTrue) signup/login/JWT/OAuth
+                                                 ├─ Legacy Mongo paths     compatibility only
                                                  └─ External: yfinance, Finviz, RSS, DuckDuckGo,
                                                     Gemini/NIM/OpenRouter, Alpaca
 ```
@@ -32,8 +32,8 @@ React SPA (CRA+Craco :3000) ──HTTPS/Bearer──► FastAPI (uvicorn :8001)
 
 | ID | Decision | Rationale | Consequence |
 |----|----------|-----------|-------------|
-| ADR-1 | Supabase Auth (GoTrue) replaces Mongo/bcrypt/JWT | Managed auth, OAuth, JWT verification | Backend keeps 3-way `get_current_user` for transition |
-| ADR-2 | Hybrid persistence (Mongo + Supabase PG) | Incremental migration; Mongo for fast-moving app data, PG for durable relational/vector | Duplication debt (must consolidate) |
+| ADR-1 | Supabase Auth (GoTrue) replaces Mongo/bcrypt/JWT | Managed auth, OAuth, JWT verification | Backend keeps legacy token paths only for compatibility |
+| ADR-2 | Supabase Postgres is canonical | Durable relational/vector store with migrations and RLS | Legacy Mongo mirrors/fallbacks must be retired or kept optional |
 | ADR-3 | pgvector for memory & RAG | Native semantic retrieval with SQL scoring | HNSW index; 1536-dim embeddings |
 | ADR-4 | Server-side broker execution only | Security: keys never in browser | All Alpaca calls behind auth on backend |
 | ADR-5 | Native-fetch isolation for Supabase client | Hosting platforms (Emergent) wrap `window.fetch` and drain bodies | `lib/supabase.js` uses iframe-sourced fetch |
@@ -42,14 +42,13 @@ React SPA (CRA+Craco :3000) ──HTTPS/Bearer──► FastAPI (uvicorn :8001)
 
 ## 4. Data Architecture & Consolidation Plan
 
-Current state: three stores, two ownership models, known duplication (see
+Current state: Supabase is primary, but legacy Mongo compatibility paths and duplicated models remain (see
 [`backend-schema.md` §0/§6](./backend-schema.md)).
 
-**Target:** Supabase Postgres as the single system of record for durable domain data; MongoDB
-retained only for high-churn/append data (news, chat, usage). 
+**Target:** Supabase Postgres as the single system of record for durable domain data. Any Mongo path should be treated as legacy fallback code, not normal local infrastructure.
 
 **Consolidation sequence:**
-1. Choose PG as canonical for personas/proposals/journal/drift/consent; treat Mongo `pilot_*` as
+1. Keep PG canonical for personas/proposals/journal/drift/consent; treat Mongo `pilot_*` as
    a deprecated mirror (read-through, stop new writes).
 2. Unify ownership: standardize on `auth.users(id)` UUID FKs; migrate vnext `owner_user_id TEXT`
    → `owner_user_id UUID` with FK + backfill; add **RLS** to all vnext tables.
@@ -117,9 +116,9 @@ retained only for high-churn/append data (news, chat, usage).
 
 - Frontend: `npm start` (Craco) on :3000; env `REACT_APP_SUPABASE_URL`,
   `REACT_APP_SUPABASE_ANON_KEY`, `REACT_APP_BACKEND_URL`.
-- Backend: `uvicorn server:app --host 0.0.0.0 --port 8001 --reload`; env `SUPABASE_URL`,
+- Backend: `uvicorn server:app --host 0.0.0.0 --port 8000 --reload`; env `SUPABASE_URL`,
   `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, DSN chain (`SUPABASE_DB_URL` >
-  `MARKETFLUX_VNEXT_DATABASE_URL` > `FUNDOS_DATABASE_URL`), `MONGO_URL`, Alpaca + LLM keys.
+  `MARKETFLUX_VNEXT_DATABASE_URL` > `FUNDOS_DATABASE_URL`), Alpaca + LLM keys.
 - Supabase project `etanlxohfiwhdwkbqyzq`; schema in `backend/supabase/schema.sql`; migrations in
   `supabase/migrations/`.
 - **Repo note:** the Supabase build lives on `main` checked out in a git **worktree**; the default
@@ -148,10 +147,9 @@ retained only for high-churn/append data (news, chat, usage).
 
 | Item | Remediation |
 |------|-------------|
-| Mongo↔Postgres duplication | §4 consolidation; one system of record per domain |
+| Legacy Mongo↔Supabase duplication | §4 consolidation; Supabase as system of record |
 | vnext tables lack RLS | Add RLS + UUID FK ownership |
 | Three paper-trading models | Unify behind one execution service |
 | `pilot_activity_events` no TTL (string timestamps) | Store BSON `Date`, then add TTL |
-| Benign `public_slug_1` Mongo index conflict warning | Reconcile `partialFilterExpression` |
 | Global `window.fetch` patch (removed) | Keep removed; rely on native-fetch isolation in `lib/supabase.js` |
 | `tables_ok: false` on unmigrated projects | Apply `supabase/migrations/*`; verify health endpoint |

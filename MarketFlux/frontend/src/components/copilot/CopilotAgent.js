@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
     Plane, Send, Loader2, Brain, Wrench, CheckCircle2, AlertTriangle,
     ArrowUpCircle, ArrowDownCircle, XCircle, Sparkles, ShieldCheck, Square,
@@ -137,6 +138,7 @@ function AgentAvatar({ size = 'sm' }) {
 }
 
 export default function CopilotAgent() {
+    const { session } = useAuth();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -240,9 +242,12 @@ export default function CopilotAgent() {
         abortRef.current = controller;
 
         try {
+            const authHeaders = session?.access_token
+                ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` }
+                : { 'Content-Type': 'application/json' };
             const res = await fetch(`${API_BASE}/api/copilot/chat/stream`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders,
                 credentials: 'include',
                 body: JSON.stringify({ message: msg, session_id: sessionId.current, model, confirm }),
                 signal: controller.signal,
@@ -339,7 +344,7 @@ export default function CopilotAgent() {
             setLoading(false);
             abortRef.current = null;
         }
-    }, [input, loading, model, confirm, patchLastAssistant]);
+    }, [input, loading, model, confirm, patchLastAssistant, session?.access_token]);
 
     const stop = () => { abortRef.current?.abort(); abortRef.current = null; setLoading(false); patchLastAssistant((m) => ({ ...m, streaming: false })); };
 

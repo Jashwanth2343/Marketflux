@@ -186,13 +186,38 @@ async def search_fundos(db, user: Optional[Dict[str, Any]], query: str, limit: i
 
 
 async def build_paper_portfolio(user: Optional[Dict[str, Any]], db=None) -> Dict[str, Any]:
-    from .alpaca_client import is_alpaca_configured, get_positions, get_account
+    from .alpaca_client import (
+        is_alpaca_configured, get_positions, get_account,
+        broker_get_positions, broker_get_account,
+    )
 
     user_id = user.get("user_id") if user else None
     alpaca_positions = []
     alpaca_account_info = None
 
-    if is_alpaca_configured() and user_id:
+    if is_alpaca_configured() and user_id and db is not None:
+        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
+        try:
+            if alpaca_account_id:
+                # Broker API: per-user sub-account
+                alpaca_positions, alpaca_account_info = await asyncio.gather(
+                    asyncio.to_thread(broker_get_positions, alpaca_account_id),
+                    asyncio.to_thread(broker_get_account, alpaca_account_id),
+                )
+            else:
+                # Shared paper trading account
+                alpaca_positions, alpaca_account_info = await asyncio.gather(
+                    asyncio.to_thread(get_positions),
+                    asyncio.to_thread(get_account),
+                )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(
+                "Failed loading Alpaca portfolio data (account=%s): %s", alpaca_account_id, exc
+            )
+    elif is_alpaca_configured() and user_id:
+        # No db — fall back to shared paper account
         try:
             alpaca_positions, alpaca_account_info = await asyncio.gather(
                 asyncio.to_thread(get_positions),
@@ -200,10 +225,7 @@ async def build_paper_portfolio(user: Optional[Dict[str, Any]], db=None) -> Dict
             )
         except Exception as exc:
             import logging
-
-            logging.getLogger(__name__).error(
-                f"Failed loading Alpaca portfolio data: {exc}"
-            )
+            logging.getLogger(__name__).error("Failed loading Alpaca portfolio data: %s", exc)
 
     positions = [
         {

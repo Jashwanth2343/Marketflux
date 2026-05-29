@@ -41,6 +41,15 @@ BLOCKED_NAMES = {
     "__builtins__", "builtins",
 }
 
+# Attribute names on allowed modules that expose os/sys/subprocess internals.
+# numpy and pandas both carry references to `os` through internal sub-modules
+# (e.g. np.distutils.compat.os, pd.io.common.os) which plain attribute access
+# can reach without an explicit import statement.
+BLOCKED_ATTRS = {
+    "os", "sys", "subprocess", "nt", "posix", "distutils",
+    "system", "popen", "fork", "spawn",
+}
+
 TIMEOUT_SECONDS = 12
 MAX_OUTPUT_CHARS = 6000
 
@@ -83,6 +92,8 @@ def _validate(code: str) -> str | None:
         elif isinstance(node, ast.Attribute):
             if node.attr.startswith("__") and node.attr.endswith("__"):
                 return f"Access to dunder attribute '{node.attr}' is not allowed."
+            if node.attr in BLOCKED_ATTRS:
+                return f"Access to attribute '{node.attr}' is not allowed in the sandbox."
         elif isinstance(node, ast.Name):
             if node.id in BLOCKED_NAMES:
                 return f"Use of '{node.id}' is not allowed in the sandbox."

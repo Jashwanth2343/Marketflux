@@ -56,16 +56,16 @@ Frontend pages (CRA + Craco): `Dashboard`, `Intelligence`, `Copilot`, `Backtest`
                                      │  HTTPS / Bearer JWT
                                      v
                      ┌─────────────────────────────────────────────┐
-                     │  FastAPI Backend (uvicorn, port 8001)        │
+                     │  FastAPI Backend (uvicorn, port 8000)        │
                      │  prefix /api  + sub-routers (see §7)         │
                      └───┬───────┬───────┬───────┬───────┬──────────┘
                          │       │       │       │       │
           ┌──────────────┘       │       │       │       └───────────────┐
           v                      v       v       v                       v
    ┌─────────────┐      ┌──────────────┐ │  ┌──────────┐         ┌───────────────┐
-   │  MongoDB    │      │  Supabase    │ │  │  Redis   │         │  External APIs│
-   │  (Motor,    │      │  Postgres    │ │  │ (cache,  │         │  - yfinance   │
-   │  app data)  │      │  + pgvector  │ │  │  optional)│        │  - Gemini LLM │
+   │ Legacy Mongo│      │  Supabase    │ │  │  Redis   │         │  External APIs│
+   │ fallback /  │      │  Postgres    │ │  │ (cache,  │         │  - yfinance   │
+   │ mirrors     │      │  + pgvector  │ │  │  optional)│        │  - Gemini LLM │
    └─────────────┘      └──────────────┘ │  └──────────┘         │  - Alpaca     │
                                           │                       │  - Finviz     │
                         ┌─────────────────┘                       │  - DuckDuckGo │
@@ -75,26 +75,24 @@ Frontend pages (CRA + Craco): `Dashboard`, `Intelligence`, `Copilot`, `Backtest`
                 └──────────────┘
 ```
 
-Three runtime tiers: **React SPA** → **FastAPI** → **(MongoDB | Supabase Postgres | Redis | external data/LLM/broker)**.
+Three runtime tiers: **React SPA** → **FastAPI** → **(Supabase Postgres/Auth | Redis | external data/LLM/broker)**, with legacy Mongo compatibility paths still present in code.
 
 ---
 
-## 4. Data Layer (Hybrid — and why)
+## 4. Data Layer
 
-MarketFlux runs **three persistence stores simultaneously**. This is a deliberate-but-transitional
-state: the platform began MongoDB-first, then adopted Supabase (Postgres + pgvector + Auth) for the
-durable trading/research domain. The migration is **partial**, so some domains exist in *both* stores.
+MarketFlux is **Supabase-first**: Supabase Auth and Supabase Postgres/pgvector are the primary durable data layer. The codebase still contains legacy Mongo mirrors/fallbacks from the pre-Supabase era, so references to Mongo should be treated as compatibility debt unless a feature explicitly still depends on that path.
 
 | Store | Driver | Owns | Notes |
 |-------|--------|------|-------|
-| **MongoDB** | Motor (async) | News, chat history, AI usage, watchlists, portfolios, legacy users, `pilot_*` mirror, research/strategy runs | Original system of record; TTL indexes for news/usage |
-| **Supabase Postgres** | asyncpg / supabase-py | Auth (`auth.users`), `profiles`, copilot domain (`personalities`, `trade_proposals`, audit/activity), `pilot_memory` (pgvector), journal/drift/snapshots, agent checkpoints, vnext domain (theses, paper trading, policies, evidence, memos, backtests) | Durable, relational, RLS-enforced |
+| **Supabase Postgres** | asyncpg / supabase-py | Auth (`auth.users`), `profiles`, copilot domain (`personalities`, `trade_proposals`, audit/activity), `pilot_memory` (pgvector), journal/drift/snapshots, agent checkpoints, vnext domain (theses, paper trading, policies, evidence, memos, backtests) | Primary durable store; relational/vector data; RLS where configured |
+| **Legacy MongoDB** | Motor (async) | Older mirrors/fallbacks for news, chat history, usage, watchlists, portfolios, legacy users, `pilot_*`, research/strategy runs | Compatibility only; do not use for new domains |
 | **Redis** | redis-py | Market-data cache (~1h TTL), API response cache (~5min TTL), session/usage cache | Optional — app degrades gracefully when offline (no caching) |
 
 ### 4.1 Known duplication (migration debt)
 
 The same domain concept currently lives in two places. This is the single biggest source of
-data-model confusion and should be consolidated (see TRD §"Data Consolidation"):
+data-model confusion and should be removed or consolidated behind Supabase (see TRD §"Data Consolidation"):
 
 | Concept | MongoDB | Supabase Postgres |
 |---------|---------|-------------------|
@@ -228,9 +226,9 @@ available. The AI digest is generated by the LLM lane and cached.
 - **Frontend**: CRA + Craco dev server on `:3000`. Env via `frontend/.env.local`
   (`REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_ANON_KEY`, `REACT_APP_BACKEND_URL`).
   Force-dark-mode bootstrap in `index.js`.
-- **Backend**: `uvicorn server:app --host 0.0.0.0 --port 8001 --reload`. Env via `backend/.env`
+- **Backend**: `uvicorn server:app --host 0.0.0.0 --port 8000 --reload`. Env via `backend/.env`
   (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `SUPABASE_DB_URL`/
-  `MARKETFLUX_VNEXT_DATABASE_URL`/`FUNDOS_DATABASE_URL`, `MONGO_URL`, Alpaca keys, LLM keys).
+  `MARKETFLUX_VNEXT_DATABASE_URL`/`FUNDOS_DATABASE_URL`, Alpaca keys, LLM keys).
 - **Supabase**: project `etanlxohfiwhdwkbqyzq`. Postgres DSN resolution order:
   `SUPABASE_DB_URL` > `MARKETFLUX_VNEXT_DATABASE_URL` > `FUNDOS_DATABASE_URL`. asyncpg pool
   (min 1 / max 5). Schema in `backend/supabase/schema.sql`; migrations in `supabase/migrations/`.
@@ -242,11 +240,11 @@ available. The AI digest is generated by the LLM lane and cached.
 ### Tech stack
 - **Frontend**: React (CRA + Craco), shadcn/ui, Tailwind CSS, Recharts, Framer Motion, axios,
   `@supabase/supabase-js`, DOMPurify.
-- **Backend**: FastAPI, uvicorn, Motor (MongoDB), asyncpg + SQLAlchemy + psycopg, pgvector,
+- **Backend**: FastAPI, uvicorn, asyncpg + SQLAlchemy + psycopg, pgvector,
   httpx, supabase-py, PyJWT, bcrypt.
 - **AI / data**: Google Gemini (`google-generativeai`), sentence-transformers (embeddings),
   yfinance, finvizfinance, feedparser (RSS), duckduckgo-search, Alpaca (`alpaca-py`).
-- **Infra**: Supabase (Postgres + pgvector + GoTrue Auth), MongoDB Atlas, Redis.
+- **Infra**: Supabase (Postgres + pgvector + GoTrue Auth), Redis, optional legacy Mongo compatibility.
 
 ---
 
@@ -315,9 +313,8 @@ OTHERS` guard so profile creation can never again block signup; defensive grants
 ### 10.7 Still-open items
 - `tables_ok: false` historically — vnext tables (`theses`, `strategy_proposals`, `paper_trades`)
   may be unmigrated on a given project; run `supabase/migrations/*`.
-- Mongo↔Postgres **duplication** (§4.1) remains; choose one system of record per domain.
+- Legacy Mongo↔Supabase **duplication** (§4.1) remains in some paths; Supabase should be the system of record.
 - Redis frequently offline in dev → no cache layer (non-fatal).
-- A benign Mongo index conflict warning on `public_slug_1` at startup.
 
 ---
 

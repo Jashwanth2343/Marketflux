@@ -157,10 +157,20 @@ def schedule_add_turn(user_id: str, user_message: str, assistant_message: str) -
 
 
 async def delete(user_id: str, mem_id: str) -> bool:
+    """Delete a memory only if it belongs to user_id (prevents IDOR)."""
     mem = await _memory_async()
     if not mem:
         return False
     try:
+        # Verify ownership before deleting — mem_id alone is insufficient.
+        all_mems = await asyncio.to_thread(
+            lambda: mem.get_all(filters={"user_id": user_id}, top_k=200)
+        )
+        items = all_mems if isinstance(all_mems, list) else (all_mems or {}).get("results", [])
+        owned_ids = {m.get("id") for m in items if isinstance(m, dict)}
+        if mem_id not in owned_ids:
+            logger.warning("memory delete denied: %s not owned by %s", mem_id, user_id)
+            return False
         await asyncio.to_thread(lambda: mem.delete(memory_id=mem_id))
         return True
     except Exception as exc:
