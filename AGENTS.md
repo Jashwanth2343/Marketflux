@@ -1,71 +1,74 @@
 # AGENTS.md
 
-## Cursor Cloud specific instructions
+## Current Local Architecture
 
-### Architecture
-- **Backend**: FastAPI (Python 3.12) at port 8001 (`MarketFlux/backend/`)
-- **Frontend**: React CRA+CRACO (Node 20) at port 3000 (`MarketFlux/frontend/`)
-- **Database**: MongoDB 7.0 (local or Atlas)
+- **Backend**: FastAPI at `http://localhost:8000` (`MarketFlux/backend/`)
+- **Frontend**: React CRA + CRACO at `http://localhost:3000` (`MarketFlux/frontend/`)
+- **Primary data/auth**: Supabase Auth + Supabase Postgres / pgvector
+- **Legacy compatibility**: some backend modules still accept a Mongo `db` object or read Mongo mirrors/fallbacks, but Mongo is not the primary local setup.
 
-### Starting Services
+## Starting Services
 
 ```bash
-# 1. MongoDB (must be running first)
-mongod --dbpath /tmp/mongodb --port 27017 --fork --logpath /tmp/mongodb/mongod.log
-
-# 2. Backend
+# Backend
 cd MarketFlux/backend
-export PATH="$HOME/.local/bin:$PATH"
-uvicorn server:app --reload --port 8001
+./venv/bin/python -m uvicorn server:app --reload --host 127.0.0.1 --port 8000
 
-# 3. Frontend (use the dev config to bypass the visual-edits babel plugin bug)
+# Frontend
 cd MarketFlux/frontend
-source /home/ubuntu/.nvm/nvm.sh && nvm use 20
-BROWSER=none REACT_APP_BACKEND_URL=http://localhost:8001 npx craco start --config craco.config.dev.js
+BROWSER=none HOST=127.0.0.1 PORT=3000 REACT_APP_BACKEND_URL=http://localhost:8000 npx craco start --config craco.config.dev.js
 ```
 
-### Known Gotchas
+Open the app at `http://localhost:3000`.
 
-1. **Visual-edits babel plugin crashes in dev mode**: The `plugins/visual-edits/babel-metadata-plugin.js` has a null-pointer bug (`importPath.parentPath.parentPath` can be null). Use `craco.config.dev.js` (which disables the plugin) instead of the default `craco.config.js` when starting the frontend dev server.
+## Known Gotchas
 
-2. **MongoDB `pilot_personalities` index issue**: The `database.py` creates a `sparse: true` unique index on `public_slug`, but seed personalities store `public_slug: null` explicitly (field present with null value). Sparse indexes only skip documents where the field is *absent*. Fix: after first backend start, run:
-   ```
-   mongosh --eval "db.getSiblingDB('MarketFlux').pilot_personalities.dropIndex('public_slug_1'); db.getSiblingDB('MarketFlux').pilot_personalities.createIndex({public_slug:1},{unique:true,partialFilterExpression:{public_slug:{\$type:'string'}},name:'public_slug_1'})"
-   ```
+1. **Use backend port 8000**: The frontend `.env` and `src/lib/api.js` default to `http://localhost:8000`. Do not start the backend on another port unless you also intentionally change the frontend env.
 
-3. **Node version**: Frontend requires Node 20 (not 22). Use `nvm use 20`.
+2. **Use `MarketFlux/backend/venv`, not `.venv`**: The `venv` environment has the current backend dependencies such as `asyncpg`. The `.venv` directory is stale/incomplete and can fail during startup.
 
-4. **Python PATH**: pip installs to `~/.local/bin` which isn't on PATH by default. Always `export PATH="$HOME/.local/bin:$PATH"` before running uvicorn.
+3. **Use `craco.config.dev.js` for frontend dev**: The default CRACO config can trip the visual-edits Babel plugin in dev mode. The dev config bypasses it.
 
-5. **HuggingFace models**: sentence-transformers requires internet access to download on first run. The server gracefully degrades without it (agent embeddings disabled).
+4. **Supabase is the primary auth/data layer**: Frontend auth uses `REACT_APP_SUPABASE_URL` and `REACT_APP_SUPABASE_ANON_KEY`. Backend vNext/FundOS data uses the DSN chain `SUPABASE_DB_URL` > `MARKETFLUX_VNEXT_DATABASE_URL` > `FUNDOS_DATABASE_URL`.
 
-6. **NaN in market data**: yfinance occasionally returns NaN values that crash JSON serialization. The `sanitize_for_json` helper handles this, but if you see 500 errors with "Out of range float values", it's this issue.
+5. **Legacy Mongo code still exists**: Do not reintroduce Mongo-first setup instructions. If Mongo fallback code is touched, keep it optional and non-blocking unless the feature explicitly still depends on it.
 
-### Required Secrets for Full Feature Set
+6. **HuggingFace models**: `sentence-transformers` may download/load models on first backend startup. The server should degrade gracefully if embeddings are unavailable.
+
+7. **NaN in market data**: `yfinance` can return NaN values that crash JSON serialization. Use the existing `sanitize_for_json` helper when adding market-data responses.
+
+## Required Secrets for Full Feature Set
 
 | Secret | Features it unlocks |
 |--------|-------------------|
-| `GEMINI_API_KEY` | AI Chat, Stock Digests, AI Screener, Pilot signal scoring, Autoresearch |
-| `APCA_API_KEY_ID` | Paper trading execution, account management, Paper Portfolio tab |
-| `APCA_API_SECRET_KEY` | (paired with above) |
+| `REACT_APP_SUPABASE_URL` | Frontend Supabase auth |
+| `REACT_APP_SUPABASE_ANON_KEY` | Frontend Supabase auth |
+| `SUPABASE_URL` | Backend Supabase service client |
+| `SUPABASE_SERVICE_KEY` | Backend Supabase auth verification / service writes |
+| `SUPABASE_DB_URL` or `FUNDOS_DATABASE_URL` | Supabase Postgres / pgvector data |
+| `GEMINI_API_KEY` | AI Chat, Stock Digests, AI Screener, Copilot scoring, Autoresearch |
+| `APCA_API_KEY_ID` | Paper trading execution and account management |
+| `APCA_API_SECRET_KEY` | Paired with Alpaca paper key |
 | `OPENROUTER_API_KEY` or `NVIDIA_NIM_API_KEY` | Strategy Studio / Strategy Terminal |
 
-Without these keys, all non-AI features still work: market data, charts, news, watchlist, portfolio tracking, search.
+Without AI/broker keys, non-AI market pages can still render with degraded functionality.
 
-### Running Tests
+## Running Tests
 
 ```bash
-# Frontend (unit tests)
+# Frontend
 cd MarketFlux/frontend
 CI=true npx craco test --watchAll=false --passWithNoTests
 
-# Backend (unit tests only — integration tests need a running server + valid API keys)
+# Backend unit tests
 cd MarketFlux/backend
-python3 -m pytest tests/test_pilot_smoke.py tests/test_thesis_router_unittest.py tests/test_thesis_backfill_unittest.py tests/test_policy_engine_unittest.py -v
+./venv/bin/python -m pytest tests/test_pilot_smoke.py tests/test_thesis_router_unittest.py tests/test_thesis_backfill_unittest.py tests/test_policy_engine_unittest.py -v
 
-# Linting happens during webpack compilation via craco's eslint config
+# Frontend production-style compile with the dev CRACO config
+cd MarketFlux/frontend
+CI=true npx craco build --config craco.config.dev.js
 ```
 
-### Frontend environment variable
+## Frontend Environment Variable
 
-Set `REACT_APP_BACKEND_URL=http://localhost:8001` when starting the frontend to point API calls at the local backend.
+Set `REACT_APP_BACKEND_URL=http://localhost:8000` when starting the frontend locally.

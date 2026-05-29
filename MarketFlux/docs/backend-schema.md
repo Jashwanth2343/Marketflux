@@ -1,22 +1,18 @@
-# MarketFlux — Backend Data Schema (As-Built)
+# MarketFlux — Backend Data Schema
 
-> The complete, field-level data model across all three persistence stores, exactly as it exists
-> today. Companion to [`architecture.md`](./architecture.md). Sources of truth:
-> `backend/database.py` (Mongo indexes), `backend/supabase/schema.sql` (auth/copilot/memory),
-> `backend/sql/vnext_pgvector_schema.sql` + `supabase/migrations/*` (vnext domain).
+> Supabase is the primary data/auth layer. This document also records legacy Mongo mirrors/fallbacks that still exist in code so they can be retired deliberately. Companion to [`architecture.md`](./architecture.md). Sources of truth: `backend/supabase/schema.sql` (auth/copilot/memory), `backend/sql/vnext_pgvector_schema.sql` + `supabase/migrations/*` (vnext domain), and `backend/database.py` for legacy Mongo indexes.
 
 ---
 
 ## 0. Store Map & Ownership Models
 
-MarketFlux persists to **three** stores. Critically, the two Postgres domains use **different
-ownership conventions** — a key inconsistency to be aware of:
+MarketFlux is Supabase-first. Critically, the two Postgres domains still use **different ownership conventions** — a key inconsistency to be aware of:
 
 | Domain | Store | Ownership column | Isolation mechanism |
 |--------|-------|------------------|---------------------|
 | Auth / Copilot / Memory | Supabase PG (`schema.sql`) | `user_id UUID` → `auth.users(id)` | **RLS** via `auth.uid()` |
 | vnext (theses, paper trading, strategy) | Supabase PG (`vnext_pgvector_schema.sql`) | `owner_user_id TEXT` (no FK) | **App-layer filtering** (no RLS) |
-| App data (news, chat, watchlist, pilot mirror) | MongoDB | `user_id` (string) | App-layer filtering |
+| Legacy app mirrors/fallbacks | MongoDB | `user_id` (string) | App-layer filtering |
 
 > ⚠️ **Two ownership models + no RLS on vnext tables** is the most important schema risk. See
 > [`architecture.md` §4.1](./architecture.md) for the duplication map and the TRD for the
@@ -24,10 +20,9 @@ ownership conventions** — a key inconsistency to be aware of:
 
 ---
 
-## 1. MongoDB Collections
+## 1. Legacy MongoDB Collections
 
-Async access via Motor. Indexes from `backend/database.py::initialize_indexes`. Documents are
-schemaless; the columns below are the fields the app reads/writes in practice.
+Async access via Motor remains in some compatibility paths. Indexes are from `backend/database.py::initialize_indexes`. Documents are schemaless; the columns below are fields older app paths read/write in practice. Do not use these collections for new product work.
 
 ### Core app collections
 
@@ -46,9 +41,9 @@ schemaless; the columns below are the fields the app reads/writes in practice.
 | `research_runs` | `owner_user_id`, `created_at` | `(owner_user_id, created_at desc)` | ReAct/research run history (Mongo copy) |
 | `strategy_runs` | `owner_user_id`, `created_at` | `(owner_user_id, created_at desc)` | Strategy terminal run history |
 
-### Pilot subsystem (MongoDB mirror)
+### Pilot subsystem (legacy MongoDB mirror)
 
-These mirror the Supabase copilot tables (see §2). Both exist today.
+These mirror the Supabase copilot tables (see §2). Supabase should be treated as canonical.
 
 | Collection | Key fields | Indexes |
 |-----------|-----------|---------|
@@ -248,8 +243,8 @@ Three distinct paper-trading models coexist: `trade_proposals` (copilot), `paper
 
 ## 6. Schema Risks & Consolidation Notes
 
-1. **Mongo↔Postgres duplication** — `pilot_*` (Mongo) vs copilot tables (PG); `saved_theses`,
-   `signal_events`, `daily_briefs` exist in both. Pick one system of record per domain.
+1. **Legacy Mongo↔Supabase duplication** — `pilot_*` (Mongo) vs copilot tables (PG); `saved_theses`,
+   `signal_events`, `daily_briefs` exist in both. Supabase should be the system of record.
 2. **Two ownership models** — `user_id UUID` (RLS-enforced) vs `owner_user_id TEXT` (app-filtered,
    no RLS). The vnext tables are not RLS-protected; isolation depends entirely on correct
    `owner_user_id` filtering in every query.
