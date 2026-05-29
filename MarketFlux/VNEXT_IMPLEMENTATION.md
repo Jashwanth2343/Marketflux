@@ -34,8 +34,11 @@ This keeps the research architecture ready for a sandboxed external agent servic
 
 ## Frontend additions
 
-- `quant-app/` is a new `Next.js` app-router workspace for the vNext shell.
-- The existing CRA frontend remains untouched as the legacy product surface.
+- The vNext research/thesis surfaces are served by the main CRA app in `frontend/`
+  (Intelligence → Theses, Portfolio & Risk, etc.) via the `/api/vnext/*` routes.
+- A standalone `Next.js` `quant-app/` shell previously hosted a public
+  marketing/research site against the same backend; it has since been retired and
+  removed in favor of consolidating everything into the main `frontend/` app.
 
 ## Local infrastructure
 
