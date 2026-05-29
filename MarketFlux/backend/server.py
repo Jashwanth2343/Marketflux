@@ -59,7 +59,13 @@ if not _raw_jwt_secret or len(_raw_jwt_secret) < 32:
             "Either set JWT_SECRET or configure SUPABASE_URL + SUPABASE_SERVICE_KEY."
         )
     import secrets as _secrets
+    import logging as _logging
     _raw_jwt_secret = _raw_jwt_secret or _secrets.token_hex(32)
+    _logging.getLogger(__name__).warning(
+        "JWT_SECRET is not set — using a random secret. "
+        "Sessions issued via the Mongo auth path will be invalidated on every server restart. "
+        "Set JWT_SECRET in your .env to persist sessions across restarts."
+    )
 
 JWT_SECRET = _raw_jwt_secret
 JWT_ALGORITHM = "HS256"

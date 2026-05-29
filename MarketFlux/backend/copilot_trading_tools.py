@@ -129,7 +129,7 @@ def get_portfolio_history(period: str = "1M", timeframe: str = "1D") -> dict:
     equity = hist.get("equity") or []
     start = equity[0] if equity else 0
     end = equity[-1] if equity else 0
-    change = end - start if (start and end) else 0
+    change = end - start if (start is not None and end is not None) else 0
     return {
         "ok": True,
         "period": period,

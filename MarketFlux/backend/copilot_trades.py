@@ -49,7 +49,8 @@ async def stage(db, user_id: str, name: str, args: Dict[str, Any]) -> Dict[str, 
         "args": args,
         "preview": pv,
         "status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        # Store as a real datetime (not ISO string) so the MongoDB TTL index fires.
+        "created_at": datetime.now(timezone.utc),
     })
     return {
         "ok": True,
@@ -68,7 +69,7 @@ async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
     or concurrent tab approvals.
     """
     # Staleness guard: reject proposals older than 1 hour.
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
 
     doc = await db[COLLECTION].find_one_and_update(
         {"id": pid, "user_id": user_id, "status": "pending", "created_at": {"$gte": cutoff}},
@@ -80,7 +81,10 @@ async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
         existing = await db[COLLECTION].find_one({"id": pid, "user_id": user_id}, {"status": 1, "created_at": 1})
         if not existing:
             return {"ok": False, "error": "Trade not found."}
-        if existing.get("created_at", "") < cutoff:
+        existing_ts = existing.get("created_at")
+        if isinstance(existing_ts, str):
+            existing_ts = datetime.fromisoformat(existing_ts)
+        if existing_ts and existing_ts < cutoff:
             return {"ok": False, "error": "Trade proposal expired (older than 1 hour). Ask the copilot for a fresh recommendation."}
         return {"ok": False, "error": f"Trade already {existing.get('status', 'processed')}."}
 

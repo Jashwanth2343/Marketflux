@@ -483,9 +483,9 @@ async def run_copilot_agent(
     holder: Dict[str, Any] = {"final_text": ""}
     try:
         if resolved.provider == "gemini":
-            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm)
+            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse)
         else:
-            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm)
+            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse)
         async for ev in sub:
             yield ev
 
@@ -520,7 +520,7 @@ async def _finalize(db, user_id: str, session_id: str, message: str, final_text:
     copilot_memory.schedule_add_turn(user_id, message, final_text)
 
 
-async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False):
+async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None):
     """Native Gemini function-calling loop."""
     model = _build_model(system_prompt, model_name=resolved.model_id)
     gemini_history: List[Dict[str, Any]] = []
@@ -554,14 +554,15 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
                 continue
             called_signatures.add(signature)
             tool_calls += 1
-            yield _sse("tool_call", name=name, label=_tool_label(name, args),
-                       args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
+            _emit = sse_fn or _sse
+            yield _emit("tool_call", name=name, label=_tool_label(name, args),
+                        args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
             result = await _exec_tool(name, args, db, user_id, confirm)
-            yield _sse("tool_result", name=name, ok=bool(result.get("ok", True)),
-                       summary=_result_summary(name, result))
+            yield _emit("tool_result", name=name, ok=bool(result.get("ok", True)),
+                        summary=_result_summary(name, result))
             tp = _trade_event_payload(name, args, result)
             if tp:
-                yield _sse("trade", **tp)
+                yield _emit("trade", **tp)
                 if db is not None and not tp.get("pending"):
                     await _log_trade(db, user_id, tp)
             function_responses.append({"function_response": {"name": name, "response": result}})
@@ -586,7 +587,7 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
     holder["final_text"] = final_text
 
 
-async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False):
+async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None):
     """OpenAI-compatible tool-calling loop (OpenRouter / NVIDIA NIM)."""
     from openai import AsyncOpenAI
 
@@ -645,14 +646,15 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
                 continue
             called.add(signature)
             tool_calls += 1
-            yield _sse("tool_call", name=name, label=_tool_label(name, args),
-                       args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
+            _emit = sse_fn or _sse
+            yield _emit("tool_call", name=name, label=_tool_label(name, args),
+                        args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
             result = await _exec_tool(name, args, db, user_id, confirm)
-            yield _sse("tool_result", name=name, ok=bool(result.get("ok", True)),
-                       summary=_result_summary(name, result))
+            yield _emit("tool_result", name=name, ok=bool(result.get("ok", True)),
+                        summary=_result_summary(name, result))
             tp = _trade_event_payload(name, args, result)
             if tp:
-                yield _sse("trade", **tp)
+                yield _emit("trade", **tp)
                 if db is not None and not tp.get("pending"):
                     await _log_trade(db, user_id, tp)
             messages.append({"role": "tool", "tool_call_id": tc.id,
