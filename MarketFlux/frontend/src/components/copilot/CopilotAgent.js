@@ -344,7 +344,7 @@ export default function CopilotAgent() {
             setLoading(false);
             abortRef.current = null;
         }
-    }, [input, loading, model, confirm, patchLastAssistant]);
+    }, [input, loading, model, confirm, patchLastAssistant, session?.access_token]);
 
     const stop = () => { abortRef.current?.abort(); abortRef.current = null; setLoading(false); patchLastAssistant((m) => ({ ...m, streaming: false })); };
 
