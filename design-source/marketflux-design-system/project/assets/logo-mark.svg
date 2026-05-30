@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80" role="img" aria-label="MarketFlux mark">
+  
+  <defs>
+    <linearGradient id="mfPaper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7F2E7"></stop>
+      <stop offset="1" stop-color="#ECE5D3"></stop>
+    </linearGradient>
+  </defs>
+
+  
+  <rect x="4" y="4" width="72" height="72" rx="18" ry="18" fill="url(#mfPaper)"></rect>
+  
+  <rect x="4.5" y="4.5" width="71" height="71" rx="17.5" ry="17.5" fill="none" stroke="#0C0B09" stroke-width="1" stroke-opacity="0.12"></rect>
+
+  
+  <path d="&#xA;    M 18 60&#xA;    L 18 22&#xA;    L 22 22&#xA;    L 40 50&#xA;    L 58 22&#xA;    L 62 22&#xA;    L 62 60&#xA;    L 56 60&#xA;    L 56 34&#xA;    L 42 56&#xA;    L 38 56&#xA;    L 24 34&#xA;    L 24 60 Z" fill="#22C55E"></path>
+
+  
+  <circle cx="40" cy="68" r="1.8" fill="#15803D"></circle>
+</svg>

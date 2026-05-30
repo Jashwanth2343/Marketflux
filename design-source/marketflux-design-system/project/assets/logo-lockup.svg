@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 64" width="340" height="64" role="img" aria-label="MarketFlux">
+  <defs>
+    <linearGradient id="mfLockupPaper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7F2E7"></stop>
+      <stop offset="1" stop-color="#ECE5D3"></stop>
+    </linearGradient>
+    <style>
+      /* Wordmark adapts to the surface. Default = light-mode safe
+         (dark ink + deep green) so "Market" never washes out on white.
+         Dark UIs flip to cream + bright green via the media query. */
+      .mf-word { fill: #15130F; }
+      .mf-flux { fill: #16A34A; }
+      @media (prefers-color-scheme: dark) {
+        .mf-word { fill: #F0EAD9; }
+        .mf-flux { fill: #4ADE80; }
+      }
+    </style>
+  </defs>
+  
+  <g transform="translate(4, 4)">
+    <rect x="0" y="0" width="56" height="56" rx="14" ry="14" fill="url(#mfLockupPaper)"></rect>
+    <rect x="0.5" y="0.5" width="55" height="55" rx="13.5" ry="13.5" fill="none" stroke="#0C0B09" stroke-width="1" stroke-opacity="0.12"></rect>
+    <path d="M 13 43 L 13 16 L 16 16 L 28 36 L 40 16 L 43 16 L 43 43 L 39 43 L 39 25 L 30 41 L 26 41 L 17 25 L 17 43 Z" fill="#22C55E"></path>
+    <circle cx="28" cy="48.5" r="1.4" fill="#15803D"></circle>
+  </g>
+  
+  <text x="74" y="40" font-family="&#39;DM Sans&#39;, system-ui, sans-serif" font-weight="600" font-size="24" letter-spacing="-0.01em" class="mf-word">
+    Market<tspan class="mf-flux" font-weight="600">Flux</tspan>
+  </text>
+</svg>

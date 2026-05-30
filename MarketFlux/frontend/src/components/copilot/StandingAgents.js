@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
     Plus, Play, Pause, Trash2, Loader2, Bot, Clock, ShieldCheck, Sparkles, X,
-    ArrowUpCircle, ArrowDownCircle,
+    ArrowUpCircle, ArrowDownCircle, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -105,9 +106,16 @@ export default function StandingAgents() {
                         Saved instructions the copilot runs on a schedule — autonomously, on your paper account.
                     </p>
                 </div>
-                <Button onClick={() => setShowForm((s) => !s)} className="rounded-xl gap-1.5">
-                    {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}{showForm ? 'Close' : 'New agent'}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Link to="/copilot/agents/demo">
+                        <Button variant="outline" className="rounded-xl gap-1.5">
+                            <Sparkles className="w-4 h-4" /> View demo
+                        </Button>
+                    </Link>
+                    <Button onClick={() => setShowForm((s) => !s)} className="rounded-xl gap-1.5">
+                        {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}{showForm ? 'Close' : 'New agent'}
+                    </Button>
+                </div>
             </div>
 
             <div className="mb-4 flex items-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-xs font-mono text-amber-300/90">
@@ -184,6 +192,11 @@ export default function StandingAgents() {
                                         </div>
                                     </div>
                                     <div className="flex flex-shrink-0 items-center gap-1">
+                                        <Link to={`/copilot/agents/${a.id}`} title="Open agent">
+                                            <Button size="sm" variant="ghost" className="h-8 text-xs gap-1">
+                                                Open <ChevronRight className="w-3 h-3" />
+                                            </Button>
+                                        </Link>
                                         <Button size="sm" variant="ghost" onClick={() => runNow(a.id)} disabled={busy === a.id} className="h-8 gap-1 text-xs" title="Run now">
                                             {busy === a.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                                         </Button>

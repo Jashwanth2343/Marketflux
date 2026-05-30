@@ -1,66 +1,280 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* =====================================================================
+   MarketFlux · global stylesheet
+   Editorial-finance design system — warm ink canvas, cream paper text,
+   champagne gold accent. Derived from the MarketFlux Design System
+   bundle in `design-source/`. Keep this file the single source of truth
+   for design tokens; component files should consume tokens, never paint.
+   ===================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display:wght@400&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
 
-    /* LIGHT MODE */
+    /* =================================================================
+       TAILWIND HSL TOKENS — wired to the new editorial palette
+       Light + dark themes both follow the editorial-finance direction:
+       warm cream paper in light, warm near-black ink in dark.
+       Champagne gold (--primary) is the single brand accent.
+       ================================================================= */
+
+    /* LIGHT MODE — warm cream paper, ink text, deepened champagne */
     :root {
-        --color-accent: #059669;
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
-        /* Adjusted primary brand colors for contrast on white */
-        --primary: 135 100% 35%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 187 100% 35%;
-        --secondary-foreground: 0 0% 100%;
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 210 40% 98%;
-        --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
-        --ring: 135 100% 35%;
-        --radius: 0.125rem;
-        --chart-1: 135 100% 35%;
-        --chart-2: 187 100% 35%;
-        --chart-3: 41 100% 45%;
-        --chart-4: 0 100% 60%;
-        --chart-5: 270 50% 50%;
-        --grid-line: 215 25% 17% / 0.1;
+        --color-accent: #B5841F;
+
+        /* Canvas + surfaces (cream paper) */
+        --background: 41 49% 91%;             /* #F2ECDE */
+        --foreground: 36 19% 9%;              /* #1B1813 */
+        --card: 39 53% 95%;                   /* #FBF7EE */
+        --card-foreground: 36 19% 9%;
+        --popover: 39 53% 95%;
+        --popover-foreground: 36 19% 9%;
+
+        /* Champagne gold — the brand & primary CTA */
+        --primary: 41 64% 39%;                /* #A87C28 deep — strong text */
+        --primary-foreground: 39 53% 95%;     /* cream ink on a fill */
+
+        /* Pewter neutral — secondary actions, info chrome */
+        --secondary: 224 9% 45%;              /* #6A6F7C */
+        --secondary-foreground: 39 53% 95%;
+
+        /* Muted surfaces */
+        --muted: 38 39% 88%;                  /* #ECE5D4 */
+        --muted-foreground: 34 12% 33%;       /* #5E574A */
+
+        /* Accent kept for legacy classes — also champagne */
+        --accent: 41 64% 39%;
+        --accent-foreground: 39 53% 95%;
+
+        /* Bear red */
+        --destructive: 0 73% 51%;             /* #DC2626 */
+        --destructive-foreground: 39 53% 95%;
+
+        --border: 38 31% 83%;                 /* #E2DAC7 */
+        --input: 38 31% 83%;
+        --ring: 41 64% 39%;
+        --radius: 0.5rem;                     /* 8px — cards/buttons default */
+
+        /* Chart palette */
+        --chart-1: 138 67% 37%;               /* bull #1E9E48 */
+        --chart-2: 41 64% 39%;                /* champagne */
+        --chart-3: 0 73% 51%;                 /* bear */
+        --chart-4: 36 8% 50%;                 /* warm gray */
+        --chart-5: 36 22% 64%;
+        --grid-line: 36 19% 9% / 0.06;
     }
 
-    /* DARK MODE (Matching Original Website Theme) */
+    /* DARK MODE — warm near-black ink canvas, cream foreground */
     .dark {
-        --color-accent: #00ff88;
-        --background: 0 0% 2%;
-        --foreground: 0 0% 93%;
-        --card: 0 0% 4%;
-        --card-foreground: 0 0% 100%;
-        --popover: 0 0% 4%;
-        --popover-foreground: 0 0% 100%;
-        --primary: 135 100% 50%;
-        --primary-foreground: 0 0% 0%;
-        --secondary: 187 100% 50%;
-        --secondary-foreground: 0 0% 0%;
-        --muted: 0 0% 10%;
-        --muted-foreground: 240 4% 66%;
-        --accent: 41 100% 50%;
-        --accent-foreground: 0 0% 0%;
-        --destructive: 0 100% 60%;
-        --destructive-foreground: 0 0% 100%;
-        --border: 215 25% 17%;
-        --input: 215 25% 17%;
-        --ring: 135 100% 50%;
-        --radius: 0.125rem;
-        --grid-line: 215 25% 50% / 0.15;
+        --color-accent: #E3B85F;
+
+        /* Canvas + surfaces */
+        --background: 39 13% 4%;              /* #0C0B09 — warm near-black */
+        --foreground: 42 41% 90%;             /* #F0EAD9 — cream paper */
+        --card: 38 19% 8%;                    /* #15130F — raised surface */
+        --card-foreground: 42 41% 90%;
+        --popover: 38 19% 8%;
+        --popover-foreground: 42 41% 90%;
+
+        /* Champagne gold — brand & primary */
+        --primary: 41 73% 73%;                /* #F4D078 strong — text/links */
+        --primary-foreground: 32 80% 6%;      /* #1B1305 ink on champagne fill */
+
+        /* Pewter neutral */
+        --secondary: 224 9% 60%;              /* #8E94A2 */
+        --secondary-foreground: 39 13% 4%;
+
+        --muted: 38 17% 11%;                  /* #1E1B15 */
+        --muted-foreground: 36 10% 61%;       /* #A8A091 */
+
+        --accent: 41 73% 73%;
+        --accent-foreground: 32 80% 6%;
+
+        --destructive: 0 84% 60%;             /* #EF4444 */
+        --destructive-foreground: 39 13% 4%;
+
+        --border: 38 17% 12%;                 /* #29251D */
+        --input: 38 17% 14%;
+        --ring: 41 73% 73%;
+        --radius: 0.5rem;
+
+        --chart-1: 142 71% 45%;               /* bull #22C55E */
+        --chart-2: 41 67% 63%;                /* champagne */
+        --chart-3: 0 84% 60%;                 /* bear */
+        --chart-4: 36 10% 61%;
+        --chart-5: 36 11% 42%;
+        --grid-line: 42 41% 90% / 0.05;
+    }
+
+    /* =================================================================
+       MARKETFLUX DESIGN-SYSTEM TOKENS (.mf-* namespace)
+       Hex variables — use these from the .mf-* component classes
+       below, or directly in inline styles. Single source of truth.
+       ================================================================= */
+    :root {
+        /* Surfaces */
+        --mf-bg-canvas:      #F2ECDE;
+        --mf-bg-surface:     #FBF7EE;
+        --mf-bg-surface-2:   #ECE5D4;
+        --mf-bg-surface-3:   #E1D8C4;
+        --mf-bg-overlay:     rgba(242, 236, 222, 0.82);
+        --mf-bg-blur:        rgba(251, 247, 238, 0.80);
+
+        /* Foreground (ink on cream) */
+        --mf-fg-primary:     #1B1813;
+        --mf-fg-secondary:   #5E574A;
+        --mf-fg-tertiary:    #8C8473;
+        --mf-fg-quaternary:  #B4AA93;
+        --mf-fg-inverse:     #FBF7EE;
+
+        --mf-border:         #E2DAC7;
+        --mf-border-strong:  #CFC4AC;
+        --mf-border-subtle:  rgba(27, 24, 19, 0.07);
+
+        /* Champagne gold — brand */
+        --mf-accent:         #C99A35;
+        --mf-accent-strong:  #8A6410;
+        --mf-accent-deep:    #B5841F;
+        --mf-accent-bg:      rgba(180, 130, 30, 0.12);
+        --mf-accent-border:  rgba(180, 130, 30, 0.38);
+        --mf-accent-fg:      #FBF7EE;
+        --mf-accent-glow:    rgba(201, 154, 53, 0.28);
+
+        /* Bull / bear (semantic — price only) */
+        --mf-bull:           #1E9E48;
+        --mf-bull-strong:    #15803D;
+        --mf-bull-deep:      #0F6B30;
+        --mf-bull-bg:        rgba(30, 158, 72, 0.12);
+        --mf-bull-border:    rgba(30, 158, 72, 0.36);
+
+        --mf-bear:           #DC2626;
+        --mf-bear-strong:    #B91C1C;
+        --mf-bear-deep:      #991B1B;
+        --mf-bear-bg:        rgba(220, 38, 38, 0.10);
+        --mf-bear-border:    rgba(220, 38, 38, 0.34);
+
+        --mf-neutral:        #6A6F7C;
+        --mf-neutral-strong: #50545F;
+        --mf-neutral-bg:     rgba(106, 111, 124, 0.10);
+        --mf-neutral-border: rgba(106, 111, 124, 0.30);
+
+        /* Chart */
+        --mf-chart-1:        #1E9E48;
+        --mf-chart-2:        #C99A35;
+        --mf-chart-3:        #DC2626;
+        --mf-chart-4:        #8C8473;
+        --mf-chart-5:        #B4AA93;
+        --mf-chart-grid:     rgba(27, 24, 19, 0.06);
+        --mf-chart-axis:     #8C8473;
+
+        /* Type families */
+        --mf-font-display:   'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        --mf-font-body:      'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        --mf-font-serif:     'DM Serif Display', 'EB Garamond', Georgia, serif;
+        --mf-font-mono:      'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+        /* Type scale */
+        --mf-text-display-xl: clamp(2.75rem, 4.5vw, 3.5rem);
+        --mf-text-display-l:  clamp(2rem, 3vw, 2.5rem);
+        --mf-text-h1:         1.5rem;
+        --mf-text-h2:         1.25rem;
+        --mf-text-h3:         1.0625rem;
+        --mf-text-body:       0.9375rem;
+        --mf-text-body-sm:    0.8125rem;
+        --mf-text-caption:    0.75rem;
+        --mf-text-micro:      0.6875rem;
+        --mf-text-data-l:     2rem;
+        --mf-text-data-m:     1.0625rem;
+        --mf-text-data-s:     0.8125rem;
+
+        /* Spacing */
+        --mf-space-1: 4px;  --mf-space-2: 8px;  --mf-space-3: 12px;
+        --mf-space-4: 16px; --mf-space-5: 20px; --mf-space-6: 24px;
+        --mf-space-8: 32px; --mf-space-10: 40px; --mf-space-12: 48px;
+        --mf-space-16: 64px;
+
+        /* Radius */
+        --mf-radius-0: 0px;
+        --mf-radius-1: 6px;
+        --mf-radius-2: 12px;
+        --mf-radius-3: 18px;
+        --mf-radius-full: 9999px;
+
+        /* Shadows */
+        --mf-shadow-soft:  0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 24px rgba(60, 50, 30, 0.10);
+        --mf-shadow-glow:  0 0 16px rgba(201, 154, 53, 0.24);
+        --mf-shadow-elev:  0 1px 0 rgba(255,255,255,0.7) inset, 0 24px 64px rgba(60, 50, 30, 0.16);
+
+        /* Motion */
+        --mf-duration-fast: 140ms;
+        --mf-duration-base: 220ms;
+        --mf-duration-slow: 400ms;
+        --mf-ease-out:      cubic-bezier(0.22, 1, 0.36, 1);
+
+        /* Layout */
+        --mf-nav-height:    60px;
+        --mf-ticker-height: 36px;
+        --mf-chat-width:    400px;
+        --mf-bento-gap:     var(--mf-space-4);
+    }
+
+    .dark {
+        /* Dark theme overrides for the mf-* namespace */
+        --mf-bg-canvas:      #0C0B09;
+        --mf-bg-surface:     #15130F;
+        --mf-bg-surface-2:   #1E1B15;
+        --mf-bg-surface-3:   #29251D;
+        --mf-bg-overlay:     rgba(12, 11, 9, 0.78);
+        --mf-bg-blur:        rgba(21, 19, 15, 0.74);
+
+        --mf-fg-primary:     #F0EAD9;
+        --mf-fg-secondary:   #A8A091;
+        --mf-fg-tertiary:    #75705F;
+        --mf-fg-quaternary:  #423E33;
+        --mf-fg-inverse:     #FFFFFF;
+
+        --mf-border:         #29251D;
+        --mf-border-strong:  #3D372C;
+        --mf-border-subtle:  rgba(244, 239, 227, 0.06);
+
+        --mf-accent:         #E3B85F;
+        --mf-accent-strong:  #F4D078;
+        --mf-accent-deep:    #A87C28;
+        --mf-accent-bg:      rgba(227, 184, 95, 0.10);
+        --mf-accent-border:  rgba(227, 184, 95, 0.34);
+        --mf-accent-fg:      #1B1305;
+        --mf-accent-glow:    rgba(227, 184, 95, 0.32);
+
+        --mf-bull:           #22C55E;
+        --mf-bull-strong:    #4ADE80;
+        --mf-bull-deep:      #15803D;
+        --mf-bull-bg:        rgba(34, 197, 94, 0.10);
+        --mf-bull-border:    rgba(34, 197, 94, 0.36);
+
+        --mf-bear:           #EF4444;
+        --mf-bear-strong:    #F87171;
+        --mf-bear-deep:      #B91C1C;
+        --mf-bear-bg:        rgba(239, 68, 68, 0.10);
+        --mf-bear-border:    rgba(239, 68, 68, 0.36);
+
+        --mf-neutral:        #9298A6;
+        --mf-neutral-strong: #B0B6C2;
+        --mf-neutral-bg:     rgba(146, 152, 166, 0.10);
+        --mf-neutral-border: rgba(146, 152, 166, 0.30);
+
+        --mf-chart-1:        #22C55E;
+        --mf-chart-2:        #E3B85F;
+        --mf-chart-3:        #EF4444;
+        --mf-chart-4:        #A8A091;
+        --mf-chart-5:        #75705F;
+        --mf-chart-grid:     rgba(244, 239, 227, 0.05);
+        --mf-chart-axis:     #75705F;
+
+        --mf-shadow-soft:    0 1px 0 rgba(255,255,255,0.02) inset, 0 8px 24px rgba(0,0,0,0.32);
+        --mf-shadow-glow:    0 0 16px rgba(227, 184, 95, 0.28);
+        --mf-shadow-elev:    0 1px 0 rgba(255,255,255,0.03) inset, 0 24px 64px rgba(0,0,0,0.48);
     }
 
     * {
@@ -69,24 +283,144 @@
 
     body {
         @apply bg-background text-foreground;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: var(--mf-font-body);
+        font-feature-settings: 'ss01';
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }
 
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6 {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--mf-font-display);
         font-weight: 600;
-        letter-spacing: -0.02em;
+        letter-spacing: -0.015em;
     }
 
     [data-debug-wrapper="true"] {
         display: contents !important;
     }
 }
+
+/* =====================================================================
+   .mf-* COMPONENT UTILITIES — drop-in classes that consume the tokens
+   ===================================================================== */
+
+/* Cards */
+.mf-card {
+    background: var(--mf-bg-surface);
+    border: 1px solid var(--mf-border);
+    border-radius: var(--mf-radius-2);
+    padding: var(--mf-space-4);
+}
+.mf-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--mf-space-3) var(--mf-space-4);
+    border-bottom: 1px solid var(--mf-border);
+}
+.mf-card-body { padding: var(--mf-space-4); }
+
+/* Type semantic classes */
+.mf-display-xl { font-family: var(--mf-font-display); font-size: var(--mf-text-display-xl); font-weight: 700; letter-spacing: -0.025em; line-height: 1.04; color: var(--mf-fg-primary); }
+.mf-display-l  { font-family: var(--mf-font-display); font-size: var(--mf-text-display-l); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; color: var(--mf-fg-primary); }
+.mf-h1         { font-family: var(--mf-font-display); font-size: var(--mf-text-h1); font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; color: var(--mf-fg-primary); }
+.mf-h2         { font-family: var(--mf-font-display); font-size: var(--mf-text-h2); font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; color: var(--mf-fg-primary); }
+.mf-h3         { font-family: var(--mf-font-display); font-size: var(--mf-text-h3); font-weight: 600; line-height: 1.4; color: var(--mf-fg-primary); }
+.mf-body       { font-family: var(--mf-font-body); font-size: var(--mf-text-body); line-height: 1.6; color: var(--mf-fg-primary); }
+.mf-body-sm    { font-size: var(--mf-text-body-sm); line-height: 1.55; color: var(--mf-fg-secondary); }
+.mf-serif      { font-family: var(--mf-font-serif); font-weight: 400; letter-spacing: -0.01em; }
+.mf-caption,
+.mf-kicker     { font-family: var(--mf-font-body); font-size: var(--mf-text-caption); font-weight: 500; letter-spacing: 0.02em; color: var(--mf-fg-secondary); }
+.mf-micro      { font-family: var(--mf-font-display); font-size: var(--mf-text-micro); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mf-fg-tertiary); }
+.mf-data-l     { font-family: var(--mf-font-mono); font-size: var(--mf-text-data-l); font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; line-height: 1.05; color: var(--mf-fg-primary); }
+.mf-data-m     { font-family: var(--mf-font-mono); font-size: var(--mf-text-data-m); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--mf-fg-primary); }
+.mf-data-s     { font-family: var(--mf-font-mono); font-size: var(--mf-text-data-s); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--mf-fg-primary); }
+.mf-mono       { font-family: var(--mf-font-mono); font-variant-numeric: tabular-nums; }
+
+/* Semantic ink — pair with ▲▼, never color alone */
+.mf-bull, .mf-pos      { color: var(--mf-bull-strong); }
+.mf-bear, .mf-neg      { color: var(--mf-bear-strong); }
+.mf-neutral, .mf-warn  { color: var(--mf-neutral-strong); }
+.mf-accent             { color: var(--mf-accent-strong); }
+.mf-muted              { color: var(--mf-fg-secondary); }
+.mf-dim                { color: var(--mf-fg-tertiary); }
+
+/* Wordmark */
+.mf-wordmark {
+    display: inline-flex; align-items: center; gap: var(--mf-space-2);
+    font-family: var(--mf-font-display);
+    font-weight: 600; font-size: 1.0625rem; letter-spacing: -0.01em;
+    color: var(--mf-fg-primary);
+}
+.mf-wordmark em { color: var(--mf-accent-strong); font-style: normal; font-weight: 600; }
+.mf-wordmark svg { width: 24px; height: 24px; }
+
+/* Liquid glass surfaces */
+.mf-glass {
+    position: relative;
+    background:
+        linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.04) 100%),
+        var(--mf-bg-blur);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid var(--mf-border-subtle);
+    border-radius: var(--mf-radius-3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(0, 0, 0, 0.30), 0 18px 54px rgba(0, 0, 0, 0.40);
+}
+
+:root:not(.dark) .mf-glass {
+    background:
+        linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.4) 100%),
+        rgba(251, 247, 238, 0.6);
+    border: 1px solid rgba(27, 24, 19, 0.10);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 18px 54px rgba(60, 50, 30, 0.12);
+}
+
+.mf-glass-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid var(--mf-border-subtle);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 4px 14px rgba(0,0,0,0.22);
+    color: var(--mf-fg-primary);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Live indicator */
+@keyframes mf-pulse {
+    0%, 100% { opacity: 1;   box-shadow: 0 0 4px var(--mf-accent-glow); }
+    50%      { opacity: 0.6; box-shadow: 0 0 14px var(--mf-accent-glow); }
+}
+.mf-live-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 9999px;
+    background: var(--mf-bull);
+    animation: mf-pulse 2.4s ease-in-out infinite;
+}
+.mf-live-dot.mf-agent-dot { background: var(--mf-accent); }
+
+/* Flash — price tick */
+@keyframes mf-flash-up   { from { background: rgba(34, 197, 94, 0.36); } to { background: transparent; } }
+@keyframes mf-flash-down { from { background: rgba(239, 68, 68, 0.36); } to { background: transparent; } }
+.mf-flash-up   { animation: mf-flash-up 900ms ease-out; }
+.mf-flash-down { animation: mf-flash-down 900ms ease-out; }
+
+/* Dot-grid background — for the agent canvas / empty states */
+.mf-grid-bg {
+    background-image: radial-gradient(circle, rgba(244,239,227,0.085) 1.1px, transparent 1.4px);
+    background-size: 26px 26px;
+    background-position: 0 0;
+}
+:root:not(.dark) .mf-grid-bg {
+    background-image: radial-gradient(circle, rgba(27,24,19,0.10) 1.1px, transparent 1.4px);
+}
+.mf-grid-bg-dense { background-size: 18px 18px; }
+.mf-grid-bg-loose { background-size: 36px 36px; }
 
 /* Hide emergent badge */
 #emergent-badge {
@@ -96,69 +430,54 @@
     pointer-events: none !important;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — champagne, not neon */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
 }
-
-::-webkit-scrollbar-track {
-    background: #050505;
-}
-
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: #1E293B;
-    border-radius: 0;
+    background: var(--mf-border-strong);
+    border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-    background: #00FF41;
+    background: var(--mf-accent);
 }
 
-/* FIX 4: Global Text Visibility overrides */
-/* All label/key text */
+/* Selection + focus */
+::selection { background: var(--mf-accent); color: var(--mf-accent-fg); }
+:focus-visible {
+    outline: 2px solid var(--mf-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Legacy text-visibility shims (kept — they're high-specificity rescues
+   for older cards that used hard-coded 10px muted labels) */
 .dark .text-\[10px\].text-muted-foreground.uppercase {
-    color: #b0b0b0 !important;
+    color: var(--mf-fg-secondary) !important;
 }
-
 .text-\[10px\].text-muted-foreground.uppercase {
     font-size: 0.78rem !important;
     letter-spacing: 0.04em !important;
 }
-
-/* All value text */
 .dark div>.font-medium.text-foreground {
-    color: #ffffff !important;
+    color: var(--mf-fg-primary) !important;
 }
-
 div>.font-medium.text-foreground {
     font-weight: 600 !important;
     font-size: 0.875rem !important;
 }
-
-/* Table column headers */
-.dark th {
-    color: #aaaaaa !important;
-}
-
+.dark th { color: var(--mf-fg-secondary) !important; }
 th {
     font-size: 0.72rem !important;
     letter-spacing: 0.06em !important;
     font-weight: 600 !important;
 }
-
-/* Table row values */
 .dark td,
-.dark td .text-foreground {
-    color: #e0e0e0 !important;
-}
-
+.dark td .text-foreground { color: var(--mf-fg-primary) !important; }
 td,
-td .text-foreground {
-    font-size: 0.85rem !important;
-}
-
-/* Section titles */
+td .text-foreground { font-size: 0.85rem !important; }
 .text-sm.font-mono.uppercase.tracking-wider {
     font-size: 0.85rem !important;
     letter-spacing: 0.08em !important;

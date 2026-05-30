@@ -1,0 +1,29 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_base.css">
+<style>
+  .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px; color: white; }
+  .tile .t { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+  .tile .p { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; opacity: 0.9; }
+</style>
+</head>
+<body>
+<div class="card" style="gap:10px">
+  <div class="mf-micro">MARKET HEATMAP TILES</div>
+  <div style="display:grid;grid-template-columns:repeat(8,1fr);grid-auto-rows:42px;gap:2px">
+    <div class="tile" style="background:#22C55E;grid-column:span 2;grid-row:span 2"><span class="t" style="font-size:14px">NVDA</span><span class="p">+4.18%</span></div>
+    <div class="tile" style="background:#06a283"><span class="t">AAPL</span><span class="p">+2.09%</span></div>
+    <div class="tile" style="background:#22C55E"><span class="t">MSFT</span><span class="p">+2.84%</span></div>
+    <div class="tile" style="background:rgba(34,197,94,0.5)"><span class="t">META</span><span class="p">+0.68%</span></div>
+    <div class="tile" style="background:#EF4444"><span class="t">TSLA</span><span class="p">−3.41%</span></div>
+    <div class="tile" style="background:rgba(34,197,94,0.5)"><span class="t">GOOGL</span><span class="p">+0.92%</span></div>
+    <div class="tile" style="background:rgba(34,197,94,0.4)"><span class="t">JPM</span><span class="p">+0.41%</span></div>
+    <div class="tile" style="background:rgba(239,68,68,0.5)"><span class="t">AMZN</span><span class="p">−1.03%</span></div>
+    <div class="tile" style="background:#22C55E"><span class="t">AVGO</span><span class="p">+2.51%</span></div>
+    <div class="tile" style="background:#EF4444"><span class="t">INTC</span><span class="p">−4.22%</span></div>
+    <div class="tile" style="background:rgba(34,197,94,0.4)"><span class="t">LLY</span><span class="p">+0.31%</span></div>
+    <div class="tile" style="background:rgba(239,68,68,0.7)"><span class="t">BAC</span><span class="p">−1.82%</span></div>
+    <div class="tile" style="background:rgba(34,197,94,0.6)"><span class="t">V</span><span class="p">+1.04%</span></div>
+  </div>
+  <div class="mf-mono" style="font-size:10px;color:var(--fg-tertiary);letter-spacing:0.08em">SIZE = MARKET CAP · COLOR = % CHANGE · TRADINGVIEW PALETTE</div>
+</div>
+</body></html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_base.css"></head>
+<body>
+<div class="card">
+  <div class="mf-micro">FEAR &amp; GREED · COMPACT</div>
+  <div style="display:flex;align-items:center;gap:14px;padding:4px 2px">
+    <svg viewBox="0 0 120 72" width="140" height="84" style="flex-shrink:0">
+      <defs>
+        <linearGradient id="fg-arc" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0"    stop-color="#EF4444"/>
+          <stop offset="0.5"  stop-color="#F5C147"/>
+          <stop offset="1"    stop-color="#22C55E"/>
+        </linearGradient>
+      </defs>
+      <!-- track -->
+      <path d="M 14 58 A 46 46 0 0 1 106 58"
+            fill="none" stroke="rgba(244,239,227,0.06)"
+            stroke-width="8" stroke-linecap="round"/>
+      <!-- value arc -->
+      <path d="M 14 58 A 46 46 0 0 1 106 58"
+            fill="none" stroke="url(#fg-arc)"
+            stroke-width="8" stroke-linecap="round"/>
+      <!-- needle @ 82/100 ≈ 148° from start -->
+      <g transform="rotate(58 60 58)">
+        <line x1="60" y1="58" x2="60" y2="16"
+              stroke="var(--fg-primary)" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="60" cy="58" r="3.5" fill="var(--fg-primary)"/>
+      </g>
+      <!-- value -->
+      <text x="60" y="50" font-family="DM Sans, sans-serif"
+            font-weight="700" font-size="20" fill="#4ADE80"
+            text-anchor="middle">82</text>
+    </svg>
+    <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+      <span class="mf-mono mf-bull"
+            style="font-size:10px;font-weight:600;letter-spacing:0.14em">
+        EXTREME GREED
+      </span>
+      <span class="mf-mono"
+            style="font-size:10.5px;color:var(--fg-tertiary)">
+        +6 <span style="color:var(--fg-quaternary)">·</span> 7d
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:5px;
+                   font-family:var(--font-mono);font-size:9.5px;font-weight:600;
+                   letter-spacing:0.12em;padding:2px 8px;
+                   color:#4ADE80;background:rgba(34,197,94,0.10);
+                   border:1px solid rgba(34,197,94,0.30);
+                   border-radius:var(--radius-full);width:fit-content">
+        <span class="mf-live-dot" style="width:5px;height:5px"></span>LIVE
+      </span>
+    </div>
+  </div>
+</div>
+</body></html>

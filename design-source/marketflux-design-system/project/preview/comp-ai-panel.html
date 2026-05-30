@@ -1,0 +1,81 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--bg-canvas); }
+  .card { padding: 22px 28px; display: flex; flex-direction: column; gap: 14px; min-height: 100%; box-sizing: border-box; justify-content: center; }
+  .panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-2);
+    max-width: 460px;
+    overflow: hidden;
+  }
+  .head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--fg-primary); font-weight: 500;
+  }
+  .badge .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--bull-strong); box-shadow: 0 0 8px var(--bull-strong);
+  }
+  .msgs { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .user {
+    align-self: flex-end; max-width: 80%;
+    background: var(--bg-surface-2); border: 1px solid var(--border);
+    border-radius: var(--radius-2);
+    padding: 9px 12px; font-size: 13px;
+  }
+  .ai {
+    align-self: flex-start;
+    background: var(--bg-surface-2);
+    border-left: 2px solid var(--bull);
+    padding: 10px 12px;
+  }
+  .ai .meta { font-size: 11px; color: var(--bull-strong); margin-bottom: 6px; font-weight: 500; }
+  .ai .body { font-size: 13px; line-height: 1.55; color: var(--fg-primary); }
+  .ai .body b { color: var(--bull-strong); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .composer {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 12px; border-top: 1px solid var(--border);
+  }
+  .composer input {
+    flex: 1; background: transparent; border: none;
+    color: var(--fg-primary); font-family: var(--font-body); font-size: 13px;
+    outline: none; padding: 6px 0;
+  }
+  .composer input::placeholder { color: var(--fg-tertiary); }
+  .composer button {
+    background: var(--bull); color: #FFFFFF; border: none;
+    padding: 7px 14px; font-family: var(--font-body);
+    font-size: 12px; font-weight: 600;
+    border-radius: var(--radius-1); cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="mf-micro">AI RESEARCH ASSISTANT · FLUXAI</div>
+  <div class="panel">
+    <div class="head">
+      <div class="badge"><span class="dot"></span>FluxAI · powered by Gemini 2.5</div>
+      <span style="color:var(--fg-tertiary);font-size:14px">×</span>
+    </div>
+    <div class="msgs">
+      <div class="user">What should I research today?</div>
+      <div class="ai">
+        <div class="meta">AAPL · 84% confidence · 12-month view</div>
+        <div class="body">Services revenue is inflecting and forward earnings remain reasonable at 28× P/E. Bull case requires holding the <b>$190</b> support level. Watch March guidance for a confirming print.</div>
+      </div>
+    </div>
+    <div class="composer">
+      <input value="Compare AAPL vs MSFT on margin trajectory" readonly />
+      <button>Send</button>
+    </div>
+  </div>
+</div>
+</body></html>

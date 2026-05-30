@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0C0B09" />
+  <title>MarketFlux · Get started</title>
+  <link rel="stylesheet" href="../colors_and_type.css" />
+  <link rel="icon" type="image/svg+xml" href="../assets/logo-mark.svg" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: var(--bg-canvas); color: var(--fg-primary); font-family: var(--font-body); min-height: 100vh; min-height: 100dvh; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
+    *, *::before, *::after { box-sizing: border-box; }
+    img, svg { max-width: 100%; height: auto; }
+
+    /* Ambient backdrop */
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background:
+        radial-gradient(ellipse 1100px 700px at 50% -10%, rgba(34, 197, 94, 0.12), transparent 60%),
+        radial-gradient(ellipse 700px 500px at 80% 100%, rgba(245, 193, 71, 0.05), transparent 60%);
+    }
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(240, 234, 217, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(240, 234, 217, 0.02) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+    }
+
+    .ob-shell {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* Top bar with brand + step counter */
+    .ob-top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px clamp(16px, 4vw, 32px);
+      gap: 16px;
+    }
+    .ob-brand { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 600; font-size: clamp(15px, 1.4vw, 17px); letter-spacing: -0.015em; text-decoration: none; color: inherit; }
+    .ob-brand em { color: var(--bull-strong); font-style: normal; }
+    .ob-counter { font-family: var(--font-mono); font-size: 12px; color: var(--fg-tertiary); letter-spacing: 0.06em; }
+
+    /* Progress bar */
+    .ob-progress {
+      max-width: 720px; margin: 0 auto; width: 100%;
+      padding: 4px clamp(16px, 4vw, 32px) 20px;
+    }
+    .ob-progress-track {
+      height: 4px; border-radius: 9999px;
+      background: rgba(244,239,227,0.06); overflow: hidden;
+    }
+    .ob-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--bull-deep), var(--bull-strong));
+      box-shadow: 0 0 12px rgba(34,197,94,0.5);
+      transition: width 380ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .ob-steps {
+      display: flex; justify-content: space-between; margin-top: 14px;
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.10em; color: var(--fg-tertiary);
+    }
+    .ob-steps .s.active { color: var(--bull-strong); }
+    .ob-steps .s.done   { color: var(--fg-secondary); }
+    .ob-steps .s {
+      display: inline-flex; align-items: center; gap: 8px;
+      flex: 1; justify-content: center;
+    }
+    .ob-steps .s::before {
+      content: ''; width: 8px; height: 8px; border-radius: 9999px;
+      background: rgba(244,239,227,0.10);
+      border: 1px solid rgba(244,239,227,0.10);
+    }
+    .ob-steps .s.active::before { background: var(--bull-strong); box-shadow: 0 0 8px var(--bull-strong); border-color: var(--bull-strong); }
+    .ob-steps .s.done::before { background: var(--bull-deep); border-color: var(--bull-deep); }
+
+    /* Card stage */
+    .ob-stage {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px clamp(12px, 4vw, 32px) 48px;
+    }
+
+    .ob-card {
+      width: 100%; max-width: 720px;
+      padding: clamp(24px, 4vw, 40px) clamp(20px, 4vw, 44px);
+      border-radius: clamp(16px, 2vw, 24px);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+      backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%);
+      border: 1px solid rgba(244,239,227,0.10);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        0 32px 64px rgba(0,0,0,0.40);
+      position: relative; overflow: hidden;
+    }
+    .ob-card::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+      background: radial-gradient(ellipse 60% 30% at 0% 0%, rgba(74,222,128,0.10), transparent 60%);
+    }
+    .ob-card > * { position: relative; z-index: 1; }
+
+    .ob-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; color: var(--bull-strong); margin-bottom: 12px; }
+    .ob-title { margin: 0 0 12px; font-family: var(--font-display); font-weight: 700; font-size: clamp(24px, 4.5vw, 36px); letter-spacing: -0.025em; line-height: 1.1; }
+    .ob-sub { margin: 0 0 28px; color: var(--fg-secondary); font-size: clamp(14px, 1.5vw, 16px); line-height: 1.55; max-width: 520px; }
+
+    /* Chip / pick options */
+    .picks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .pick {
+      padding: 18px 20px;
+      border-radius: 14px;
+      background: rgba(244,239,227,0.02);
+      border: 1px solid rgba(244,239,227,0.08);
+      display: flex; gap: 14px; align-items: flex-start;
+      cursor: pointer;
+      transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+      text-align: left;
+    }
+    .pick:hover { background: rgba(244,239,227,0.05); border-color: rgba(244,239,227,0.14); }
+    .pick.on {
+      background: var(--bull-bg);
+      border-color: rgba(74,222,128,0.36);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 6px 20px rgba(34,197,94,0.16);
+    }
+    .pick .ico {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: rgba(244,239,227,0.04); border: 1px solid rgba(244,239,227,0.08);
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--fg-secondary); flex-shrink: 0;
+    }
+    .pick.on .ico { background: var(--bull-bg); border-color: var(--bull-border); color: var(--bull-strong); }
+    .pick .t { font-family: var(--font-display); font-weight: 600; font-size: 15px; color: var(--fg-primary); margin-bottom: 3px; }
+    .pick .d { font-size: 13px; color: var(--fg-secondary); line-height: 1.4; }
+
+    /* sector multi-select chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      padding: 9px 16px; border-radius: 9999px;
+      background: rgba(244,239,227,0.03);
+      border: 1px solid rgba(244,239,227,0.10);
+      color: var(--fg-secondary); font-size: 13.5px; font-weight: 500; cursor: pointer;
+      transition: all 160ms var(--ease-out);
+    }
+    .chip:hover { color: var(--fg-primary); border-color: rgba(244,239,227,0.20); }
+    .chip.on {
+      background: var(--bull-bg); border-color: var(--bull-border); color: var(--bull-strong);
+    }
+
+    /* slider */
+    .slider-wrap { padding: 24px 8px; }
+    .slider-row { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--fg-tertiary); letter-spacing: 0.10em; }
+    .slider-input {
+      width: 100%; margin: 18px 0 12px;
+      -webkit-appearance: none; appearance: none;
+      height: 6px; border-radius: 9999px;
+      background: linear-gradient(90deg, var(--bull-deep), var(--bull-strong), var(--gold), var(--bear));
+      outline: none;
+    }
+    .slider-input::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 22px; height: 22px; border-radius: 9999px;
+      background: #FFFFFF;
+      border: 2px solid var(--bull-strong);
+      box-shadow: 0 4px 14px rgba(34,197,94,0.40);
+      cursor: pointer;
+    }
+    .slider-input::-moz-range-thumb {
+      width: 22px; height: 22px; border-radius: 9999px;
+      background: #FFFFFF;
+      border: 2px solid var(--bull-strong);
+      box-shadow: 0 4px 14px rgba(34,197,94,0.40);
+      cursor: pointer;
+    }
+    .slider-label-card {
+      margin-top: 18px;
+      padding: 16px 18px; border-radius: 14px;
+      background: rgba(244,239,227,0.03);
+      border: 1px solid rgba(244,239,227,0.08);
+    }
+    .slider-label-card .h { font-family: var(--font-display); font-weight: 600; font-size: 16px; color: var(--fg-primary); margin-bottom: 4px; }
+    .slider-label-card .b { font-size: 13.5px; color: var(--fg-secondary); line-height: 1.5; }
+
+    /* Step 4 — agent preview */
+    .agent-preview {
+      padding: 22px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(74,222,128,0.10), rgba(34,197,94,0.02));
+      border: 1px solid rgba(74,222,128,0.24);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .agent-preview .pill {
+      display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+      padding: 3px 10px; border-radius: 9999px;
+      background: var(--bull-bg); border: 1px solid var(--bull-border);
+      color: var(--bull-strong); font-size: 11px; font-weight: 500;
+    }
+    .agent-preview .pill .d { width: 5px; height: 5px; border-radius: 9999px; background: var(--bull-strong); box-shadow: 0 0 5px var(--bull-strong); }
+    .agent-preview h4 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: -0.015em; }
+    .agent-preview .p { margin: 0; font-family: var(--font-serif); font-size: 18px; color: var(--fg-primary); line-height: 1.4; }
+    .agent-preview .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .agent-preview .tag {
+      padding: 3px 9px; border-radius: 9999px;
+      background: rgba(244,239,227,0.05); border: 1px solid rgba(244,239,227,0.10);
+      color: var(--fg-secondary); font-size: 11px;
+    }
+
+    /* Step 5 — success */
+    .check-burst {
+      width: 84px; height: 84px; border-radius: 9999px;
+      background: linear-gradient(180deg, var(--bull-strong), var(--bull-deep));
+      box-shadow: 0 0 48px rgba(34,197,94,0.5), inset 0 1px 0 rgba(255,255,255,0.20);
+      display: inline-flex; align-items: center; justify-content: center;
+      color: #FFFFFF; margin-bottom: 16px;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.8); opacity: 0.8; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+    .check-ring { position: absolute; width: 84px; height: 84px; border-radius: 9999px; border: 2px solid var(--bull-strong); animation: pulse-ring 1.8s ease-out infinite; pointer-events: none; }
+
+    /* Footer / nav */
+    .ob-footer {
+      display: flex; align-items: center; justify-content: space-between; margin-top: 36px;
+    }
+    .btn {
+      font-family: var(--font-body); font-size: 14px; font-weight: 600;
+      padding: 11px 22px; min-height: 44px;
+      border: 1px solid; border-radius: 9999px;
+      display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+      transition: background 140ms var(--ease-out), border-color 140ms var(--ease-out);
+      box-sizing: border-box;
+      text-decoration: none;
+    }
+    .btn.primary { background: var(--bull); color: #FFFFFF; border-color: var(--bull); }
+    .btn.primary:hover { background: var(--bull-deep); border-color: var(--bull-deep); }
+    .btn.primary:disabled { background: rgba(244,239,227,0.06); border-color: rgba(244,239,227,0.08); color: var(--fg-tertiary); cursor: not-allowed; }
+    .btn.ghost { background: transparent; color: var(--fg-secondary); border-color: rgba(244,239,227,0.14); }
+    .btn.ghost:hover { color: var(--fg-primary); border-color: rgba(244,239,227,0.28); }
+
+    /* responsive */
+    @media (max-width: 720px) {
+      .picks { grid-template-columns: 1fr; }
+      .ob-steps .s span { display: none; }
+      .ob-counter { font-size: 11px; }
+      .ob-footer { flex-direction: row-reverse; gap: 8px; }
+      .ob-footer .btn { padding: 11px 18px; font-size: 13px; }
+      .pick { padding: 14px 16px; gap: 12px; }
+      .pick .ico { width: 32px; height: 32px; }
+      .pick .t { font-size: 14px; }
+      .pick .d { font-size: 12.5px; }
+      .chip { padding: 9px 14px; font-size: 13px; min-height: 44px; align-items: center; display: inline-flex; }
+      .ob-eyebrow { font-size: 10px; }
+    }
+    @media (max-width: 380px) {
+      .ob-card { border-radius: 14px; }
+      .ob-footer { gap: 6px; }
+      .ob-footer .btn { padding: 10px 14px; font-size: 12px; }
+      .ob-progress { padding-left: 12px; padding-right: 12px; }
+      .ob-stage { padding-left: 8px; padding-right: 8px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+const STEPS = ['Welcome', 'Interests', 'Risk', 'Agent', 'Done'];
+
+const TRADER_TYPES = [
+  { id: 'retail',  icon: 'user',         t: 'Retail investor', d: "I trade my own money. Long-term, occasional active." },
+  { id: 'active',  icon: 'zap',          t: 'Active trader',   d: "Weekly trades. Options, swing setups, technicals." },
+  { id: 'pro',     icon: 'briefcase',    t: 'Professional',    d: "I manage capital or research full-time." },
+  { id: 'curious', icon: 'graduation-cap', t: 'Just curious',  d: "Learning the ropes. Mostly observing for now." },
+];
+
+const SECTORS = [
+  'Technology', 'Financials', 'Healthcare', 'Energy', 'Consumer',
+  'Industrials', 'Real Estate', 'Communications', 'Utilities',
+  'Crypto', 'Bonds', 'ETFs', 'Commodities'
+];
+
+const RISK_LABELS = [
+  { min: 0,  max: 25,  t: 'Conservative',   d: 'Capital preservation first. Bonds, dividend ETFs, blue chips. Agents will be cautious — small position sizes and tight stops.' },
+  { min: 25, max: 50,  t: 'Balanced',       d: 'Mix of growth and income. Diversified equities, occasional options. Agents act on confirmed signals only.' },
+  { min: 50, max: 75,  t: 'Growth',         d: 'Higher equity exposure, including tech and small-caps. Agents will take more frequent positions with moderate size.' },
+  { min: 75, max: 101, t: 'Aggressive',     d: 'High conviction, high volatility. Leveraged ETFs, options, crypto. Agents will trade aggressively — make sure you can stomach drawdowns.' },
+];
+
+function App() {
+  const [step, setStep] = useState(0);
+  const [traderType, setTraderType] = useState(null);
+  const [sectors, setSectors] = useState(new Set(['Technology']));
+  const [risk, setRisk] = useState(45);
+  const [agentAccepted, setAgentAccepted] = useState(false);
+
+  const riskLabel = useMemo(() => RISK_LABELS.find(r => risk >= r.min && risk < r.max) || RISK_LABELS[0], [risk]);
+
+  // Suggested agent depends on trader type + risk
+  const suggestedAgent = useMemo(() => {
+    const sectorList = [...sectors];
+    const first = sectorList[0] || 'Technology';
+    if (risk >= 75) {
+      return {
+        title: 'Aggressive momentum',
+        prompt: `Watch ${first} stocks for 5%+ daily breakouts. Buy $1,000 on breakout, set 8% stop.`,
+        tags: ['Trading strategy', 'Market monitoring', first],
+      };
+    }
+    if (risk >= 50) {
+      return {
+        title: 'Sector rotation',
+        prompt: `Track ${first} momentum. Rotate 5% of cash into the strongest holding weekly.`,
+        tags: ['Rebalancing', first],
+      };
+    }
+    if (risk >= 25) {
+      return {
+        title: 'Bargain hunter',
+        prompt: `When my ${first} holdings drop 10% from 30-day high, buy $250 of each.`,
+        tags: ['Trading strategy', first],
+      };
+    }
+    return {
+      title: 'Dividend sweep',
+      prompt: `Every dividend payout, reinvest into the highest-yield bond ETF.`,
+      tags: ['Cash management', 'Fund management'],
+    };
+  }, [sectors, risk]);
+
+  function next() {
+    if (step < STEPS.length - 1) setStep(step + 1);
+  }
+  function prev() {
+    if (step > 0) setStep(step - 1);
+  }
+  function toggleSector(s) {
+    const ns = new Set(sectors);
+    if (ns.has(s)) ns.delete(s);
+    else ns.add(s);
+    setSectors(ns);
+  }
+
+  // Validation per step
+  const canAdvance = (() => {
+    if (step === 0) return !!traderType;
+    if (step === 1) return sectors.size > 0;
+    if (step === 2) return true;
+    if (step === 3) return agentAccepted;
+    return true;
+  })();
+
+  const progress = ((step) / (STEPS.length - 1)) * 100;
+
+  return (
+    <div className="ob-shell" data-screen-label="Onboarding">
+      {/* Top bar */}
+      <div className="ob-top">
+        <a className="ob-brand" href="index.html">
+          <img src="../assets/logo-mark.svg" width="30" height="30" alt="" />
+          Market<em>Flux</em>
+        </a>
+        <div className="ob-counter">{String(step + 1).padStart(2, '0')} / {String(STEPS.length).padStart(2, '0')}</div>
+      </div>
+
+      {/* Progress */}
+      <div className="ob-progress">
+        <div className="ob-progress-track">
+          <div className="ob-progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="ob-steps">
+          {STEPS.map((s, i) => (
+            <span key={s} className={`s ${i === step ? 'active' : i < step ? 'done' : ''}`}>
+              <span>{s}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Stage */}
+      <div className="ob-stage">
+        <div className="ob-card">
+          {step === 0 && (
+            <>
+              <div className="ob-eyebrow">STEP 01 · WELCOME</div>
+              <h1 className="ob-title">What's your trading style?</h1>
+              <p className="ob-sub">We use this once — to seed your dashboard and tune the agents we suggest. You can change it later in settings.</p>
+              <div className="picks">
+                {TRADER_TYPES.map(t => (
+                  <button key={t.id}
+                    className={`pick ${traderType === t.id ? 'on' : ''}`}
+                    onClick={() => setTraderType(t.id)}>
+                    <span className="ico"><i data-lucide={t.icon}></i></span>
+                    <div>
+                      <div className="t">{t.t}</div>
+                      <div className="d">{t.d}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <div className="ob-eyebrow">STEP 02 · INTERESTS</div>
+              <h1 className="ob-title">What do you actually follow?</h1>
+              <p className="ob-sub">Pick sectors and asset classes you watch. We'll seed your dashboard and news feed with these.</p>
+              <div className="chips">
+                {SECTORS.map(s => (
+                  <button key={s} className={`chip ${sectors.has(s) ? 'on' : ''}`} onClick={() => toggleSector(s)}>
+                    {sectors.has(s) ? '✓ ' : ''}{s}
+                  </button>
+                ))}
+              </div>
+              <p style={{ marginTop: 18, fontSize: 13, color: 'var(--fg-tertiary)' }}>
+                {sectors.size} selected · pick up to 8 for the best feed
+              </p>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <div className="ob-eyebrow">STEP 03 · RISK</div>
+              <h1 className="ob-title">How aggressive are you, really?</h1>
+              <p className="ob-sub">This becomes the default guardrail on every agent you build. We always ask before any trade — you can override at any time.</p>
+              <div className="slider-wrap">
+                <div className="slider-row">
+                  <span>CONSERVATIVE</span>
+                  <span>AGGRESSIVE</span>
+                </div>
+                <input className="slider-input" type="range" min="0" max="100" value={risk}
+                  onChange={e => setRisk(Number(e.target.value))} />
+                <div className="slider-label-card">
+                  <div className="h">{riskLabel.t}<span style={{ marginLeft: 10, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--bull-strong)', fontWeight: 500 }}>{risk}/100</span></div>
+                  <div className="b">{riskLabel.d}</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <div className="ob-eyebrow">STEP 04 · FIRST AGENT</div>
+              <h1 className="ob-title">Try this for size.</h1>
+              <p className="ob-sub">Based on what you told us — {riskLabel.t.toLowerCase()} with focus on {[...sectors].slice(0, 2).join(' & ') || 'broad markets'} — FluxAI suggests this starter agent. Review and edit before activating.</p>
+              <div className="agent-preview">
+                <span className="pill"><span className="d"></span>Suggested by FluxAI</span>
+                <h4>{suggestedAgent.title}</h4>
+                <p className="p">"{suggestedAgent.prompt}"</p>
+                <div className="tags">
+                  {suggestedAgent.tags.map(t => <span key={t} className="tag">{t}</span>)}
+                </div>
+              </div>
+              <div style={{ marginTop: 18, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button className={`btn ${agentAccepted ? 'primary' : 'ghost'}`} onClick={() => setAgentAccepted(true)}>
+                  {agentAccepted ? '✓ Looks good' : 'Use this agent'}
+                </button>
+                <button className="btn ghost">Customise</button>
+                <button className="btn ghost" onClick={() => setAgentAccepted(true)}>Skip · I'll build my own</button>
+              </div>
+            </>
+          )}
+
+          {step === 4 && (
+            <div style={{ textAlign: 'center', padding: '12px 0' }}>
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <div className="check-ring" />
+                <div className="check-burst">
+                  <i data-lucide="check" style={{ width: 36, height: 36 }}></i>
+                </div>
+              </div>
+              <h1 className="ob-title" style={{ textAlign: 'center', marginTop: 8 }}>You're in.</h1>
+              <p className="ob-sub" style={{ marginLeft: 'auto', marginRight: 'auto', textAlign: 'center' }}>
+                Your dashboard is seeded with {sectors.size} {sectors.size === 1 ? 'sector' : 'sectors'} and your <b style={{ color: 'var(--bull-strong)' }}>{suggestedAgent.title}</b> agent is staged for review. Let's go.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <a className="btn primary" href="../ui_kits/web/index.html">Open dashboard <i data-lucide="arrow-right"></i></a>
+                <a className="btn ghost" href="index.html">Back to landing</a>
+              </div>
+              <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid rgba(244,239,227,0.06)', fontSize: 12, color: 'var(--fg-tertiary)' }}>
+                Step completed in {Math.floor(Math.random() * 30) + 70} seconds.
+              </div>
+            </div>
+          )}
+
+          {/* Footer nav — only on steps before the success */}
+          {step < 4 && (
+            <div className="ob-footer">
+              <button className="btn ghost" onClick={prev} disabled={step === 0}
+                style={step === 0 ? { opacity: 0.4, cursor: 'not-allowed' } : {}}>
+                <i data-lucide="arrow-left"></i> Back
+              </button>
+              <button className="btn primary" onClick={next} disabled={!canAdvance}>
+                {step === 3 ? 'Finish setup' : 'Continue'} <i data-lucide="arrow-right"></i>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+
+// Re-render Lucide icons whenever React rerenders
+const observer = new MutationObserver(() => window.lucide && window.lucide.createIcons());
+observer.observe(document.getElementById('root'), { childList: true, subtree: true });
+window.lucide && window.lucide.createIcons();
+</script>
+</body>
+</html>

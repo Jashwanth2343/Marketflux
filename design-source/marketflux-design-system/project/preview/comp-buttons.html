@@ -1,0 +1,44 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--bg-canvas); }
+  .card { padding: 24px 28px; display: flex; flex-direction: column; gap: 18px; min-height: 100%; box-sizing: border-box; justify-content: center; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    font-family: var(--font-body); font-size: 13px; font-weight: 600;
+    padding: 9px 16px; border-radius: var(--radius-2);
+    border: 1px solid; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    line-height: 1;
+    transition: background 140ms var(--ease-out), border-color 140ms var(--ease-out);
+  }
+  .primary    { background: var(--bull); color: #FFFFFF; border-color: var(--bull); }
+  .primary:hover { background: var(--bull-deep); border-color: var(--bull-deep); }
+  .secondary  { background: transparent; color: var(--fg-primary); border-color: var(--border-strong); }
+  .secondary:hover { background: var(--bg-surface-2); }
+  .ghost      { background: transparent; color: var(--fg-secondary); border-color: transparent; }
+  .ghost:hover { background: var(--bg-surface-2); color: var(--fg-primary); }
+  .destructive{ background: transparent; color: var(--bear); border-color: var(--bear-border); }
+  .destructive:hover { background: var(--bear-bg); }
+  .small      { padding: 6px 11px; font-size: 12px; }
+  .large      { padding: 12px 20px; font-size: 14px; }
+  .disabled   { color: var(--fg-tertiary); background: transparent; border-color: var(--border); cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="mf-micro">BUTTONS</div>
+  <div class="row">
+    <button class="btn primary">Run screener</button>
+    <button class="btn secondary">Add to watchlist</button>
+    <button class="btn ghost">Cancel</button>
+    <button class="btn destructive">Close position</button>
+  </div>
+  <div class="row">
+    <button class="btn primary small">Small</button>
+    <button class="btn primary">Default →</button>
+    <button class="btn primary large">Large action</button>
+    <button class="btn disabled">Disabled</button>
+  </div>
+</div>
+</body></html>

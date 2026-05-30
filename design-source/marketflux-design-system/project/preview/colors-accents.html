@@ -1,0 +1,48 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--bg-canvas); }
+  .card { padding: 22px 28px; display: flex; flex-direction: column; gap: 14px; min-height: 100%; box-sizing: border-box; justify-content: center; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .sw { border: 1px solid var(--border); border-radius: var(--radius-2); overflow: hidden; }
+  .top { height: 88px; }
+  .meta { padding: 10px 14px; }
+  .name { font-family: var(--font-display); font-weight: 600; font-size: 14px; color: var(--fg-primary); }
+  .hex { font-family: var(--font-mono); font-size: 11px; color: var(--fg-tertiary); margin-top: 2px; }
+  .use { font-family: var(--font-mono); font-size: 10px; color: var(--fg-secondary); margin-top: 4px; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="mf-micro">SEMANTIC ACCENTS · DATA INK ONLY</div>
+  <div class="grid">
+    <div class="sw">
+      <div class="top" style="background:var(--bull)"></div>
+      <div class="meta">
+        <div class="name">Bull green</div>
+        <div class="hex">#22C55E · ▲</div>
+        <div class="use">Gains · BULLISH · brand · CTA</div>
+      </div>
+    </div>
+    <div class="sw">
+      <div class="top" style="background:var(--bear)"></div>
+      <div class="meta">
+        <div class="name">Bear red</div>
+        <div class="hex">#EF4444 · ▼</div>
+        <div class="use">Losses · BEARISH · destructive</div>
+      </div>
+    </div>
+    <div class="sw">
+      <div class="top" style="background:var(--gold)"></div>
+      <div class="meta">
+        <div class="name">Gold</div>
+        <div class="hex">#F5C147 · ●</div>
+        <div class="use">NEUTRAL · alert · warning (rare)</div>
+      </div>
+    </div>
+  </div>
+  <div style="font-family:var(--font-body);font-size:12px;color:var(--fg-secondary);line-height:1.5;max-width:560px">
+    Three accents only. No violet, no cyan, no orange neon. Color is paired with a glyph (▲▼●) so meaning carries to colour-vision-deficient users.
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--bg-canvas); min-height: 100%; }
+  .stage {
+    padding: 28px 32px 32px; min-height: 100%; box-sizing: border-box;
+    position: relative; display: flex; flex-direction: column; gap: 20px;
+    background:
+      radial-gradient(ellipse 720px 460px at 18% 0%, rgba(34, 197, 94, 0.16), transparent 62%),
+      radial-gradient(ellipse 560px 360px at 92% 100%, rgba(74, 222, 128, 0.10), transparent 60%),
+      radial-gradient(ellipse 460px 320px at 50% 50%, rgba(245, 193, 71, 0.05), transparent 70%);
+  }
+
+  /* — Header ------------------------------------------------------ */
+  .head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 18px;
+  }
+  .lockup {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-tertiary);
+  }
+  .title {
+    font-family: var(--font-display); font-weight: 600;
+    font-size: 28px; line-height: 1.1; letter-spacing: -0.015em;
+    color: var(--fg-primary);
+  }
+  .title em {
+    font-style: normal;
+    background: linear-gradient(135deg, #B6FF6B 0%, #4ADE80 50%, #22C55E 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .meta {
+    text-align: right; font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--fg-tertiary); letter-spacing: 0.06em;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .meta b { color: var(--fg-secondary); font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; }
+
+  /* — Hero specimen ----------------------------------------------- */
+  .card.hero {
+    padding: 32px;
+    display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px;
+    align-items: center; min-height: 220px;
+  }
+  .hero-left h2 {
+    margin: 0 0 10px;
+    font-family: var(--font-display); font-weight: 600;
+    font-size: 22px; line-height: 1.18; letter-spacing: -0.01em;
+    color: var(--fg-primary);
+  }
+  .hero-left p {
+    margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--fg-secondary);
+    max-width: 46ch;
+  }
+  .agent-orb {
+    width: 92px; height: 92px; border-radius: 999px;
+    background: radial-gradient(circle at 32% 28%, #DFFFB6 0%, #4ADE80 45%, #15803D 95%);
+    box-shadow:
+      0 0 0 1px rgba(182,255,107,0.42),
+      0 0 0 6px rgba(74,222,128,0.10),
+      0 0 36px rgba(74,222,128,0.55),
+      inset -8px -10px 22px rgba(0,40,12,0.45),
+      inset 6px 8px 18px rgba(255,255,255,0.35);
+    justify-self: center;
+    position: relative;
+  }
+  .agent-orb::after {
+    content: ''; position: absolute; top: 14px; left: 18px;
+    width: 30px; height: 16px; border-radius: 999px;
+    background: rgba(255,255,255,0.6); filter: blur(4px);
+  }
+
+  /* — Sub-row: usage in context ---------------------------------- */
+  .row { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px; }
+  .card { padding: 18px; min-height: 116px; display: flex; flex-direction: column; gap: 6px; }
+  .card h3 {
+    margin: 0; font-family: var(--font-display); font-weight: 600;
+    font-size: 14px; letter-spacing: -0.005em; color: var(--fg-primary);
+  }
+  .card p {
+    margin: 0; font-size: 12px; line-height: 1.5; color: var(--fg-secondary);
+  }
+  .card .num {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+    font-size: 26px; font-weight: 500; letter-spacing: -0.01em;
+    color: var(--fg-primary); margin-top: 2px;
+  }
+  .card .num .delta { font-size: 13px; color: #4ADE80; margin-left: 6px; }
+  .card .kicker {
+    font-family: var(--font-mono); font-size: 9.5px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-tertiary);
+  }
+
+  /* — Pill row --------------------------------------------------- */
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dot {
+    width: 6px; height: 6px; border-radius: 9999px;
+    background: #4ADE80; box-shadow: 0 0 6px #4ADE80;
+  }
+
+  /* — Token footer ---------------------------------------------- */
+  .tokens {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    padding: 12px 18px; margin-top: 4px;
+  }
+  .tok { display: flex; flex-direction: column; gap: 2px; }
+  .tok span:first-child {
+    font-family: var(--font-mono); font-size: 9.5px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-tertiary);
+  }
+  .tok span:last-child {
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-primary);
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- Header -->
+  <div class="head">
+    <div class="lockup">
+      <span class="eyebrow">Brand · Liquid Glass</span>
+      <h1 class="title">Glass <em>Highlight</em> — the AI surface.</h1>
+    </div>
+    <div class="meta">
+      <b>Adopted variant</b>
+      <span>.mf-glass + .mf-glass-hi</span>
+      <span style="color: #4ADE80">★ canonical</span>
+    </div>
+  </div>
+
+  <!-- HERO specimen — the chosen variant at scale -->
+  <section class="card mf-glass mf-glass-hi mf-glass-edge hero">
+    <div class="hero-left">
+      <span class="eyebrow" style="color: #4ADE80">FluxAI · live</span>
+      <h2 style="margin-top: 8px;">A translucent surface tuned for agent reasoning.</h2>
+      <p>Glass Highlight pairs the base liquid-glass blur with a soft brand-green specular wash and an inner cream rim. Reserved for the AI panel, the active-agent CTA, and any surface that should read as <em style="color: var(--fg-primary); font-style: normal; font-weight: 500;">"the model is thinking here"</em>.</p>
+    </div>
+    <div class="agent-orb" aria-hidden="true"></div>
+  </section>
+
+  <!-- Usage row — three concrete applications -->
+  <div class="row">
+    <div class="card mf-glass mf-glass-hi mf-glass-edge">
+      <span class="kicker">AI Insight · AAPL</span>
+      <h3>Bullish · 84% conf.</h3>
+      <p>Q3 earnings beat + supply-chain tailwind. 12-mo PT $210.</p>
+    </div>
+    <div class="card mf-glass mf-glass-hi">
+      <span class="kicker">Agent run · live</span>
+      <div class="num">3.42<span style="font-size: 13px; color: var(--fg-tertiary); margin-left: 4px;">s</span></div>
+      <p>14 tools · 18 signals fused</p>
+    </div>
+    <div class="card mf-glass mf-glass-hi">
+      <span class="kicker">Confidence</span>
+      <div class="num">84%<span class="delta">+6</span></div>
+      <p>vs. last hourly snapshot</p>
+    </div>
+  </div>
+
+  <!-- Pills — glass-hi at chip scale -->
+  <div class="pill-row">
+    <span class="mf-glass-pill mf-glass-hi"><span class="dot"></span>FluxAI active</span>
+    <span class="mf-glass-pill mf-glass-hi">Streaming · run #2843</span>
+    <span class="mf-glass-pill mf-glass-hi">Sonnet 4.5</span>
+    <span class="mf-glass-pill mf-glass-hi">Paper · NYSE open</span>
+    <span class="mf-glass-pill mf-glass-hi">14:32 UTC</span>
+  </div>
+
+  <!-- Token footer -->
+  <div class="card mf-glass tokens">
+    <div class="tok"><span>Blur</span><span>28px</span></div>
+    <div class="tok"><span>Saturate</span><span>160%</span></div>
+    <div class="tok"><span>Highlight</span><span>rgba(74,222,128,.18)</span></div>
+    <div class="tok"><span>Rim</span><span>inset 0 1px 0 rgba(244,239,227,.10)</span></div>
+  </div>
+
+</div>
+</body></html>

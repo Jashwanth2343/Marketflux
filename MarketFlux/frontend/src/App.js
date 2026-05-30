@@ -11,6 +11,7 @@ import AuthCallback from "@/components/AuthCallback";
 import Dashboard from "@/pages/Dashboard";
 import Intelligence from "@/pages/Intelligence";
 import Copilot from "@/pages/Copilot";
+import AgentDetail from "@/pages/AgentDetail";
 import PortfolioRisk from "@/pages/PortfolioRisk";
 import Backtest from "@/pages/Backtest";
 import StockDetail from "@/pages/StockDetail";
@@ -117,6 +118,9 @@ function AppRouter() {
               <Route path="/intelligence/thesis/:thesisId" element={<ThesisWorkspace />} />
               <Route path="/intelligence/thesis/:thesisId/trade-lab" element={<ThesisTradeLab />} />
               <Route path="/copilot" element={<Copilot />} />
+              <Route path="/copilot/agents/:agentId" element={<AgentDetail />} />
+              <Route path="/agents" element={<Navigate to="/copilot?tab=proposals" replace />} />
+              <Route path="/agents/:agentId" element={<AgentDetail />} />
               <Route path="/backtest" element={<Backtest />} />
               <Route path="/portfolio" element={<PortfolioRisk />} />
               <Route path="/leaderboard" element={<PilotLeaderboard />} />

@@ -1,0 +1,49 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--bg-canvas); }
+  .wrap { padding: 22px 26px; display: flex; flex-direction: column; gap: 18px; min-height: 100%; box-sizing: border-box; }
+  .kicker { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--bull-strong); display: inline-flex; align-items: center; gap: 7px; }
+  .kicker::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--bull-strong); box-shadow: 0 0 6px var(--bull-strong); }
+  h1 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 38px; letter-spacing: -0.025em; line-height: 1.05; }
+  h1 span { color: var(--fg-secondary); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .agent { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: center; justify-content: space-between; }
+  .lbl { font-family: var(--font-mono); font-size: 9px; color: var(--fg-tertiary); letter-spacing: 0.14em; text-transform: uppercase; }
+  .pill { padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 500; }
+  .pill.active { background: var(--bull-bg); border: 1px solid var(--bull-border); color: var(--bull-strong); display: inline-flex; align-items: center; gap: 5px; }
+  .pill.active::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--bull-strong); }
+  .pill.soon { background: var(--bg-surface-2); border: 1px solid var(--border); color: var(--fg-tertiary); }
+  .title { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+  .prompt { font-size: 12px; color: var(--fg-secondary); line-height: 1.5; }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tag { font-size: 10px; padding: 2px 7px; border-radius: 9999px; background: var(--bg-surface-2); border: 1px solid var(--border); color: var(--fg-secondary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="kicker">FluxAI Agents · now in beta</span>
+  <h1>Agents.<br><span>For your portfolio.</span></h1>
+  <div class="grid">
+    <div class="agent">
+      <div class="row"><span class="lbl">Agent</span><span class="pill active">Active</span></div>
+      <div class="title">CPI hedge</div>
+      <div class="prompt">Sell 10% of consumer staples if next CPI prints &gt; 4%.</div>
+      <div class="tags"><span class="tag">Market monitoring</span><span class="tag">Risk</span></div>
+    </div>
+    <div class="agent">
+      <div class="row"><span class="lbl">Agent</span><span class="pill active">Active</span></div>
+      <div class="title">BTC EMA dip</div>
+      <div class="prompt">Check BTC vs 50-day EMA every 15min. Buy $2k on dip.</div>
+      <div class="tags"><span class="tag">Trading</span><span class="tag">Crypto</span></div>
+    </div>
+    <div class="agent">
+      <div class="row"><span class="lbl">Agent</span><span class="pill soon">Coming soon</span></div>
+      <div class="title">Fed rate cut</div>
+      <div class="prompt">If the Fed cuts rates, trim 10% of bank stocks into tech.</div>
+      <div class="tags"><span class="tag">Macro</span><span class="tag">Risk</span></div>
+    </div>
+  </div>
+</div>
+</body></html>

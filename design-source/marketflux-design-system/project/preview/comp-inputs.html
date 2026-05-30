@@ -1,0 +1,61 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css"><link rel="stylesheet" href="_base.css"></head>
+<body>
+<div class="card">
+  <div class="mf-micro">Inputs &amp; Search</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div>
+      <label class="mf-micro" style="font-size:10px;display:block;margin-bottom:5px">Ticker</label>
+      <div style="display:flex;align-items:center;gap:9px;
+                  background:var(--bg-surface-2);
+                  border:1px solid var(--border);
+                  border-radius:var(--radius-full);
+                  padding:9px 16px;
+                  font-family:var(--font-body);font-size:13px;color:var(--fg-primary)">
+        <span style="color:var(--fg-tertiary);font-size:13px">⌕</span>
+        <span class="mf-mono" style="font-weight:600;letter-spacing:0.02em">AAPL</span>
+        <span style="margin-left:auto;color:var(--fg-tertiary);font-size:10px;
+                     padding:1px 7px;border:1px solid var(--border);
+                     border-radius:var(--radius-1)">↵</span>
+      </div>
+    </div>
+    <div>
+      <label class="mf-micro" style="font-size:10px;display:block;margin-bottom:5px">Query · focused</label>
+      <div style="display:flex;align-items:center;gap:9px;
+                  background:var(--bg-surface-2);
+                  border:1px solid var(--bull);
+                  border-radius:var(--radius-full);
+                  padding:9px 16px;
+                  font-family:var(--font-body);font-size:13px;color:var(--fg-primary);
+                  box-shadow:0 0 0 3px rgba(34,197,94,0.10)">
+        <span style="color:var(--bull-strong);font-size:13px">⌕</span>
+        <span>Tech stocks with PE under 20</span>
+        <span class="cursor" style="background:var(--bull-strong);width:2px;height:14px;
+                     margin-left:1px;animation:blink 1s step-end infinite;
+                     border-radius:var(--radius-full)"></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:14px;align-items:center;margin-top:4px">
+    <label class="mf-micro" style="font-size:10px;min-width:80px">Market cap</label>
+    <div style="flex:1;height:6px;background:var(--bg-surface-2);
+                position:relative;border-radius:var(--radius-full)">
+      <div style="position:absolute;left:25%;right:30%;height:100%;
+                  background:var(--bull);border-radius:var(--radius-full)"></div>
+      <div style="position:absolute;left:25%;top:50%;width:14px;height:14px;
+                  background:var(--fg-primary);border:2px solid var(--bull);
+                  border-radius:var(--radius-full);
+                  transform:translate(-50%,-50%);
+                  box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>
+      <div style="position:absolute;left:70%;top:50%;width:14px;height:14px;
+                  background:var(--fg-primary);border:2px solid var(--bull);
+                  border-radius:var(--radius-full);
+                  transform:translate(-50%,-50%);
+                  box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>
+    </div>
+    <span class="mf-mono mf-bull" style="font-size:11px;min-width:88px;text-align:right">$10B – $100B</span>
+  </div>
+</div>
+<style>@keyframes blink { 50% { opacity: 0; } }</style>
+</body></html>

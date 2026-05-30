@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0C0B09" />
+  <title>MarketFlux · Trade with intelligence</title>
+  <link rel="stylesheet" href="../colors_and_type.css" />
+  <link rel="icon" type="image/svg+xml" href="../assets/logo-mark.svg" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: var(--bg-canvas); color: var(--fg-primary); font-family: var(--font-body); overflow-x: hidden; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    *, *::before, *::after { box-sizing: border-box; }
+    img, svg { max-width: 100%; height: auto; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ============================================================
+       AMBIENT BACKDROP — subtle Wall St hints (ticker, columns, candles)
+       ============================================================ */
+    .backdrop {
+      position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      overflow: hidden;
+    }
+    .backdrop::before {
+      content: ''; position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 1200px 800px at 20% 0%, rgba(34, 197, 94, 0.12), transparent 60%),
+        radial-gradient(ellipse 900px 700px at 100% 30%, rgba(245, 193, 71, 0.06), transparent 60%),
+        radial-gradient(ellipse 600px 400px at 50% 100%, rgba(34, 197, 94, 0.04), transparent 60%);
+    }
+    .backdrop::after {
+      content: ''; position: absolute; inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(240, 234, 217, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(240, 234, 217, 0.025) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+    }
+
+    /* tiny candle silhouettes scattered in the background */
+    .candle { position: absolute; opacity: 0.25; }
+    .candle .wick { width: 1px; background: var(--fg-quaternary); margin: 0 auto; }
+    .candle .body { background: var(--fg-quaternary); }
+    .candle.bull .body { background: var(--bull-deep); }
+    .candle.bear .body { background: var(--bear-deep); }
+
+    /* ============================================================
+       NAV
+       ============================================================ */
+    .nav {
+      position: sticky; top: 0; z-index: 30;
+      padding: 16px clamp(16px, 4vw, 32px);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px;
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      background: rgba(12, 11, 9, 0.55);
+      border-bottom: 1px solid rgba(244, 239, 227, 0.05);
+    }
+    .nav-brand { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 600; font-size: clamp(15px, 1.4vw, 18px); letter-spacing: -0.015em; }
+    .nav-brand em { color: var(--bull-strong); font-style: normal; }
+    .nav-links { display: flex; gap: 28px; font-size: 14px; color: var(--fg-secondary); }
+    .nav-links a { transition: color 140ms var(--ease-out); }
+    .nav-links a:hover { color: var(--fg-primary); }
+    .nav-cta { display: flex; gap: 8px; align-items: center; }
+
+    /* ============================================================
+       BUTTONS
+       ============================================================ */
+    .btn {
+      font-size: 14px; font-weight: 600; padding: 11px 18px;
+      min-height: 44px;
+      border: 1px solid; border-radius: 9999px;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: background 140ms var(--ease-out), border-color 140ms var(--ease-out), transform 140ms var(--ease-out);
+      box-sizing: border-box;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .btn.primary { background: var(--bull); color: #FFFFFF; border-color: var(--bull); }
+    .btn.primary:hover { background: var(--bull-deep); border-color: var(--bull-deep); }
+    .btn.ghost { background: transparent; color: var(--fg-primary); border-color: rgba(244,239,227,0.18); }
+    .btn.ghost:hover { background: rgba(244,239,227,0.06); }
+    .btn.glass {
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      color: var(--fg-primary); border-color: rgba(244,239,227,0.14);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 6px 18px rgba(0,0,0,0.22);
+    }
+    .btn.glass:hover { background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)); }
+
+    /* ============================================================
+       SECTIONS
+       ============================================================ */
+    section { max-width: 1180px; margin: 0 auto; padding: clamp(56px, 8vw, 96px) clamp(16px, 4vw, 32px); position: relative; }
+
+    .kicker {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 9999px;
+      background: var(--bull-bg); border: 1px solid var(--bull-border);
+      color: var(--bull-strong);
+      font-size: 12px; font-weight: 500; letter-spacing: 0.02em;
+    }
+    .kicker .dot { width: 6px; height: 6px; border-radius: 9999px; background: var(--bull-strong); box-shadow: 0 0 6px var(--bull-strong); }
+
+    h1.hero-title {
+      margin: 24px 0 20px;
+      font-family: var(--font-display); font-weight: 700;
+      font-size: clamp(48px, 7vw, 88px); letter-spacing: -0.035em;
+      line-height: 1.0;
+    }
+    h1.hero-title em { color: var(--bull-strong); font-style: normal; }
+    .hero-sub {
+      max-width: 560px; font-size: 19px; line-height: 1.55; color: var(--fg-secondary);
+      margin: 0 0 36px;
+    }
+
+    /* ============================================================
+       HERO — 3D mockup stage
+       ============================================================ */
+    .hero {
+      padding-top: clamp(40px, 6vw, 80px);
+      padding-bottom: clamp(72px, 10vw, 140px);
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: clamp(32px, 4vw, 60px);
+      align-items: center;
+    }
+
+    /* Subtle bull silhouette behind the hero — Wall St *hint*, very low opacity */
+    .hero::after {
+      content: ''; position: absolute; right: -120px; top: 40px;
+      width: 560px; height: 480px;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 160'><path fill='%2322C55E' d='M40 120 L25 100 L20 85 L25 70 L35 60 L48 56 L55 62 L62 50 L75 42 L92 38 L110 40 L125 46 L138 56 L148 70 L156 88 L160 108 L168 118 L172 130 L162 138 L150 134 L142 128 L130 132 L118 130 L110 124 L96 130 L80 134 L66 132 L52 128 Z'/></svg>");
+      background-size: contain; background-repeat: no-repeat;
+      opacity: 0.025; transform: rotate(-8deg); pointer-events: none;
+    }
+
+    .hero-left { z-index: 2; min-width: 0; }
+    .hero-right { position: relative; z-index: 1; perspective: 1800px; perspective-origin: 50% 40%; min-height: 540px; min-width: 0; }
+
+    /* The 3D stage */
+    .stage {
+      position: relative; width: 100%; height: 540px;
+      transform-style: preserve-3d;
+      max-width: 100%;
+    }
+
+    .scene-card {
+      position: absolute; transform-style: preserve-3d;
+      transition: transform 600ms var(--ease-out);
+    }
+
+    /* Primary card — large dashboard */
+    .scene-main {
+      top: 40px; left: 0; width: 560px; height: 380px;
+      transform: rotateY(-18deg) rotateX(6deg) translateZ(0);
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(21,19,15,0.85), rgba(12,11,9,0.85));
+      border: 1px solid rgba(244,239,227,0.12);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        0 40px 80px rgba(0,0,0,0.55),
+        0 0 0 1px rgba(34, 197, 94, 0.08);
+      overflow: hidden;
+    }
+    .scene-main .head {
+      padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(244,239,227,0.06);
+    }
+    .scene-main .head .l { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+    .scene-main .head .l em { color: var(--bull-strong); font-style: normal; }
+    .scene-main .head .r { font-family: var(--font-mono); font-size: 11px; color: var(--fg-tertiary); }
+    .scene-main .body { padding: 18px; display: flex; flex-direction: column; gap: 14px; height: calc(100% - 51px); box-sizing: border-box; }
+    .scene-main .row-top { display: flex; justify-content: space-between; align-items: baseline; }
+    .scene-main .row-top .t { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
+    .scene-main .row-top .sub { font-size: 11px; color: var(--fg-tertiary); margin-top: 1px; }
+    .scene-main .row-top .px { font-family: var(--font-mono); font-weight: 500; font-size: 26px; font-variant-numeric: tabular-nums; }
+    .scene-main .row-top .delta { font-family: var(--font-mono); font-size: 11px; color: var(--bull-strong); font-variant-numeric: tabular-nums; margin-top: 4px; }
+    .chart-shell { flex: 1; position: relative; }
+
+    /* Floating agent card — Public.com agent shape */
+    .scene-agent {
+      top: 220px; right: -20px; width: 280px;
+      transform: rotateY(-12deg) rotateX(4deg) translateZ(80px);
+      padding: 16px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(74,222,128,0.16), rgba(34,197,94,0.04));
+      backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+      border: 1px solid rgba(74,222,128,0.32);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 24px 48px rgba(34,197,94,0.20);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .scene-agent .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 9px; border-radius: 9999px;
+      background: var(--bull-bg); border: 1px solid var(--bull-border);
+      color: var(--bull-strong); font-size: 10.5px; font-weight: 500;
+      align-self: flex-start;
+    }
+    .scene-agent .pill .d { width: 5px; height: 5px; border-radius: 9999px; background: var(--bull-strong); box-shadow: 0 0 5px var(--bull-strong); }
+    .scene-agent .title { font-family: var(--font-display); font-weight: 600; font-size: 16px; color: var(--fg-primary); }
+    .scene-agent .prompt { font-size: 12.5px; color: var(--fg-secondary); line-height: 1.5; }
+    .scene-agent .meta { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid rgba(244,239,227,0.06); font-family: var(--font-mono); font-size: 10px; color: var(--fg-tertiary); }
+
+    /* Floating notification — price tick */
+    .scene-tick {
+      top: 0; right: 80px; width: 230px;
+      transform: rotateY(-6deg) rotateX(2deg) translateZ(140px);
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(244,239,227,0.14);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 18px 36px rgba(0,0,0,0.30);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .scene-tick .ico {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--bull-bg); border: 1px solid var(--bull-border);
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--bull-strong); flex-shrink: 0;
+    }
+    .scene-tick .title { font-family: var(--font-display); font-weight: 600; font-size: 12.5px; }
+    .scene-tick .sub { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-tertiary); font-variant-numeric: tabular-nums; }
+
+    /* tilt-on-hover for the stage */
+    .hero-right:hover .scene-main  { transform: rotateY(-12deg) rotateX(4deg) translateZ(0); }
+    .hero-right:hover .scene-agent { transform: rotateY(-8deg)  rotateX(2deg) translateZ(80px); }
+    .hero-right:hover .scene-tick  { transform: rotateY(-2deg)  rotateX(1deg) translateZ(140px); }
+
+    /* ============================================================
+       LOGO BAR
+       ============================================================ */
+    .trust {
+      max-width: 1080px; padding-top: 0;
+    }
+    .trust-row {
+      display: flex; gap: 36px; align-items: center; justify-content: center;
+      padding: 22px 0; flex-wrap: wrap;
+      border-top: 1px solid rgba(244,239,227,0.06);
+      border-bottom: 1px solid rgba(244,239,227,0.06);
+    }
+    .trust-label { font-family: var(--font-mono); font-size: 11px; color: var(--fg-tertiary); letter-spacing: 0.12em; text-transform: uppercase; }
+    .trust-logo { font-family: var(--font-display); font-weight: 600; font-size: 15px; color: var(--fg-secondary); letter-spacing: -0.01em; opacity: 0.7; transition: opacity 140ms var(--ease-out); }
+    .trust-logo:hover { opacity: 1; color: var(--fg-primary); }
+
+    /* ============================================================
+       FEATURES GRID
+       ============================================================ */
+    .section-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-tertiary); margin-bottom: 8px; }
+    .section-title { margin: 0 0 16px; font-family: var(--font-display); font-weight: 700; font-size: clamp(32px, 4.2vw, 48px); letter-spacing: -0.025em; line-height: 1.1; }
+    .section-title span { color: var(--fg-secondary); }
+    .section-lede { max-width: 520px; font-size: 16px; line-height: 1.6; color: var(--fg-secondary); margin: 0 0 48px; }
+
+    .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .feat {
+      padding: 26px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+      backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+      border: 1px solid rgba(244,239,227,0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 36px rgba(0,0,0,0.25);
+      display: flex; flex-direction: column; gap: 14px;
+      transition: transform 200ms var(--ease-out), border-color 200ms var(--ease-out);
+    }
+    .feat:hover { transform: translateY(-4px); border-color: rgba(74,222,128,0.20); }
+    .feat .glyph {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, rgba(74,222,128,0.20), rgba(34,197,94,0.04));
+      border: 1px solid rgba(74,222,128,0.24);
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--bull-strong);
+    }
+    .feat h3 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; }
+    .feat p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--fg-secondary); }
+    .feat .more { margin-top: 6px; color: var(--bull-strong); font-size: 13px; font-weight: 500; }
+
+    /* ============================================================
+       AGENTS SHOWCASE — prompt → workflow
+       ============================================================ */
+    .agents-show {
+      display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: center;
+    }
+    .ws-card {
+      padding: 26px;
+      border-radius: 20px;
+      background: linear-gradient(180deg, rgba(21,19,15,0.85), rgba(12,11,9,0.85));
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(244,239,227,0.10);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 24px 56px rgba(0,0,0,0.40);
+    }
+    .ws-prompt {
+      font-family: var(--font-serif);
+      font-size: 24px; line-height: 1.35; color: var(--fg-primary); letter-spacing: -0.005em;
+      margin: 0 0 22px;
+    }
+    .ws-step { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-top: 1px solid rgba(244,239,227,0.06); }
+    .ws-step:first-of-type { border-top: none; padding-top: 0; }
+    .ws-step .n { font-family: var(--font-mono); font-size: 11px; color: var(--fg-tertiary); min-width: 24px; padding-top: 1px; }
+    .ws-step .dot { width: 8px; height: 8px; border-radius: 9999px; background: var(--bull-strong); box-shadow: 0 0 8px var(--bull-strong); margin-top: 6px; flex-shrink: 0; }
+    .ws-step .dot.pending { background: var(--border-strong); box-shadow: none; }
+    .ws-step .label { font-size: 14px; line-height: 1.5; color: var(--fg-primary); }
+    .ws-step .label .m { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--fg-tertiary); margin-top: 2px; }
+
+    /* ============================================================
+       ONBOARDING TEASER
+       ============================================================ */
+    .ob-strip {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-top: 36px;
+    }
+    .ob-step {
+      padding: 18px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(244,239,227,0.06);
+      display: flex; flex-direction: column; gap: 10px; min-height: 140px;
+    }
+    .ob-step .n { font-family: var(--font-mono); font-size: 11px; color: var(--bull-strong); letter-spacing: 0.10em; }
+    .ob-step .t { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+    .ob-step .d { font-size: 13px; color: var(--fg-secondary); line-height: 1.45; }
+
+    /* ============================================================
+       FINAL CTA
+       ============================================================ */
+    .cta {
+      text-align: center;
+      padding: 80px 32px;
+      border-radius: 24px;
+      background:
+        radial-gradient(ellipse 800px 500px at 50% 0%, rgba(34, 197, 94, 0.20), transparent 60%),
+        linear-gradient(180deg, rgba(21,19,15,0.85), rgba(12,11,9,0.85));
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(74,222,128,0.20);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 32px 64px rgba(0,0,0,0.40);
+    }
+    .cta h2 { margin: 0 0 16px; font-family: var(--font-display); font-weight: 700; font-size: clamp(34px, 5vw, 56px); letter-spacing: -0.025em; line-height: 1.05; }
+    .cta p { max-width: 520px; margin: 0 auto 32px; font-size: 17px; color: var(--fg-secondary); line-height: 1.55; }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    footer { border-top: 1px solid rgba(244,239,227,0.06); padding: 36px 32px; text-align: center; font-size: 13px; color: var(--fg-tertiary); }
+    footer a { color: var(--fg-secondary); margin: 0 12px; }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+
+    /* Wide screens — give the hero a bit more breathing room */
+    @media (min-width: 1400px) {
+      section { max-width: 1280px; }
+      h1.hero-title { font-size: clamp(64px, 6vw, 92px); }
+    }
+
+    /* Tablet — ≤ 1100px */
+    @media (max-width: 1100px) {
+      .hero { grid-template-columns: 1.1fr 1fr; gap: 36px; }
+      .scene-main  { width: 92%; left: 4%; }
+      .scene-tick  { right: 4%; }
+      .scene-agent { right: -8px; width: 240px; }
+      .feat-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* Small tablet — ≤ 980px (collapse hero to single column) */
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr; gap: 56px; }
+      .hero-right { min-height: 500px; max-width: 600px; margin: 0 auto; width: 100%; }
+      .hero::after { display: none; }
+      .agents-show { grid-template-columns: 1fr; gap: 32px; }
+      .ob-strip { grid-template-columns: repeat(2, 1fr); }
+      .nav-links { display: none; }
+    }
+
+    /* Mobile — ≤ 640px */
+    @media (max-width: 640px) {
+      .nav { padding: 12px 16px; gap: 8px; }
+      .nav-brand img { width: 26px; height: 26px; }
+      .nav-cta .btn.ghost { display: none; }
+      .nav-cta .btn.primary { padding: 9px 14px; font-size: 13px; }
+
+      .hero { padding-top: 24px; padding-bottom: 56px; gap: 36px; }
+      .hero-right { min-height: 0; height: auto; perspective: 1200px; }
+      .stage { height: auto; min-height: 480px; }
+      .scene-main  { width: 88%; left: 6%; height: 320px; transform: rotateY(-10deg) rotateX(4deg); }
+      .scene-tick  { top: -8px; right: 0; width: 200px; transform: rotateY(-4deg) rotateX(2deg) translateZ(60px); }
+      .scene-agent { top: 190px; right: -4px; width: 240px; transform: rotateY(-8deg) rotateX(2deg) translateZ(60px); }
+      .scene-main .row-top .px { font-size: 22px; }
+
+      h1.hero-title { font-size: clamp(36px, 9vw, 52px); margin-top: 18px; }
+      .hero-sub { font-size: 16px; margin-bottom: 24px; }
+
+      section { padding: 56px 16px; }
+      .section-title { font-size: clamp(28px, 7vw, 36px); }
+      .section-lede { font-size: 15px; margin-bottom: 32px; }
+
+      .feat-grid { grid-template-columns: 1fr; gap: 12px; }
+      .feat { padding: 22px; }
+      .feat h3 { font-size: 17px; }
+
+      .ws-card { padding: 20px; }
+      .ws-prompt { font-size: 18px; }
+      .ws-step .label { font-size: 13px; }
+
+      .ob-strip { grid-template-columns: 1fr; gap: 10px; }
+      .ob-step { min-height: 0; padding: 14px 16px; }
+
+      .cta { padding: 48px 20px; border-radius: 18px; }
+      .cta h2 { font-size: clamp(28px, 7vw, 40px); }
+      .cta p { font-size: 15px; }
+
+      .trust-row { gap: 18px; padding: 16px 0; }
+      .trust-logo { font-size: 14px; }
+
+      footer { padding: 28px 16px; font-size: 12px; }
+      footer a { display: inline-block; margin: 4px 8px; }
+    }
+
+    /* Very small — ≤ 380px (older / cheap phones) */
+    @media (max-width: 380px) {
+      .scene-tick  { width: 180px; }
+      .scene-agent { width: 220px; right: 0; }
+      .nav-brand span, .nav-brand .em-text { display: none; }
+    }
+
+    /* Reduce motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .hero-right:hover .scene-main,
+      .hero-right:hover .scene-agent,
+      .hero-right:hover .scene-tick { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Ambient backdrop -->
+<div class="backdrop">
+  <!-- Scattered candles, small and faint, as Wall St hint -->
+  <div class="candle bull" style="left:8%;top:14%"><div class="wick" style="height:24px"></div><div class="body" style="width:6px;height:34px;margin-top:-12px"></div><div class="wick" style="height:12px"></div></div>
+  <div class="candle bear" style="left:88%;top:22%"><div class="wick" style="height:20px"></div><div class="body" style="width:6px;height:28px;margin-top:-10px"></div><div class="wick" style="height:14px"></div></div>
+  <div class="candle bull" style="left:4%;top:62%"><div class="wick" style="height:14px"></div><div class="body" style="width:6px;height:42px;margin-top:-7px"></div><div class="wick" style="height:18px"></div></div>
+  <div class="candle bear" style="left:92%;top:68%"><div class="wick" style="height:18px"></div><div class="body" style="width:6px;height:22px;margin-top:-9px"></div><div class="wick" style="height:10px"></div></div>
+  <div class="candle bull" style="left:50%;top:48%"><div class="wick" style="height:10px"></div><div class="body" style="width:5px;height:18px;margin-top:-5px"></div><div class="wick" style="height:8px"></div></div>
+</div>
+
+<!-- NAV -->
+<header class="nav">
+  <a class="nav-brand" href="#"><img src="../assets/logo-mark.svg" width="32" height="32" alt="" /> Market<em>Flux</em></a>
+  <nav class="nav-links">
+    <a href="#features">Product</a>
+    <a href="#agents">Agents</a>
+    <a href="#onboarding">Get started</a>
+    <a href="../ui_kits/web/index.html">Demo</a>
+  </nav>
+  <div class="nav-cta">
+    <a class="btn ghost" href="#">Sign in</a>
+    <a class="btn primary" href="#onboarding">Start free <i data-lucide="arrow-right"></i></a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero" data-screen-label="01 Hero">
+  <div class="hero-left">
+    <span class="kicker"><span class="dot"></span> FluxAI agents · now in beta</span>
+    <h1 class="hero-title">Trade with <em>intelligence.</em></h1>
+    <p class="hero-sub">
+      Real-time market data, sentiment-driven research, and AI agents that monitor the market 24/7 — all from one editorial-grade terminal built for serious investors.
+    </p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <a class="btn primary" href="#onboarding">Get started in 90 seconds <i data-lucide="arrow-right"></i></a>
+      <a class="btn glass" href="../ui_kits/web/index.html"><i data-lucide="play"></i> Watch live demo</a>
+    </div>
+    <div style="margin-top:32px;display:flex;gap:24px;flex-wrap:wrap;font-size:13px;color:var(--fg-tertiary)">
+      <span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="check" style="width:14px;height:14px;color:var(--bull-strong)"></i> No credit card</span>
+      <span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="check" style="width:14px;height:14px;color:var(--bull-strong)"></i> Sign in with Google</span>
+      <span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="check" style="width:14px;height:14px;color:var(--bull-strong)"></i> Cancel anytime</span>
+    </div>
+  </div>
+
+  <!-- 3D mockup stage -->
+  <div class="hero-right">
+    <div class="stage">
+
+      <!-- Main dashboard card -->
+      <div class="scene-card scene-main">
+        <div class="head">
+          <div class="l"><img src="../assets/logo-mark.svg" width="20" height="20" alt=""/> Market<em>Flux</em></div>
+          <div class="r">14:32 UTC · LIVE</div>
+        </div>
+        <div class="body">
+          <div class="row-top">
+            <div>
+              <div class="t">AAPL</div>
+              <div class="sub">Apple Inc. · NASDAQ</div>
+            </div>
+            <div style="text-align:right">
+              <div class="px">$192.35</div>
+              <div class="delta">▲ +3.94 · +2.09%</div>
+            </div>
+          </div>
+          <div class="chart-shell">
+            <svg viewBox="0 0 480 200" width="100%" height="100%" preserveAspectRatio="none" style="display:block">
+              <defs>
+                <linearGradient id="fl" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#22C55E" stop-opacity="0.30"/>
+                  <stop offset="1" stop-color="#22C55E" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <g stroke="rgba(240,234,217,0.04)" stroke-width="1">
+                <line x1="0" y1="50" x2="480" y2="50"/>
+                <line x1="0" y1="100" x2="480" y2="100"/>
+                <line x1="0" y1="150" x2="480" y2="150"/>
+              </g>
+              <path d="M 0,165 L 30,150 L 60,145 L 90,128 L 120,138 L 150,118 L 180,124 L 210,98 L 240,92 L 270,108 L 300,80 L 330,62 L 360,52 L 390,42 L 420,30 L 450,22 L 480,18 L 480,200 L 0,200 Z" fill="url(#fl)"/>
+              <polyline fill="none" stroke="#22C55E" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+                points="0,165 30,150 60,145 90,128 120,138 150,118 180,124 210,98 240,92 270,108 300,80 330,62 360,52 390,42 420,30 450,22 480,18"/>
+              <polyline fill="none" stroke="#F5C147" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.65"
+                points="0,170 80,160 160,148 240,128 320,102 400,68 480,32"/>
+              <circle cx="480" cy="18" r="4" fill="#22C55E"/>
+              <circle cx="480" cy="18" r="8" fill="none" stroke="#22C55E" stroke-width="1" opacity="0.5"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating notification tick -->
+      <div class="scene-card scene-tick">
+        <div class="ico"><i data-lucide="bell" style="width:16px;height:16px"></i></div>
+        <div>
+          <div class="title">NVDA breakout · $1,182</div>
+          <div class="sub">▲ +4.18% · Agent triggered</div>
+        </div>
+      </div>
+
+      <!-- Floating agent card -->
+      <div class="scene-card scene-agent">
+        <span class="pill"><span class="d"></span>Active agent</span>
+        <div class="title">CPI hedge</div>
+        <div class="prompt">Sell 10% of consumer staples if next CPI prints &gt; 4%.</div>
+        <div class="meta">3 runs · next: 12 Jun</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- TRUST -->
+<section class="trust" style="padding-top:0;padding-bottom:0">
+  <div class="trust-row">
+    <span class="trust-label">Built on data from</span>
+    <span class="trust-logo">NYSE</span>
+    <span class="trust-logo">NASDAQ</span>
+    <span class="trust-logo">Polygon</span>
+    <span class="trust-logo">Bloomberg</span>
+    <span class="trust-logo">Reuters</span>
+    <span class="trust-logo">Gemini 2.5</span>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div style="max-width:680px;margin-bottom:48px">
+    <div class="section-eyebrow">What you get</div>
+    <h2 class="section-title">One terminal. <span>Every market signal.</span></h2>
+    <p class="section-lede">
+      MarketFlux pairs real-time market data with an LLM research brain. Bloomberg-style density, Coinbase-grade UX, Public.com-style agents.
+    </p>
+  </div>
+
+  <div class="feat-grid">
+    <div class="feat">
+      <div class="glyph"><i data-lucide="layout-dashboard" style="width:20px;height:20px"></i></div>
+      <h3>Real-time dashboard</h3>
+      <p>Bento-grid view of indices, top movers, market heatmap, fear & greed gauge, and live news — all updating without a refresh.</p>
+      <a class="more" href="../ui_kits/web/index.html">See it live →</a>
+    </div>
+    <div class="feat">
+      <div class="glyph"><i data-lucide="sparkles" style="width:20px;height:20px"></i></div>
+      <h3>FluxAI agents</h3>
+      <p>Describe an investing strategy in plain English. FluxAI translates intent into a workflow you can review, edit, and activate.</p>
+      <a class="more" href="#agents">How agents work →</a>
+    </div>
+    <div class="feat">
+      <div class="glyph"><i data-lucide="search" style="width:20px;height:20px"></i></div>
+      <h3>Natural-language screener</h3>
+      <p>"Mega-cap tech with PE under 30 and bullish AI sentiment." Type the thesis; we return the matches with one-click export.</p>
+      <a class="more" href="#">Try the screener →</a>
+    </div>
+    <div class="feat">
+      <div class="glyph"><i data-lucide="newspaper" style="width:20px;height:20px"></i></div>
+      <h3>Sentiment-scored news</h3>
+      <p>RSS feeds from 7+ financial sources, scored bullish / bearish / neutral and threaded back to the tickers they touch.</p>
+      <a class="more" href="#">See the feed →</a>
+    </div>
+    <div class="feat">
+      <div class="glyph"><i data-lucide="brain" style="width:20px;height:20px"></i></div>
+      <h3>Research workspace</h3>
+      <p>LLM-drafted theses with citations, side-by-side comparisons, and a trade lab to stress-test before you commit capital.</p>
+      <a class="more" href="#">Open research →</a>
+    </div>
+    <div class="feat">
+      <div class="glyph"><i data-lucide="shield" style="width:20px;height:20px"></i></div>
+      <h3>You're in control</h3>
+      <p>Every agent action is visible, auditable, and editable. Approve before live; pause or stop with one tap.</p>
+      <a class="more" href="#">Safety model →</a>
+    </div>
+  </div>
+</section>
+
+<!-- AGENTS SHOWCASE -->
+<section id="agents">
+  <div style="max-width:680px;margin-bottom:48px">
+    <div class="section-eyebrow">Agents on MarketFlux</div>
+    <h2 class="section-title">Describe what you want. <span>Your agent handles the rest.</span></h2>
+    <p class="section-lede">From a one-line prompt to a live, monitored workflow in under a minute. You review every step.</p>
+  </div>
+  <div class="agents-show">
+    <div class="ws-card">
+      <span class="kicker"><span class="dot"></span> Example prompt</span>
+      <p class="ws-prompt" style="margin-top:14px">"If VIX hits 25, buy a put on SPY worth $1,000 and notify me."</p>
+      <div class="ws-step">
+        <span class="n">01</span><span class="dot"></span>
+        <span class="label">Monitor VIX every minute<span class="m">Live · running now</span></span>
+      </div>
+      <div class="ws-step">
+        <span class="n">02</span><span class="dot pending"></span>
+        <span class="label">Wait for VIX above 25<span class="m">Current 18.42 · need +6.58</span></span>
+      </div>
+      <div class="ws-step">
+        <span class="n">03</span><span class="dot pending"></span>
+        <span class="label">Buy SPY 30-day put · $1,000<span class="m">Market order</span></span>
+      </div>
+      <div class="ws-step">
+        <span class="n">04</span><span class="dot pending"></span>
+        <span class="label">Notify on fill<span class="m">Email + push</span></span>
+      </div>
+    </div>
+    <div>
+      <h3 style="margin:0 0 12px;font-family:var(--font-display);font-weight:600;font-size:24px;letter-spacing:-0.015em">Plain English to live workflow.</h3>
+      <p style="margin:0 0 20px;color:var(--fg-secondary);font-size:15px;line-height:1.55">
+        FluxAI parses your prompt, surfaces the underlying conditions and actions, and lets you tune every detail before activation. The agent runs inside your authenticated MarketFlux session — no third-party API keys, no black box.
+      </p>
+      <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;font-size:14px;color:var(--fg-primary)">
+        <li style="display:flex;align-items:flex-start;gap:10px"><i data-lucide="check" style="width:16px;height:16px;color:var(--bull-strong);margin-top:3px;flex-shrink:0"></i>Real-time market data — no 15-minute delay</li>
+        <li style="display:flex;align-items:flex-start;gap:10px"><i data-lucide="check" style="width:16px;height:16px;color:var(--bull-strong);margin-top:3px;flex-shrink:0"></i>Multi-leg options, crypto, equities, ETFs, bonds</li>
+        <li style="display:flex;align-items:flex-start;gap:10px"><i data-lucide="check" style="width:16px;height:16px;color:var(--bull-strong);margin-top:3px;flex-shrink:0"></i>Edit, pause, or stop any agent at any moment</li>
+        <li style="display:flex;align-items:flex-start;gap:10px"><i data-lucide="check" style="width:16px;height:16px;color:var(--bull-strong);margin-top:3px;flex-shrink:0"></i>Activity feed + transaction history for every action</li>
+      </ul>
+      <a class="btn primary" href="../ui_kits/web/index.html" style="margin-top:28px">Explore agents <i data-lucide="arrow-right"></i></a>
+    </div>
+  </div>
+</section>
+
+<!-- ONBOARDING TEASER -->
+<section id="onboarding">
+  <div style="max-width:680px;margin-bottom:8px">
+    <div class="section-eyebrow">Onboarding</div>
+    <h2 class="section-title">Up and running in <span>five steps.</span></h2>
+    <p class="section-lede">No setup wizard fatigue. Each step takes 10–20 seconds. We have you live before your coffee cools.</p>
+  </div>
+  <div class="ob-strip">
+    <div class="ob-step">
+      <span class="n">STEP 01</span>
+      <div class="t">Welcome</div>
+      <div class="d">Tell us what kind of investor you are — retail, professional, or somewhere between.</div>
+    </div>
+    <div class="ob-step">
+      <span class="n">STEP 02</span>
+      <div class="t">Pick interests</div>
+      <div class="d">Sectors and assets you watch. We use this to seed your dashboard and news feed.</div>
+    </div>
+    <div class="ob-step">
+      <span class="n">STEP 03</span>
+      <div class="t">Risk tolerance</div>
+      <div class="d">A single slider. Sets the default guardrails on any agent you build.</div>
+    </div>
+    <div class="ob-step">
+      <span class="n">STEP 04</span>
+      <div class="t">First agent</div>
+      <div class="d">FluxAI suggests a starter agent based on your answers. Review and approve.</div>
+    </div>
+    <div class="ob-step">
+      <span class="n">STEP 05</span>
+      <div class="t">You're in</div>
+      <div class="d">Dashboard loads, agent goes live, you're trading with intelligence.</div>
+    </div>
+  </div>
+  <div style="margin-top:32px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <a class="btn primary" href="onboarding.html">Try the onboarding flow <i data-lucide="arrow-right"></i></a>
+    <span style="font-size:13px;color:var(--fg-tertiary)">Avg. 92 seconds to first agent</span>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section style="padding-bottom:96px">
+  <div class="cta">
+    <span class="kicker"><span class="dot"></span> Limited beta · invite-only</span>
+    <h2 style="margin-top:20px">Markets don't sleep.<br/>Neither should your edge.</h2>
+    <p>Join the early-access list. We're onboarding 50 traders a week, ordered by waitlist position.</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <a class="btn primary" href="onboarding.html">Get started <i data-lucide="arrow-right"></i></a>
+      <a class="btn glass" href="../ui_kits/web/index.html"><i data-lucide="layout-dashboard"></i> Browse demo</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  © 2026 MarketFlux Holdings, Inc. &nbsp;·&nbsp;
+  <a href="#">Privacy</a><a href="#">Terms</a><a href="#">Disclosures</a><a href="#">FAQ</a>
+</footer>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

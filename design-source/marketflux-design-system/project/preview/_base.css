@@ -1,0 +1,21 @@
+/* Shared scaffolding for design-system preview cards */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0C0B09;
+  color: #F0EAD9;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  overflow: hidden;
+}
+.card {
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; gap: 8px; }

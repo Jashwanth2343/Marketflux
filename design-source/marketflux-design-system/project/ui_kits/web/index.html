@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0C0B09" />
+  <title>MarketFlux · UI Kit</title>
+  <link rel="stylesheet" href="../../colors_and_type.css" />
+  <link rel="icon" type="image/svg+xml" href="../../assets/logo-mark.svg" />
+  <style>
+    html, body { margin: 0; padding: 0; background: var(--bg-canvas); min-height: 100vh; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: var(--font-body); color: var(--fg-primary); }
+    main { min-height: calc(100vh - 92px); }
+    img, svg { max-width: 100%; height: auto; }
+
+    /* === Responsive overrides for the UI kit's React-rendered screens === */
+
+    /* Tablet ≤ 1100px — bento collapses to 2-col stacking */
+    @media (max-width: 1100px) {
+      .mf-bento { grid-template-columns: 1fr 1fr !important; }
+      .mf-news-grid { grid-template-columns: 1fr 1fr !important; }
+      .mf-fund-grid { grid-template-columns: repeat(3, 1fr) !important; }
+    }
+
+    /* Small tablet ≤ 880px — drop bento to single column */
+    @media (max-width: 880px) {
+      .mf-bento { grid-template-columns: 1fr !important; min-height: 0 !important; }
+      .mf-split-2 { grid-template-columns: 1fr !important; }
+      .mf-fund-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+
+    /* Mobile ≤ 640px — single column everywhere, page tightens */
+    @media (max-width: 640px) {
+      /* Top nav: hide secondary route links + the inline search bar */
+      header > header > nav { display: none !important; }
+      .mf-page { padding: 16px !important; }
+      .mf-news-grid { grid-template-columns: 1fr !important; }
+      .mf-fund-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+      /* AI chat panel becomes full-screen */
+      aside { width: 100% !important; }
+    }
+  </style>
+  <!-- Lucide UMD (icons) -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <!-- React -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Fake market data -->
+  <script src="data.js"></script>
+  <script src="agents-data.js"></script>
+
+  <!-- Components (atoms + molecules) -->
+  <script type="text/babel" src="components.jsx"></script>
+
+  <!-- Nav + AI Chat -->
+  <script type="text/babel" src="nav.jsx"></script>
+
+  <!-- Screens -->
+  <script type="text/babel" src="screens.jsx"></script>
+  <script type="text/babel" src="agent-detail.jsx"></script>
+  <script type="text/babel" src="agents.jsx"></script>
+
+  <!-- App orchestrator -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [route, setRoute] = useState('dashboard');
+      const [stockSym, setStockSym] = useState('AAPL');
+      const [chatOpen, setChatOpen] = useState(false);
+
+      useEffect(() => {
+        window.__mfGo = (r, sym) => {
+          if (sym) setStockSym(sym);
+          setRoute(r);
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        };
+      }, []);
+
+      const chatWidth = chatOpen ? 380 : 0;
+      let body = null;
+      if (route === 'dashboard')      body = <Dashboard />;
+      else if (route === 'stock')     body = <StockDetail sym={stockSym} />;
+      else if (route === 'screener')  body = <AIScreener />;
+      else if (route === 'agents')    body = <Agents />;
+      else body = <div style={{ padding: 40 }}>
+        <Card><CardBody>
+          <Kicker>WORK IN PROGRESS</Kicker>
+          <div style={{ marginTop: 12, fontSize: 16 }}>The <b style={{ color: 'var(--accent-strong)' }}>{route.toUpperCase()}</b> surface isn't wired in this demo kit. Try Dashboard, Screener, Agents, or click a stock from the Movers or your AI Brief.</div>
+        </CardBody></Card>
+      </div>;
+
+      return <div style={{
+        minHeight: '100vh',
+        marginRight: chatWidth,
+        transition: 'margin-right var(--duration-base) var(--ease-mechanical)',
+      }}>
+        <TopNav route={route} setRoute={setRoute}
+          onOpenChat={() => setChatOpen(o => !o)} chatOpen={chatOpen} />
+        <main data-screen-label={'00 ' + route.toUpperCase()}>{body}</main>
+        <AIChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+      </div>;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
