@@ -390,7 +390,7 @@ export default function CopilotAgent() {
                             >
                                 {models.length === 0 && <option value={model}>{model}</option>}
                                 {models.map((m) => (
-                                    <option key={m.key} value={m.key} className="bg-[#0a0a0a] text-foreground">
+                                    <option key={m.key} value={m.key} className="bg-[#15130F] text-foreground">
                                         {m.label}{m.experimental ? ' · beta' : ''}
                                     </option>
                                 ))}

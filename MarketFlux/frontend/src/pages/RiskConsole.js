@@ -12,7 +12,7 @@ import api from '@/lib/api';
 
 // --- Helpers ---
 function riskColor(label) {
-  if (!label) return '#00F3FF';
+  if (!label) return '#9298A6';
   if (label.includes('LOW')) return '#3FB950';
   if (label.includes('MODERATE')) return '#F0A500';
   return '#F85149';
@@ -121,9 +121,9 @@ function StressTestChart({ stressTests }) {
 function FactorExposure({ factors }) {
   if (!factors) return null;
   const items = [
-    { key: 'growth', label: 'Growth', color: '#00F3FF' },
+    { key: 'growth', label: 'Growth', color: '#9298A6' },
     { key: 'value', label: 'Value', color: '#F0A500' },
-    { key: 'quality', label: 'Quality', color: '#00FF41' },
+    { key: 'quality', label: 'Quality', color: '#E3B85F' },
   ];
 
   return (
@@ -315,7 +315,7 @@ export default function RiskConsole({ embedded = false }) {
 
   const result = portfolioResult;
   const portBeta = result?.portfolio_beta;
-  const betaColor = portBeta == null ? '#00F3FF' : portBeta > 1.3 ? '#F85149' : portBeta > 0.9 ? '#F0A500' : '#3FB950';
+  const betaColor = portBeta == null ? '#9298A6' : portBeta > 1.3 ? '#F85149' : portBeta > 0.9 ? '#F0A500' : '#3FB950';
 
   const content = (
     <>

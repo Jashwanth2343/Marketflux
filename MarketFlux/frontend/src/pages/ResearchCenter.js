@@ -16,25 +16,25 @@ import api, { API_BASE } from '@/lib/api';
 // --- Helpers ---
 function signalColor(label) {
   if (!label) return 'text-muted-foreground';
-  if (label.includes('STRONG BUY')) return 'text-[#00FF41]';
+  if (label.includes('STRONG BUY')) return 'text-[#E3B85F]';
   if (label.includes('BUY')) return 'text-[#3FB950]';
   if (label.includes('STRONG SELL')) return 'text-[#F85149]';
   if (label.includes('SELL')) return 'text-[#F85149]';
-  return 'text-[#00F3FF]';
+  return 'text-[#9298A6]';
 }
 
 function signalBgColor(label) {
   if (!label) return 'bg-muted/20';
-  if (label.includes('STRONG BUY')) return 'bg-[#00FF41]/10 border-[#00FF41]/30';
+  if (label.includes('STRONG BUY')) return 'bg-[#E3B85F]/10 border-[#E3B85F]/30';
   if (label.includes('BUY')) return 'bg-[#3FB950]/10 border-[#3FB950]/30';
   if (label.includes('STRONG SELL')) return 'bg-[#F85149]/10 border-[#F85149]/30';
   if (label.includes('SELL')) return 'bg-[#F85149]/10 border-[#F85149]/30';
-  return 'bg-[#00F3FF]/10 border-[#00F3FF]/30';
+  return 'bg-[#9298A6]/10 border-[#9298A6]/30';
 }
 
 function ScoreBar({ score }) {
   const pct = ((score + 100) / 200) * 100;
-  const color = score >= 25 ? '#00FF41' : score >= -25 ? '#00F3FF' : '#F85149';
+  const color = score >= 25 ? '#4ADE80' : score >= -25 ? '#9298A6' : '#F85149';
   return (
     <div className="w-full bg-muted/20 h-1.5 rounded-none mt-1">
       <div className="h-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
@@ -45,7 +45,7 @@ function ScoreBar({ score }) {
 function CategoryScore({ label, data }) {
   if (!data) return null;
   const score = data.score || 0;
-  const color = score >= 25 ? '#00FF41' : score >= -25 ? '#00F3FF' : '#F85149';
+  const color = score >= 25 ? '#4ADE80' : score >= -25 ? '#9298A6' : '#F85149';
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-border/20">
       <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
@@ -65,9 +65,9 @@ function renderMarkdown(text) {
     .replace(/\\(#{1,6}\s)/g, '$1')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/^### (.*$)/gm, '<h3 style="font-size:0.85rem;font-weight:700;margin:0.75rem 0 0.35rem;color:#00FF41;font-family:monospace;">$1</h3>')
-    .replace(/^## (.*$)/gm, '<h2 style="font-size:0.95rem;font-weight:800;margin:1rem 0 0.5rem;color:#00F3FF;font-family:monospace;">$1</h2>')
-    .replace(/^# (.*$)/gm, '<h1 style="font-size:1.1rem;font-weight:800;margin:1rem 0 0.5rem;color:#00FF41;font-family:monospace;">$1</h1>')
+    .replace(/^### (.*$)/gm, '<h3 style="font-size:0.85rem;font-weight:700;margin:0.75rem 0 0.35rem;color:#E3B85F;font-family:monospace;">$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2 style="font-size:0.95rem;font-weight:800;margin:1rem 0 0.5rem;color:#9298A6;font-family:monospace;">$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1 style="font-size:1.1rem;font-weight:800;margin:1rem 0 0.5rem;color:#E3B85F;font-family:monospace;">$1</h1>')
     .replace(/^\- (.*$)/gm, '<li style="margin-left:1rem;margin-bottom:0.15rem;">$1</li>')
     .replace(/`([^`]+)`/g, '<code style="background:#1a1a1a;padding:0.1rem 0.25rem;font-family:monospace;font-size:0.8rem;">$1</code>')
     .replace(/\|(.+)\|/g, (match) => {
@@ -223,17 +223,17 @@ function ResearchMemoPanel({ ticker }) {
       {streaming && (
         <div className="mb-4">
           {thinking && (
-            <div className="flex items-center gap-2 mb-3 text-[#00F3FF] font-mono text-xs animate-pulse">
+            <div className="flex items-center gap-2 mb-3 text-[#9298A6] font-mono text-xs animate-pulse">
               <Activity className="w-3.5 h-3.5" />
               <span>{thinking}</span>
             </div>
           )}
           <div className="grid grid-cols-5 gap-1 mb-3">
             {agentList.map(agent => (
-              <div key={agent} className={`text-center p-1.5 border rounded-none text-[9px] font-mono transition-colors ${agentStatuses[agent] === 'done' ? 'border-[#00FF41]/40 text-[#00FF41]' : 'border-border/30 text-muted-foreground'}`}>
+              <div key={agent} className={`text-center p-1.5 border rounded-none text-[9px] font-mono transition-colors ${agentStatuses[agent] === 'done' ? 'border-[#E3B85F]/40 text-[#E3B85F]' : 'border-border/30 text-muted-foreground'}`}>
                 <div>{agentIcons[agent]}</div>
                 <div>{agentNames[agent]}</div>
-                {agentStatuses[agent] === 'done' && <div className="text-[#00FF41]">✓</div>}
+                {agentStatuses[agent] === 'done' && <div className="text-[#E3B85F]">✓</div>}
               </div>
             ))}
           </div>
@@ -290,7 +290,7 @@ function IdeasFeed() {
   return (
     <div className="space-y-4">
       {market_conditions.macro_summary && (
-        <div className="p-2.5 border border-[#00F3FF]/20 bg-[#00F3FF]/5">
+        <div className="p-2.5 border border-[#9298A6]/20 bg-[#9298A6]/5">
           <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Macro Context</p>
           <p className="font-mono text-xs text-foreground/80">{market_conditions.macro_summary}</p>
         </div>
@@ -307,13 +307,13 @@ function IdeasFeed() {
 
       {top_buys.length > 0 && (
         <div>
-          <p className="font-mono text-[10px] text-[#00FF41] uppercase tracking-wider mb-2">🚀 Top Buy Ideas</p>
+          <p className="font-mono text-[10px] text-[#E3B85F] uppercase tracking-wider mb-2">🚀 Top Buy Ideas</p>
           <div className="space-y-1.5">
             {top_buys.map(idea => (
               <button
                 key={idea.ticker}
                 onClick={() => navigate(`/stock/${idea.ticker}`)}
-                className="w-full flex items-center justify-between p-2 border border-[#00FF41]/20 hover:border-[#00FF41]/40 bg-[#00FF41]/5 hover:bg-[#00FF41]/10 transition-colors text-left"
+                className="w-full flex items-center justify-between p-2 border border-[#E3B85F]/20 hover:border-[#E3B85F]/40 bg-[#E3B85F]/5 hover:bg-[#E3B85F]/10 transition-colors text-left"
               >
                 <div>
                   <span className="font-mono text-xs font-bold text-foreground">{idea.ticker}</span>
@@ -321,7 +321,7 @@ function IdeasFeed() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[10px] text-muted-foreground">{idea.sector}</span>
-                  <span className="font-mono text-xs text-[#00FF41] font-bold">{idea.score > 0 ? '+' : ''}{idea.score}</span>
+                  <span className="font-mono text-xs text-[#4ADE80] font-bold">{idea.score > 0 ? '+' : ''}{idea.score}</span>
                   <ChevronRight className="w-3 h-3 text-muted-foreground" />
                 </div>
               </button>
@@ -475,11 +475,11 @@ function ThematicResearch() {
           <div className="grid grid-cols-2 gap-3">
             {result.top_longs?.length > 0 && (
               <div>
-                <p className="font-mono text-[10px] text-[#00FF41] uppercase tracking-wider mb-2">📈 Long Ideas</p>
+                <p className="font-mono text-[10px] text-[#E3B85F] uppercase tracking-wider mb-2">📈 Long Ideas</p>
                 <div className="space-y-1">
                   {result.top_longs.map(s => (
                     <button key={s.symbol} onClick={() => navigate(`/stock/${s.symbol}`)}
-                      className="w-full flex items-center justify-between p-1.5 border border-[#00FF41]/20 hover:bg-[#00FF41]/5 text-left transition-colors">
+                      className="w-full flex items-center justify-between p-1.5 border border-[#E3B85F]/20 hover:bg-[#E3B85F]/5 text-left transition-colors">
                       <span className="font-mono text-xs font-bold">{s.symbol}</span>
                       <span className={`font-mono text-xs ${signalColor(s.signal_label)}`}>{s.composite_score > 0 ? '+' : ''}{s.composite_score}</span>
                     </button>
@@ -649,9 +649,9 @@ export default function ResearchCenter({ embedded = false }) {
             </CardHeader>
             <CardContent className="pt-3 space-y-1.5">
               {[
-                { label: 'Macro Dashboard', path: '/intelligence?tab=macro', icon: Activity, color: '#00F3FF' },
+                { label: 'Macro Dashboard', path: '/intelligence?tab=macro', icon: Activity, color: '#9298A6' },
                 { label: 'Risk Console', path: '/portfolio?tab=risk', icon: Shield, color: '#F0A500' },
-                { label: 'AI Screener', path: '/intelligence?tab=screener', icon: Search, color: '#00FF41' },
+                { label: 'AI Screener', path: '/intelligence?tab=screener', icon: Search, color: '#E3B85F' },
                 { label: 'News Feed', path: '/intelligence?tab=news', icon: Star, color: '#F0A500' },
               ].map(({ label, path, icon: Icon, color }) => (
                 <button

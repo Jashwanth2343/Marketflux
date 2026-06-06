@@ -40,7 +40,7 @@ function FilterChips({ filters }) {
         <Badge
           key={i}
           variant="outline"
-          className="rounded-none text-[10px] font-mono border-[#FFB000]/40 text-[#FFB000]"
+          className="rounded-none text-[10px] font-mono border-[#E3B85F]/40 text-[#E3B85F]"
         >
           {chip.label}
         </Badge>
@@ -131,12 +131,12 @@ export default function AIScreener({ embedded = false }) {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            {useAIScreener ? <Zap className="w-5 h-5 text-[#FFB000]" /> : <BarChart3 className="w-5 h-5 text-[#00F3FF]" />}
+            {useAIScreener ? <Zap className="w-5 h-5 text-[#E3B85F]" /> : <BarChart3 className="w-5 h-5 text-[#9298A6]" />}
             <h1 className="text-xl md:text-2xl font-mono font-bold tracking-tight text-foreground">
               Market{' '}
               <span style={useAIScreener
-                ? { color: '#FFB000', textShadow: '0 0 10px rgba(255,176,0,0.4)' }
-                : { color: '#00F3FF', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>
+                ? { color: '#E3B85F', textShadow: '0 0 10px rgba(227,184,95,0.4)' }
+                : { color: '#9298A6', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>
                 Screener
               </span>
             </h1>
@@ -155,7 +155,7 @@ export default function AIScreener({ embedded = false }) {
             onClick={() => setUseAIScreener(false)}
             className="px-3 py-2 flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider transition-all"
             style={!useAIScreener ? {
-              background: 'rgba(0,243,255,0.1)', color: '#00F3FF',
+              background: 'rgba(146,152,166,0.1)', color: '#9298A6',
               borderRight: '1px solid rgba(255,255,255,0.08)',
             } : {
               color: 'rgba(255,255,255,0.35)',
@@ -168,7 +168,7 @@ export default function AIScreener({ embedded = false }) {
             onClick={() => setUseAIScreener(true)}
             className="px-3 py-2 flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider transition-all"
             style={useAIScreener ? {
-              background: 'rgba(255,176,0,0.1)', color: '#FFB000',
+              background: 'rgba(227,184,95,0.1)', color: '#E3B85F',
             } : {
               color: 'rgba(255,255,255,0.35)',
             }}
@@ -185,10 +185,10 @@ export default function AIScreener({ embedded = false }) {
           {/* AI disclaimer */}
           <div
             className="flex gap-3 p-3 rounded-xl"
-            style={{ background: 'rgba(255,176,0,0.06)', border: '1px solid rgba(255,176,0,0.2)' }}
+            style={{ background: 'rgba(227,184,95,0.06)', border: '1px solid rgba(227,184,95,0.2)' }}
           >
-            <Zap className="w-4 h-4 shrink-0 mt-0.5 text-[#FFB000]" />
-            <p className="text-[11px] font-mono text-[rgba(255,176,0,0.85)] leading-relaxed">
+            <Zap className="w-4 h-4 shrink-0 mt-0.5 text-[#E3B85F]" />
+            <p className="text-[11px] font-mono text-[rgba(227,184,95,0.85)] leading-relaxed">
               AI interprets your query into dynamic stock filters. Results may vary — always verify before trading.
             </p>
           </div>
@@ -200,7 +200,7 @@ export default function AIScreener({ embedded = false }) {
           >
             <form data-testid="screener-form" onSubmit={handleScreen} className="space-y-3">
               <div className="relative">
-                <Zap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#FFB000]" />
+                <Zap className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#E3B85F]" />
                 <Input
                   data-testid="screener-input"
                   value={query}
@@ -220,7 +220,7 @@ export default function AIScreener({ embedded = false }) {
                   disabled={loading || !query.trim()}
                   size="sm"
                   className="h-9 px-5 text-[11px] font-mono uppercase tracking-wider rounded-lg"
-                  style={{ background: '#FFB000', color: '#000' }}
+                  style={{ background: '#E3B85F', color: '#000' }}
                 >
                   {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Search className="w-3.5 h-3.5 mr-1.5" />}
                   Screen Stocks
@@ -252,19 +252,19 @@ export default function AIScreener({ embedded = false }) {
                       onClick={() => setQuery(s)}
                       className="px-2.5 py-1.5 text-[10px] font-mono rounded-full transition-all"
                       style={{
-                        background: 'rgba(255,176,0,0.06)',
-                        border: '1px solid rgba(255,176,0,0.18)',
-                        color: 'rgba(255,176,0,0.7)',
+                        background: 'rgba(227,184,95,0.06)',
+                        border: '1px solid rgba(227,184,95,0.18)',
+                        color: 'rgba(227,184,95,0.7)',
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.background = 'rgba(255,176,0,0.12)';
-                        e.currentTarget.style.color = '#FFB000';
-                        e.currentTarget.style.borderColor = 'rgba(255,176,0,0.35)';
+                        e.currentTarget.style.background = 'rgba(227,184,95,0.12)';
+                        e.currentTarget.style.color = '#E3B85F';
+                        e.currentTarget.style.borderColor = 'rgba(227,184,95,0.35)';
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.background = 'rgba(255,176,0,0.06)';
-                        e.currentTarget.style.color = 'rgba(255,176,0,0.7)';
-                        e.currentTarget.style.borderColor = 'rgba(255,176,0,0.18)';
+                        e.currentTarget.style.background = 'rgba(227,184,95,0.06)';
+                        e.currentTarget.style.color = 'rgba(227,184,95,0.7)';
+                        e.currentTarget.style.borderColor = 'rgba(227,184,95,0.18)';
                       }}
                     >
                       {s}
@@ -287,7 +287,7 @@ export default function AIScreener({ embedded = false }) {
           {/* Loading */}
           {loading && (
             <div className="py-12 text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-[#FFB000] mx-auto mb-3" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#E3B85F] mx-auto mb-3" />
               <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
                 Converting query to filters & screening stocks<span className="cursor-blink">_</span>
               </p>
@@ -340,11 +340,11 @@ export default function AIScreener({ embedded = false }) {
 
               {/* AI Summary */}
               {results.summary && (
-                <Card className="rounded-none border-[#FFB000]/30 bg-[#FFB000]/5">
+                <Card className="rounded-none border-[#E3B85F]/30 bg-[#E3B85F]/5">
                   <CardContent className="p-4 flex items-start gap-3">
-                    <Zap className="w-4 h-4 text-[#FFB000] flex-shrink-0 mt-0.5" />
+                    <Zap className="w-4 h-4 text-[#E3B85F] flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-[10px] font-mono text-[#FFB000] uppercase tracking-wider mb-1">AI Analysis</p>
+                      <p className="text-[10px] font-mono text-[#E3B85F] uppercase tracking-wider mb-1">AI Analysis</p>
                       <p className="text-sm text-foreground leading-relaxed" data-testid="ai-summary">{results.summary}</p>
                     </div>
                   </CardContent>
@@ -380,7 +380,7 @@ export default function AIScreener({ embedded = false }) {
                               key={stock.symbol}
                               className="border-b transition-colors"
                               style={{ borderColor: 'rgba(255,255,255,0.05)' }}
-                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,176,0,0.04)'; }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(227,184,95,0.04)'; }}
                               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                             >
                               <td className="px-4 py-2.5">
@@ -404,7 +404,7 @@ export default function AIScreener({ embedded = false }) {
                                 <span className="font-data text-foreground">${formatPrice(stock.price)}</span>
                               </td>
                               <td className="px-4 py-2.5 text-right">
-                                <span className={`font-data flex items-center justify-end gap-1 ${isPositive ? 'dark:text-[#00FF41] text-[#059669]' : 'text-[#FF3333]'}`}>
+                                <span className={`font-data flex items-center justify-end gap-1 ${isPositive ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
                                   {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                                   {isPositive ? '+' : ''}{stock.change_percent?.toFixed(2)}%
                                 </span>
@@ -434,9 +434,9 @@ export default function AIScreener({ embedded = false }) {
                 <div className="py-12 flex flex-col items-center gap-3 text-center">
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{ background: 'rgba(255,176,0,0.07)', border: '1px solid rgba(255,176,0,0.15)' }}
+                    style={{ background: 'rgba(227,184,95,0.07)', border: '1px solid rgba(227,184,95,0.15)' }}
                   >
-                    <Search className="w-5 h-5 text-[#FFB000]" />
+                    <Search className="w-5 h-5 text-[#E3B85F]" />
                   </div>
                   <div>
                     <p className="text-sm font-mono font-semibold text-foreground mb-1" data-testid="no-results">No stocks matched</p>

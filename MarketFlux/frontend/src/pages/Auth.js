@@ -17,7 +17,7 @@ function PasswordStrength({ password }) {
     { label: 'Symbol', ok: /[^A-Za-z0-9]/.test(password) },
   ];
   const score = checks.filter(c => c.ok).length;
-  const colors = ['#FF3333', '#FF3333', '#FFB000', '#00FF41', '#00FF41'];
+  const colors = ['#FF3333', '#FF3333', '#E3B85F', '#E3B85F', '#E3B85F'];
   const labels = ['', 'Weak', 'Weak', 'Good', 'Strong'];
   return (
     <div className="mt-2 space-y-1.5">
@@ -36,7 +36,7 @@ function PasswordStrength({ password }) {
             <span
               key={label}
               className="text-[9px] font-mono flex items-center gap-0.5 transition-colors"
-              style={{ color: ok ? '#00FF41' : 'rgba(255,255,255,0.3)' }}
+              style={{ color: ok ? '#E3B85F' : 'rgba(255,255,255,0.3)' }}
             >
               <span style={{ fontSize: '8px' }}>{ok ? '✓' : '○'}</span> {label}
             </span>
@@ -103,46 +103,46 @@ export default function Auth() {
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       data-testid="auth-page"
       style={{
-        background: 'radial-gradient(ellipse at 20% 50%, rgba(0,255,65,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(0,243,255,0.05) 0%, transparent 40%), #09100d'
+        background: 'radial-gradient(ellipse at 20% 50%, rgba(227,184,95,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(146,152,166,0.05) 0%, transparent 40%), #09100d'
       }}
     >
       {/* Animated grid lines */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        backgroundImage: 'linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px)',
+        backgroundImage: 'linear-gradient(rgba(227,184,95,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(227,184,95,0.03) 1px, transparent 1px)',
         backgroundSize: '60px 60px'
       }} />
 
       {/* Floating stat pills — trust signals */}
-      <div className="absolute top-8 left-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(0,255,65,0.15)] bg-[rgba(0,255,65,0.04)]">
-        <BarChart2 className="w-3 h-3 text-[#00FF41]" />
-        <span className="text-[10px] font-mono text-[#00FF41]">Live Market Data</span>
+      <div className="absolute top-8 left-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(227,184,95,0.15)] bg-[rgba(227,184,95,0.04)]">
+        <BarChart2 className="w-3 h-3 text-[#E3B85F]" />
+        <span className="text-[10px] font-mono text-[#E3B85F]">Live Market Data</span>
       </div>
-      <div className="absolute top-8 right-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(0,243,255,0.15)] bg-[rgba(0,243,255,0.04)]">
-        <ShieldCheck className="w-3 h-3 text-[#00F3FF]" />
-        <span className="text-[10px] font-mono text-[#00F3FF]">Secure &amp; Encrypted</span>
+      <div className="absolute top-8 right-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(146,152,166,0.15)] bg-[rgba(146,152,166,0.04)]">
+        <ShieldCheck className="w-3 h-3 text-[#9298A6]" />
+        <span className="text-[10px] font-mono text-[#9298A6]">Secure &amp; Encrypted</span>
       </div>
-      <div className="absolute bottom-8 left-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(255,176,0,0.15)] bg-[rgba(255,176,0,0.04)]">
-        <Zap className="w-3 h-3 text-[#FFB000]" />
-        <span className="text-[10px] font-mono text-[#FFB000]">AI-Powered Research</span>
+      <div className="absolute bottom-8 left-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(227,184,95,0.15)] bg-[rgba(227,184,95,0.04)]">
+        <Zap className="w-3 h-3 text-[#E3B85F]" />
+        <span className="text-[10px] font-mono text-[#E3B85F]">AI-Powered Research</span>
       </div>
 
       <Card
-        className="w-full max-w-md relative z-10 border-[rgba(0,255,65,0.15)] shadow-2xl"
+        className="w-full max-w-md relative z-10 border-[rgba(227,184,95,0.15)] shadow-2xl"
         style={{
           background: 'linear-gradient(160deg, rgba(12,20,14,0.97) 0%, rgba(8,14,10,0.99) 100%)',
           backdropFilter: 'blur(24px)',
-          boxShadow: '0 0 0 1px rgba(0,255,65,0.08), 0 32px 80px rgba(0,0,0,0.6), 0 0 80px rgba(0,255,65,0.03)'
+          boxShadow: '0 0 0 1px rgba(227,184,95,0.08), 0 32px 80px rgba(0,0,0,0.6), 0 0 80px rgba(227,184,95,0.03)'
         }}
       >
         {/* Top accent line */}
-        <div className="absolute top-0 left-8 right-8 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(0,255,65,0.4), transparent)' }} />
+        <div className="absolute top-0 left-8 right-8 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(227,184,95,0.4), transparent)' }} />
 
         <CardHeader className="text-center pb-3 pt-8">
           <div className="flex items-center justify-center gap-2.5 mb-5">
             <div className="relative">
-              <Activity className="w-8 h-8 text-[#00FF41]" style={{ filter: 'drop-shadow(0 0 8px rgba(0,255,65,0.6))' }} />
+              <Activity className="w-8 h-8 text-[#E3B85F]" style={{ filter: 'drop-shadow(0 0 8px rgba(227,184,95,0.6))' }} />
             </div>
-            <span className="font-mono text-2xl font-bold text-[#00FF41] tracking-tight" style={{ textShadow: '0 0 20px rgba(0,255,65,0.4)' }}>
+            <span className="font-mono text-2xl font-bold text-[#E3B85F] tracking-tight" style={{ textShadow: '0 0 20px rgba(227,184,95,0.4)' }}>
               MARKET FLUX
             </span>
           </div>
@@ -163,7 +163,7 @@ export default function Auth() {
               background: 'rgba(255,255,255,0.03)',
               color: 'rgba(255,255,255,0.8)'
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,255,65,0.3)'; e.currentTarget.style.background = 'rgba(0,255,65,0.05)'; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(227,184,95,0.3)'; e.currentTarget.style.background = 'rgba(227,184,95,0.05)'; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
           >
             <svg className="w-4 h-4 mr-2.5" viewBox="0 0 24 24">
@@ -201,7 +201,7 @@ export default function Auth() {
           {success && (
             <div
               className="mb-4 p-3 flex items-start gap-2.5 text-xs font-mono border rounded"
-              style={{ borderColor: 'rgba(0,255,65,0.3)', background: 'rgba(0,255,65,0.06)', color: '#00FF41' }}
+              style={{ borderColor: 'rgba(227,184,95,0.3)', background: 'rgba(227,184,95,0.06)', color: '#E3B85F' }}
             >
               <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
               {success}
@@ -217,7 +217,7 @@ export default function Auth() {
                 data-testid="login-tab"
                 value="login"
                 className="flex-1 font-mono text-xs uppercase tracking-wider py-2 transition-all duration-200 data-[state=active]:text-black"
-                style={{'--tab-active-bg': '#00FF41'}}
+                style={{'--tab-active-bg': '#E3B85F'}}
               >
                 <LogIn className="w-3 h-3 mr-1.5" /> Login
               </TabsTrigger>
@@ -248,7 +248,7 @@ export default function Auth() {
                     className="font-mono text-sm transition-all duration-200"
                     style={{
                       background: 'rgba(255,255,255,0.03)',
-                      borderColor: loginEmail ? 'rgba(0,255,65,0.25)' : 'rgba(255,255,255,0.1)',
+                      borderColor: loginEmail ? 'rgba(227,184,95,0.25)' : 'rgba(255,255,255,0.1)',
                     }}
                   />
                 </div>
@@ -260,7 +260,7 @@ export default function Auth() {
                     </Label>
                     <button
                       type="button"
-                      className="text-[10px] font-mono text-[rgba(0,243,255,0.5)] hover:text-[#00F3FF] transition-colors"
+                      className="text-[10px] font-mono text-[rgba(146,152,166,0.5)] hover:text-[#9298A6] transition-colors"
                       onClick={() => {}}
                       tabIndex={-1}
                     >
@@ -279,7 +279,7 @@ export default function Auth() {
                       className="font-mono text-sm pr-10 transition-all duration-200"
                       style={{
                         background: 'rgba(255,255,255,0.03)',
-                        borderColor: loginPassword ? 'rgba(0,255,65,0.25)' : 'rgba(255,255,255,0.1)',
+                        borderColor: loginPassword ? 'rgba(227,184,95,0.25)' : 'rgba(255,255,255,0.1)',
                       }}
                     />
                     <button
@@ -299,9 +299,9 @@ export default function Auth() {
                   disabled={loading}
                   className="w-full font-mono text-xs uppercase tracking-wider py-5 transition-all duration-200 mt-2"
                   style={{
-                    background: loading ? 'rgba(0,255,65,0.4)' : '#00FF41',
+                    background: loading ? 'rgba(227,184,95,0.4)' : '#E3B85F',
                     color: '#000',
-                    boxShadow: loading ? 'none' : '0 0 20px rgba(0,255,65,0.25)'
+                    boxShadow: loading ? 'none' : '0 0 20px rgba(227,184,95,0.25)'
                   }}
                 >
                   {loading ? (
@@ -334,7 +334,7 @@ export default function Auth() {
                     className="font-mono text-sm transition-all duration-200"
                     style={{
                       background: 'rgba(255,255,255,0.03)',
-                      borderColor: regName ? 'rgba(0,255,65,0.25)' : 'rgba(255,255,255,0.1)',
+                      borderColor: regName ? 'rgba(227,184,95,0.25)' : 'rgba(255,255,255,0.1)',
                     }}
                   />
                 </div>
@@ -353,7 +353,7 @@ export default function Auth() {
                     className="font-mono text-sm transition-all duration-200"
                     style={{
                       background: 'rgba(255,255,255,0.03)',
-                      borderColor: regEmail ? 'rgba(0,255,65,0.25)' : 'rgba(255,255,255,0.1)',
+                      borderColor: regEmail ? 'rgba(227,184,95,0.25)' : 'rgba(255,255,255,0.1)',
                     }}
                   />
                 </div>
@@ -373,7 +373,7 @@ export default function Auth() {
                       className="font-mono text-sm pr-10 transition-all duration-200"
                       style={{
                         background: 'rgba(255,255,255,0.03)',
-                        borderColor: regPassword ? 'rgba(0,255,65,0.25)' : 'rgba(255,255,255,0.1)',
+                        borderColor: regPassword ? 'rgba(227,184,95,0.25)' : 'rgba(255,255,255,0.1)',
                       }}
                     />
                     <button
@@ -394,9 +394,9 @@ export default function Auth() {
                   disabled={loading}
                   className="w-full font-mono text-xs uppercase tracking-wider py-5 transition-all duration-200 mt-2"
                   style={{
-                    background: loading ? 'rgba(0,255,65,0.4)' : '#00FF41',
+                    background: loading ? 'rgba(227,184,95,0.4)' : '#E3B85F',
                     color: '#000',
-                    boxShadow: loading ? 'none' : '0 0 20px rgba(0,255,65,0.25)'
+                    boxShadow: loading ? 'none' : '0 0 20px rgba(227,184,95,0.25)'
                   }}
                 >
                   {loading ? (
@@ -421,7 +421,7 @@ export default function Auth() {
         </CardContent>
 
         {/* Bottom accent line */}
-        <div className="absolute bottom-0 left-8 right-8 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(0,243,255,0.2), transparent)' }} />
+        <div className="absolute bottom-0 left-8 right-8 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(146,152,166,0.2), transparent)' }} />
       </Card>
     </div>
   );
