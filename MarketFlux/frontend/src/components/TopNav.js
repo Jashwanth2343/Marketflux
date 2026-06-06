@@ -64,10 +64,10 @@ function MarketStatusDot() {
   return (
     <div className={`hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-mono uppercase tracking-wider border ${
       isOpen
-        ? 'border-[rgba(0,255,65,0.2)] bg-[rgba(0,255,65,0.06)] text-[#00FF41]'
+        ? 'border-[rgba(227,184,95,0.2)] bg-[rgba(227,184,95,0.06)] text-[#E3B85F]'
         : 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-[rgba(255,255,255,0.35)]'
     }`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-[#00FF41] pulse-live' : 'bg-[rgba(255,255,255,0.3)]'}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-[#E3B85F] pulse-live' : 'bg-[rgba(255,255,255,0.3)]'}`} />
       {isOpen ? 'Live' : 'Closed'}
     </div>
   );
@@ -96,10 +96,10 @@ export default function TopNav() {
         <div className="flex items-center gap-5 flex-shrink-0">
           <Link to="/" className="flex items-center gap-2 group" data-testid="logo-link">
             <Activity
-              className="w-5 h-5 text-[#00FF41] transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(0,255,65,0.8)]"
+              className="w-5 h-5 text-[#E3B85F] transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(227,184,95,0.8)]"
             />
-            <span className="font-mono text-base font-bold tracking-tight text-[#00FF41] hidden sm:inline"
-              style={{ textShadow: '0 0 12px rgba(0,255,65,0.3)' }}>
+            <span className="font-mono text-base font-bold tracking-tight text-[#E3B85F] hidden sm:inline"
+              style={{ textShadow: '0 0 12px rgba(227,184,95,0.3)' }}>
               MARKET FLUX
             </span>
           </Link>
@@ -116,15 +116,15 @@ export default function TopNav() {
                 to={path}
                 className={`relative flex items-center gap-1.5 px-3 py-2 text-[11px] font-mono uppercase tracking-wider rounded-md transition-all duration-150 ${
                   active
-                    ? 'text-[#00FF41] bg-[rgba(0,255,65,0.08)]'
+                    ? 'text-[#E3B85F] bg-[rgba(227,184,95,0.08)]'
                     : 'text-[rgba(255,255,255,0.45)] hover:text-[rgba(255,255,255,0.9)] hover:bg-[rgba(255,255,255,0.05)]'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {label}
                 {active && (
-                  <span className="absolute bottom-0 left-2 right-2 h-px bg-[#00FF41] rounded-full"
-                    style={{ boxShadow: '0 0 6px rgba(0,255,65,0.6)' }} />
+                  <span className="absolute bottom-0 left-2 right-2 h-px bg-[#E3B85F] rounded-full"
+                    style={{ boxShadow: '0 0 6px rgba(227,184,95,0.6)' }} />
                 )}
               </Link>
             );
@@ -152,9 +152,9 @@ export default function TopNav() {
           <div className="hidden lg:flex items-center gap-2">
             {user ? (
               <>
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[rgba(0,255,65,0.05)] border border-[rgba(0,255,65,0.12)]">
-                  <div className="w-5 h-5 rounded-full bg-[rgba(0,255,65,0.15)] flex items-center justify-center">
-                    <User className="w-3 h-3 text-[#00FF41]" />
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[rgba(227,184,95,0.05)] border border-[rgba(227,184,95,0.12)]">
+                  <div className="w-5 h-5 rounded-full bg-[rgba(227,184,95,0.15)] flex items-center justify-center">
+                    <User className="w-3 h-3 text-[#E3B85F]" />
                   </div>
                   <span className="text-[10px] font-mono text-[rgba(255,255,255,0.6)] max-w-[100px] truncate">
                     {user.name || user.email}
@@ -177,7 +177,7 @@ export default function TopNav() {
                     data-testid="login-nav-btn"
                     variant="ghost"
                     size="sm"
-                    className="text-[10px] font-mono uppercase tracking-wider gap-1.5 text-[rgba(255,255,255,0.45)] hover:text-[#00FF41] hover:bg-[rgba(0,255,65,0.06)] transition-all px-3 h-8"
+                    className="text-[10px] font-mono uppercase tracking-wider gap-1.5 text-[rgba(255,255,255,0.45)] hover:text-[#E3B85F] hover:bg-[rgba(227,184,95,0.06)] transition-all px-3 h-8"
                   >
                     <LogIn className="w-3 h-3" /> Login
                   </Button>
@@ -188,9 +188,9 @@ export default function TopNav() {
                   onClick={loginWithGoogle}
                   className="text-[10px] font-mono uppercase tracking-wider h-8 px-3 transition-all duration-200"
                   style={{
-                    background: '#00FF41',
+                    background: '#E3B85F',
                     color: '#000',
-                    boxShadow: '0 0 12px rgba(0,255,65,0.2)'
+                    boxShadow: '0 0 12px rgba(227,184,95,0.2)'
                   }}
                 >
                   Sign In
@@ -204,7 +204,7 @@ export default function TopNav() {
             data-testid="mobile-menu-toggle"
             variant="ghost"
             size="icon"
-            className="lg:hidden w-8 h-8 rounded-md text-[#00FF41] hover:bg-[rgba(0,255,65,0.08)]"
+            className="lg:hidden w-8 h-8 rounded-md text-[#E3B85F] hover:bg-[rgba(227,184,95,0.08)]"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -229,7 +229,7 @@ export default function TopNav() {
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-2.5 px-3 py-2.5 text-xs font-mono uppercase tracking-wider rounded-md transition-colors ${
                   isActive(path)
-                    ? 'bg-[rgba(0,255,65,0.1)] text-[#00FF41] border border-[rgba(0,255,65,0.2)]'
+                    ? 'bg-[rgba(227,184,95,0.1)] text-[#E3B85F] border border-[rgba(227,184,95,0.2)]'
                     : 'text-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.05)] hover:text-white border border-transparent'
                 }`}
               >
@@ -241,8 +241,8 @@ export default function TopNav() {
           <div className="pt-3 border-t border-[rgba(255,255,255,0.06)] flex flex-col gap-2">
             {user ? (
               <>
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[rgba(0,255,65,0.05)]">
-                  <User className="w-3.5 h-3.5 text-[#00FF41]" />
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[rgba(227,184,95,0.05)]">
+                  <User className="w-3.5 h-3.5 text-[#E3B85F]" />
                   <span className="text-xs font-mono text-[rgba(255,255,255,0.5)] truncate">{user.name || user.email}</span>
                 </div>
                 <Button
@@ -262,7 +262,7 @@ export default function TopNav() {
                 </Link>
                 <Button
                   className="w-full text-xs font-mono gap-2 justify-start"
-                  style={{ background: '#00FF41', color: '#000' }}
+                  style={{ background: '#E3B85F', color: '#000' }}
                   onClick={() => { loginWithGoogle(); setMobileOpen(false); }}
                 >
                   Continue with Google

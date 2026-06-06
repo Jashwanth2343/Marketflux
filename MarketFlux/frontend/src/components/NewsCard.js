@@ -1,17 +1,17 @@
 import { ExternalLink, Clock } from 'lucide-react';
 
 const SENTIMENT_STYLES = {
-  bullish:  { color: '#00FF41', bg: 'rgba(0,255,65,0.08)',   border: 'rgba(0,255,65,0.2)',   label: '▲ Bullish' },
-  BULLISH:  { color: '#00FF41', bg: 'rgba(0,255,65,0.08)',   border: 'rgba(0,255,65,0.2)',   label: '▲ Bullish' },
-  POSITIVE: { color: '#00FF41', bg: 'rgba(0,255,65,0.08)',   border: 'rgba(0,255,65,0.2)',   label: '▲ Bullish' },
-  positive: { color: '#00FF41', bg: 'rgba(0,255,65,0.08)',   border: 'rgba(0,255,65,0.2)',   label: '▲ Bullish' },
+  bullish:  { color: '#4ADE80', bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.2)',   label: '▲ Bullish' },
+  BULLISH:  { color: '#4ADE80', bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.2)',   label: '▲ Bullish' },
+  POSITIVE: { color: '#4ADE80', bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.2)',   label: '▲ Bullish' },
+  positive: { color: '#4ADE80', bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.2)',   label: '▲ Bullish' },
   bearish:  { color: '#FF4444', bg: 'rgba(255,51,51,0.08)',  border: 'rgba(255,51,51,0.2)',  label: '▼ Bearish' },
   BEARISH:  { color: '#FF4444', bg: 'rgba(255,51,51,0.08)',  border: 'rgba(255,51,51,0.2)',  label: '▼ Bearish' },
   NEGATIVE: { color: '#FF4444', bg: 'rgba(255,51,51,0.08)',  border: 'rgba(255,51,51,0.2)',  label: '▼ Bearish' },
   negative: { color: '#FF4444', bg: 'rgba(255,51,51,0.08)',  border: 'rgba(255,51,51,0.2)',  label: '▼ Bearish' },
-  neutral:  { color: '#FFB000', bg: 'rgba(255,176,0,0.08)',  border: 'rgba(255,176,0,0.2)',  label: '◆ Neutral' },
-  NEUTRAL:  { color: '#FFB000', bg: 'rgba(255,176,0,0.08)',  border: 'rgba(255,176,0,0.2)',  label: '◆ Neutral' },
-  Neutral:  { color: '#FFB000', bg: 'rgba(255,176,0,0.08)',  border: 'rgba(255,176,0,0.2)',  label: '◆ Neutral' },
+  neutral:  { color: '#9298A6', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
+  NEUTRAL:  { color: '#9298A6', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
+  Neutral:  { color: '#9298A6', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
 };
 
 function SentimentPill({ sentiment }) {
@@ -51,8 +51,8 @@ export default function NewsCard({ article, compact = false }) {
         className="group flex gap-3 p-3 rounded-lg border transition-all duration-200"
         style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.07)' }}
         onMouseEnter={e => {
-          e.currentTarget.style.borderColor = 'rgba(0,255,65,0.2)';
-          e.currentTarget.style.background = 'rgba(0,255,65,0.03)';
+          e.currentTarget.style.borderColor = 'rgba(227,184,95,0.2)';
+          e.currentTarget.style.background = 'rgba(227,184,95,0.03)';
         }}
         onMouseLeave={e => {
           e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
@@ -73,13 +73,13 @@ export default function NewsCard({ article, compact = false }) {
             <div className="flex flex-wrap gap-1 mb-1.5">
               {article.tickers.slice(0, 3).map(t => (
                 <span key={t} className="px-1.5 py-px text-[8px] font-mono font-bold rounded"
-                  style={{ background: 'rgba(0,255,65,0.08)', color: '#00FF41', border: '1px solid rgba(0,255,65,0.15)' }}>
+                  style={{ background: 'rgba(227,184,95,0.08)', color: '#E3B85F', border: '1px solid rgba(227,184,95,0.15)' }}>
                   {t}
                 </span>
               ))}
             </div>
           )}
-          <p className="text-sm text-foreground leading-snug line-clamp-2 group-hover:text-[#00FF41] transition-colors duration-150">
+          <p className="text-sm text-foreground leading-snug line-clamp-2 group-hover:text-[#E3B85F] transition-colors duration-150">
             {article.title}
           </p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -104,9 +104,9 @@ export default function NewsCard({ article, compact = false }) {
       className="group flex flex-col rounded-lg border overflow-hidden transition-all duration-200"
       style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.07)' }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'rgba(0,255,65,0.2)';
+        e.currentTarget.style.borderColor = 'rgba(227,184,95,0.2)';
         e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,255,65,0.08)';
+        e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(227,184,95,0.08)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
@@ -133,14 +133,14 @@ export default function NewsCard({ article, compact = false }) {
           <div className="flex flex-wrap gap-1">
             {article.tickers.slice(0, 3).map(t => (
               <span key={t} className="px-1.5 py-px text-[9px] font-mono font-bold rounded"
-                style={{ background: 'rgba(0,255,65,0.08)', color: '#00FF41', border: '1px solid rgba(0,255,65,0.15)' }}>
+                style={{ background: 'rgba(227,184,95,0.08)', color: '#E3B85F', border: '1px solid rgba(227,184,95,0.15)' }}>
                 {t}
               </span>
             ))}
           </div>
         )}
 
-        <p className="text-sm text-foreground font-medium leading-snug line-clamp-2 group-hover:text-[#00FF41] transition-colors duration-150 flex-1">
+        <p className="text-sm text-foreground font-medium leading-snug line-clamp-2 group-hover:text-[#E3B85F] transition-colors duration-150 flex-1">
           {article.title}
         </p>
 

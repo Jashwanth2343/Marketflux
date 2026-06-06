@@ -10,20 +10,20 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 const CUSTOM_STYLES = `
   .terminal-scrollbar::-webkit-scrollbar { width: 4px; }
   .terminal-scrollbar::-webkit-scrollbar-track { background: transparent; }
-  .terminal-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 255, 136, 0.3); border-radius: 4px; }
-  .terminal-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 255, 136, 0.6); }
+  .terminal-scrollbar::-webkit-scrollbar-thumb { background: rgba(227, 184, 95, 0.3); border-radius: 4px; }
+  .terminal-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(227, 184, 95, 0.6); }
   
   .terminal-pulse {
-    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4);
+    box-shadow: 0 0 0 0 rgba(227, 184, 95, 0.4);
     animation: pulse-green 2s infinite;
   }
   @keyframes pulse-green {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.8); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(0, 255, 136, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(227, 184, 95, 0.8); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(227, 184, 95, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(227, 184, 95, 0); }
   }
 
-  .eq-bar { animation: eq-bounce 1.2s ease-in-out infinite; background: #00ff88; width: 3px; border-radius: 2px; }
+  .eq-bar { animation: eq-bounce 1.2s ease-in-out infinite; background: #E3B85F; width: 3px; border-radius: 2px; }
   .eq-bar:nth-child(1) { animation-delay: 0.0s; }
   .eq-bar:nth-child(2) { animation-delay: 0.2s; }
   .eq-bar:nth-child(3) { animation-delay: 0.4s; }
@@ -47,7 +47,7 @@ const CUSTOM_STYLES = `
 
   .fin-card {
     background: var(--card-bg, rgba(255, 255, 255, 0.03));
-    border-left: 3px solid #00ff88;
+    border-left: 3px solid #E3B85F;
     padding: 10px 14px;
     margin: 6px 0;
     border-radius: 6px;
@@ -64,7 +64,7 @@ const CUSTOM_STYLES = `
   .fin-card-value { color: var(--color-accent); font-weight: 700; font-size: 15px; }
   .dark .fin-card-value { color: var(--color-accent); }
   .fin-impact-badge {
-    background: rgba(0, 255, 136, 0.15);
+    background: rgba(227, 184, 95, 0.15);
     color: var(--color-accent);
     font-size: 10px;
     padding: 2px 6px;
@@ -234,7 +234,7 @@ function renderMarkdown(text) {
 
   // 3. Handle Typography
   return html
-    .replace(/^### (.*$)/gm, '<h3 style="color: var(--color-accent, #00ff88); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 20px; margin-bottom: 8px;">$1</h3>')
+    .replace(/^### (.*$)/gm, '<h3 style="color: var(--color-accent, #E3B85F); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 20px; margin-bottom: 8px;">$1</h3>')
     .replace(/^## (.*$)/gm, '<h2 style="color: #ffffff; font-size: 15px; font-weight: 700; border-left: 3px solid var(--color-accent); padding-left: 8px; margin-top: 24px; margin-bottom: 10px;">$1</h2>')
     .replace(/^# (.*$)/gm, '<h1 style="color: #ffffff; font-size: 18px; font-weight: 800; margin-top: 28px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">$1</h1>')
     .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #ffffff; font-weight: 700;">$1</strong>')
@@ -630,7 +630,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
         <button
           data-testid="chatbot-toggle"
           onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-6 right-6 z-[999] group flex items-center justify-center gap-2 px-5 py-3.5 bg-gradient-to-tr from-primary to-[#00d035] text-primary-foreground font-semibold rounded-full shadow-lg hover:shadow-primary/30 hover:scale-105 transition-all duration-300"
+          className="fixed bottom-6 right-6 z-[999] group flex items-center justify-center gap-2 px-5 py-3.5 bg-gradient-to-tr from-primary to-[#F4D078] text-primary-foreground font-semibold rounded-full shadow-lg hover:shadow-primary/30 hover:scale-105 transition-all duration-300"
         >
           <TerminalSquare className="w-5 h-5 fill-black/10" />
           <span className="text-sm hidden sm:inline">Flux AI</span>
@@ -643,7 +643,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
           data-testid="chatbot-window"
           className={`fixed z-[999] flex flex-col overflow-hidden transition-transform duration-300 ease-in-out border-[rgba(255,255,255,0.08)] ${isDesktop
             ? 'top-0 right-0 bottom-0 h-full border-l shadow-2xl'
-            : 'bottom-6 right-6 w-[380px] h-[580px] max-h-[85vh] rounded-[12px] shadow-[0_0_40px_rgba(0,255,136,0.05)] border-t border-l border-r'
+            : 'bottom-6 right-6 w-[380px] h-[580px] max-h-[85vh] rounded-[12px] shadow-[0_0_40px_rgba(227,184,95,0.05)] border-t border-l border-r'
             }`}
           style={{
             width: isDesktop ? `${chatWidth}px` : '380px',
@@ -662,7 +662,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
           )}
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)]" style={{ backgroundColor: '#0a0a0a' }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)]" style={{ backgroundColor: '#15130F' }}>
             <div className="flex items-center gap-2">
               {showHistory && (
                 <button onClick={() => setShowHistory(false)} className="mr-1">
@@ -853,7 +853,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
               {/* Input */}
               <div
                 className="p-3 border-t border-[rgba(255,255,255,0.08)]"
-                style={{ backgroundColor: '#0a0a0a' }}
+                style={{ backgroundColor: '#15130F' }}
               >
                 <form
                   onSubmit={(e) => {
@@ -879,7 +879,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
                         }
                       }}
                       placeholder="Ask about markets, stocks, macro..."
-                      className="flex-1 w-full dark:bg-[rgba(255,255,255,0.04)] bg-slate-100 text-foreground dark:border-[rgba(255,255,255,0.1)] border-border focus:border-primary/50 focus:ring-0 focus:shadow-[0_0_0_2px_rgba(0,255,136,0.1)] rounded-md font-mono text-xs px-3 py-2.5 min-h-[40px] resize-none terminal-scrollbar placeholder:text-muted-foreground/50 pr-8"
+                      className="flex-1 w-full dark:bg-[rgba(255,255,255,0.04)] bg-slate-100 text-foreground dark:border-[rgba(255,255,255,0.1)] border-border focus:border-primary/50 focus:ring-0 focus:shadow-[0_0_0_2px_rgba(227,184,95,0.1)] rounded-md font-mono text-xs px-3 py-2.5 min-h-[40px] resize-none terminal-scrollbar placeholder:text-muted-foreground/50 pr-8"
                       rows={1}
                       disabled={loading || (!aiUsage.unlimited && aiUsage.remaining <= 0)}
                     />

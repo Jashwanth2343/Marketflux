@@ -144,7 +144,7 @@ export default function StandingAgents() {
                             onChange={(e) => setForm((f) => ({ ...f, interval_minutes: Number(e.target.value) }))}
                             className="h-10 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm text-foreground outline-none"
                         >
-                            {INTERVALS.map((i) => <option key={i.value} value={i.value} className="bg-[#0a0a0a]">{i.label}</option>)}
+                            {INTERVALS.map((i) => <option key={i.value} value={i.value} className="bg-[#15130F]">{i.label}</option>)}
                         </select>
                         <Button onClick={create} disabled={creating} className="rounded-xl gap-1.5">
                             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Create & activate

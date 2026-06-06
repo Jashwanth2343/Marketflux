@@ -30,7 +30,7 @@ function YieldCurveChart({ yields, curveLabel, curveColor }) {
               <span className="font-mono text-[9px] text-foreground/70">{val?.toFixed(2)}%</span>
               <div
                 className="w-full rounded-none transition-all"
-                style={{ height: `${Math.max(8, heightPct)}%`, background: curveColor || '#00F3FF', opacity: 0.8 }}
+                style={{ height: `${Math.max(8, heightPct)}%`, background: curveColor || '#9298A6', opacity: 0.8 }}
               />
               <span className="font-mono text-[9px] text-muted-foreground">{mat}</span>
             </div>
@@ -137,7 +137,7 @@ function SectorTable({ sectors }) {
                 {s.return_3m >= 0 ? '+' : ''}{s.return_3m}%
               </td>
               <td className="text-right pl-2">
-                <span className={`font-mono text-[9px] px-1.5 py-0.5 ${s.momentum_acceleration > 1 ? 'text-[#00FF41] bg-[#00FF41]/10' : s.momentum_acceleration < -1 ? 'text-[#F85149] bg-[#F85149]/10' : 'text-muted-foreground'}`}>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 ${s.momentum_acceleration > 1 ? 'text-[#4ADE80] bg-[#4ADE80]/10' : s.momentum_acceleration < -1 ? 'text-[#F85149] bg-[#F85149]/10' : 'text-muted-foreground'}`}>
                   {s.momentum_acceleration > 0.5 ? '↑ ACCEL' : s.momentum_acceleration < -0.5 ? '↓ DECEL' : '→ FLAT'}
                 </span>
               </td>
@@ -152,7 +152,7 @@ function SectorTable({ sectors }) {
 // --- Economic Calendar ---
 function EconCalendar({ calendar }) {
   if (!calendar || calendar.length === 0) return null;
-  const importanceColor = { CRITICAL: '#F85149', HIGH: '#F0A500', MEDIUM: '#00F3FF' };
+  const importanceColor = { CRITICAL: '#F85149', HIGH: '#F0A500', MEDIUM: '#9298A6' };
   return (
     <div className="space-y-2">
       {calendar.map((ev, i) => (
@@ -224,10 +224,10 @@ export default function MacroDashboard({ embedded = false }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <Globe className="w-5 h-5 text-[#00F3FF]" />
+          <Globe className="w-5 h-5 text-[#9298A6]" />
           <div>
             <h1 className="font-mono text-xl font-bold tracking-tight text-foreground">
-              Macro <span style={{ color: '#00F3FF', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>Dashboard</span>
+              Macro <span style={{ color: '#9298A6', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>Dashboard</span>
             </h1>
             <p className="font-mono text-[11px] text-muted-foreground">
               Yield Curve · VIX Regime · Sector Rotation · Economic Calendar
@@ -248,7 +248,7 @@ export default function MacroDashboard({ embedded = false }) {
             className="h-8 px-3 text-[11px] font-mono uppercase tracking-wider gap-1.5"
             style={{
               border: '1px solid rgba(255,255,255,0.08)',
-              color: refreshing ? '#00F3FF' : 'rgba(255,255,255,0.4)',
+              color: refreshing ? '#9298A6' : 'rgba(255,255,255,0.4)',
             }}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
@@ -260,9 +260,9 @@ export default function MacroDashboard({ embedded = false }) {
       {macro_summary && (
         <div
           className="p-3.5 rounded-xl"
-          style={{ border: '1px solid rgba(0,243,255,0.18)', background: 'rgba(0,243,255,0.05)' }}
+          style={{ border: '1px solid rgba(146,152,166,0.18)', background: 'rgba(146,152,166,0.05)' }}
         >
-          <p className="font-mono text-[10px] text-[#00F3FF] uppercase tracking-wider mb-1.5">Macro Intelligence Summary</p>
+          <p className="font-mono text-[10px] text-[#9298A6] uppercase tracking-wider mb-1.5">Macro Intelligence Summary</p>
           <p className="font-mono text-xs text-foreground/80 leading-relaxed">{macro_summary}</p>
         </div>
       )}
@@ -284,13 +284,13 @@ export default function MacroDashboard({ embedded = false }) {
                   <span className="font-mono text-2xl font-black text-foreground">{fear_greed.value}</span>
                   <Badge variant="outline" className="font-mono text-[10px]">{fear_greed.label}</Badge>
                 </div>
-                <div className="w-full h-2 bg-gradient-to-r from-[#F85149] via-[#F0A500] via-[#00F3FF] to-[#00FF41] rounded-none">
+                <div className="w-full h-2 bg-gradient-to-r from-[#F85149] via-[#F0A500] via-[#9298A6] to-[#E3B85F] rounded-none">
                   <div className="w-3 h-3 -mt-0.5 bg-white rounded-full shadow transition-all duration-500"
                     style={{ marginLeft: `${(fear_greed.value - 3) / 97 * 100}%` }} />
                 </div>
                 <div className="flex justify-between mt-1">
                   <span className="font-mono text-[9px] text-[#F85149]">Extreme Fear</span>
-                  <span className="font-mono text-[9px] text-[#00FF41]">Extreme Greed</span>
+                  <span className="font-mono text-[9px] text-[#E3B85F]">Extreme Greed</span>
                 </div>
               </CardContent>
             </Card>

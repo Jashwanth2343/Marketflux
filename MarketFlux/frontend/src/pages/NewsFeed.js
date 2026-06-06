@@ -7,9 +7,9 @@ import api from '@/lib/api';
 
 const SENTIMENT_OPTIONS = [
   { value: '', label: 'All' },
-  { value: 'bullish', label: '▲ Bullish', color: '#00FF41', bg: 'rgba(0,255,65,0.08)', border: 'rgba(0,255,65,0.25)' },
+  { value: 'bullish', label: '▲ Bullish', color: '#4ADE80', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.25)' },
   { value: 'bearish', label: '▼ Bearish', color: '#FF4444', bg: 'rgba(255,68,68,0.08)', border: 'rgba(255,68,68,0.25)' },
-  { value: 'neutral', label: '◆ Neutral', color: '#FFB000', bg: 'rgba(255,176,0,0.08)', border: 'rgba(255,176,0,0.25)' },
+  { value: 'neutral', label: '◆ Neutral', color: '#9298A6', bg: 'rgba(146,152,166,0.08)', border: 'rgba(146,152,166,0.25)' },
 ];
 
 const CATEGORY_OPTIONS = [
@@ -134,9 +134,9 @@ export default function NewsFeed({ embedded = false }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Newspaper className="w-5 h-5 text-[#00F3FF]" />
+            <Newspaper className="w-5 h-5 text-[#9298A6]" />
             <h1 className="text-xl md:text-2xl font-mono font-bold tracking-tight text-foreground">
-              News <span style={{ color: '#00F3FF', textShadow: '0 0 10px rgba(0,243,255,0.4)' }}>Feed</span>
+              News <span style={{ color: '#9298A6', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>Feed</span>
             </h1>
           </div>
           <p className="text-[11px] font-mono text-muted-foreground">
@@ -156,10 +156,10 @@ export default function NewsFeed({ embedded = false }) {
           disabled={refreshing}
           className="text-[11px] font-mono uppercase tracking-wider gap-1.5 h-8 px-3 transition-all"
           style={{
-            color: refreshing ? '#00FF41' : 'rgba(255,255,255,0.4)',
+            color: refreshing ? '#E3B85F' : 'rgba(255,255,255,0.4)',
             border: '1px solid',
-            borderColor: refreshing ? 'rgba(0,255,65,0.3)' : 'rgba(255,255,255,0.08)',
-            background: refreshing ? 'rgba(0,255,65,0.05)' : 'transparent',
+            borderColor: refreshing ? 'rgba(227,184,95,0.3)' : 'rgba(255,255,255,0.08)',
+            background: refreshing ? 'rgba(227,184,95,0.05)' : 'transparent',
           }}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -196,7 +196,7 @@ export default function NewsFeed({ embedded = false }) {
             type="submit"
             size="sm"
             className="h-9 px-4 text-[11px] font-mono uppercase tracking-wider rounded-lg"
-            style={{ background: '#00F3FF', color: '#000' }}
+            style={{ background: '#9298A6', color: '#000' }}
           >
             Search
           </Button>
@@ -250,16 +250,16 @@ export default function NewsFeed({ embedded = false }) {
             onClick={() => setWatchlistOnly(!watchlistOnly)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-semibold tracking-wide transition-all duration-150"
             style={watchlistOnly ? {
-              color: '#00FF41', background: 'rgba(0,255,65,0.08)',
-              border: '1px solid rgba(0,255,65,0.25)',
-              boxShadow: '0 0 8px rgba(0,255,65,0.1)',
+              color: '#E3B85F', background: 'rgba(227,184,95,0.08)',
+              border: '1px solid rgba(227,184,95,0.25)',
+              boxShadow: '0 0 8px rgba(227,184,95,0.1)',
             } : {
               color: 'rgba(255,255,255,0.35)',
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.08)',
             }}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${watchlistOnly ? 'bg-[#00FF41] pulse-live' : 'bg-[rgba(255,255,255,0.2)]'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${watchlistOnly ? 'bg-[#E3B85F] pulse-live' : 'bg-[rgba(255,255,255,0.2)]'}`} />
             Watchlist
           </button>
 
@@ -287,12 +287,12 @@ export default function NewsFeed({ embedded = false }) {
         <div className="py-20 flex flex-col items-center gap-4 text-center">
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(0,243,255,0.07)', border: '1px solid rgba(0,243,255,0.15)' }}
+            style={{ background: 'rgba(146,152,166,0.07)', border: '1px solid rgba(146,152,166,0.15)' }}
           >
             {keyword || sentimentFilter || categoryFilter ? (
-              <Search className="w-7 h-7" style={{ color: '#00F3FF' }} />
+              <Search className="w-7 h-7" style={{ color: '#9298A6' }} />
             ) : (
-              <WifiOff className="w-7 h-7" style={{ color: '#00F3FF' }} />
+              <WifiOff className="w-7 h-7" style={{ color: '#9298A6' }} />
             )}
           </div>
           <div>
@@ -312,7 +312,7 @@ export default function NewsFeed({ embedded = false }) {
               variant="ghost"
               size="sm"
               onClick={() => { setSentimentFilter(''); setCategoryFilter(''); setKeyword(''); }}
-              className="text-xs font-mono text-[#00F3FF] hover:bg-[rgba(0,243,255,0.06)]"
+              className="text-xs font-mono text-[#9298A6] hover:bg-[rgba(146,152,166,0.06)]"
             >
               Clear filters
             </Button>
@@ -333,7 +333,7 @@ export default function NewsFeed({ embedded = false }) {
         <div className="py-6 text-center">
           <div
             className="w-5 h-5 rounded-full border-2 animate-spin mx-auto"
-            style={{ borderColor: 'rgba(0,243,255,0.2)', borderTopColor: '#00F3FF' }}
+            style={{ borderColor: 'rgba(146,152,166,0.2)', borderTopColor: '#9298A6' }}
           />
         </div>
       )}
@@ -350,9 +350,9 @@ export default function NewsFeed({ embedded = false }) {
             color: 'rgba(255,255,255,0.4)',
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'rgba(0,243,255,0.25)';
-            e.currentTarget.style.color = '#00F3FF';
-            e.currentTarget.style.background = 'rgba(0,243,255,0.04)';
+            e.currentTarget.style.borderColor = 'rgba(146,152,166,0.25)';
+            e.currentTarget.style.color = '#9298A6';
+            e.currentTarget.style.background = 'rgba(146,152,166,0.04)';
           }}
           onMouseLeave={e => {
             e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
