@@ -84,6 +84,10 @@ async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
         existing_ts = existing.get("created_at")
         if isinstance(existing_ts, str):
             existing_ts = datetime.fromisoformat(existing_ts)
+        # PyMongo decodes BSON dates as naive UTC; cutoff is aware. Normalize
+        # so the comparison can't raise TypeError on stale approval clicks.
+        if existing_ts is not None and existing_ts.tzinfo is None:
+            existing_ts = existing_ts.replace(tzinfo=timezone.utc)
         if existing_ts and existing_ts < cutoff:
             return {"ok": False, "error": "Trade proposal expired (older than 1 hour). Ask the copilot for a fresh recommendation."}
         return {"ok": False, "error": f"Trade already {existing.get('status', 'processed')}."}

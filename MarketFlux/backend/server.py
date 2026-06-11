@@ -61,7 +61,8 @@ if not _raw_jwt_secret or len(_raw_jwt_secret) < 32:
     if not _supabase_auth_enabled:
         raise RuntimeError(
             "SECURITY: JWT_SECRET env var is missing or too short (must be ≥32 chars). "
-            "Either set JWT_SECRET or configure SUPABASE_URL + SUPABASE_SERVICE_KEY."
+            "Either set JWT_SECRET or configure SUPABASE_URL plus SUPABASE_SERVICE_KEY "
+            "(or SUPABASE_ANON_KEY)."
         )
     import secrets as _secrets
     import logging as _logging

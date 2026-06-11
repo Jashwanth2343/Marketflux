@@ -247,11 +247,14 @@ def build_thesis_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
         alpaca_close_order = None
         if payload.status == "closed" and is_alpaca_configured():
-            from .alpaca_client import close_position
+            from .alpaca_client import broker_close_position, close_position
             # Use per-user broker sub-account if available, else shared paper account.
             user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
             alpaca_account_id = (user_doc or {}).get("alpaca_account_id")
-            alpaca_close_order = close_position(trade["ticker"])
+            if alpaca_account_id:
+                alpaca_close_order = broker_close_position(alpaca_account_id, trade["ticker"])
+            else:
+                alpaca_close_order = close_position(trade["ticker"])
             if alpaca_close_order:
                 _logger.info(
                     f"Paper trade {trade_id} closed on Alpaca "

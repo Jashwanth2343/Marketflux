@@ -237,7 +237,7 @@ async def get_recent_filings(symbol: str) -> dict:
         rows = await _list_filings_raw(symbol, SUPPORTED_FORMS, limit=12)
     except Exception as exc:  # noqa: BLE001
         logger.warning("get_recent_filings(%s) failed: %s", symbol, exc)
-        return {"ok": False, "error": f"EDGAR list failed: {exc}"}
+        return {"ok": False, "error": "EDGAR filings list is temporarily unavailable."}
     if not rows:
         return {"ok": False, "error": f"No EDGAR filings found for {symbol}."}
     return {"ok": True, "symbol": symbol, "count": len(rows),
@@ -294,7 +294,7 @@ async def search_filings(symbol: str, query: str, form: str = "10-K") -> dict:
                 "source": "SEC EDGAR full text"}
     except Exception as exc:  # noqa: BLE001
         logger.warning("search_filings(%s) failed: %s", symbol, exc)
-        return {"ok": False, "error": f"filing search failed: {exc}"}
+        return {"ok": False, "error": "Filing search is temporarily unavailable."}
 
 
 async def diff_risk_factors(symbol: str) -> dict:
@@ -336,4 +336,4 @@ async def diff_risk_factors(symbol: str) -> dict:
                 "source": "SEC EDGAR Item 1A diff"}
     except Exception as exc:  # noqa: BLE001
         logger.warning("diff_risk_factors(%s) failed: %s", symbol, exc)
-        return {"ok": False, "error": f"risk factor diff failed: {exc}"}
+        return {"ok": False, "error": "Risk-factor diff is temporarily unavailable."}
