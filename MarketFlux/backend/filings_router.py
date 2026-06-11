@@ -42,10 +42,13 @@ def _clean_symbol(symbol: str) -> str:
 
 def _fail(res: dict, fallback: str) -> HTTPException:
     msg = res.get("error") or ""
-    if not any(msg.startswith(m) for m in _SAFE_ERROR_MARKERS):
-        logger.warning("filings route error (sanitized): %s", msg)
-        msg = fallback
-    return HTTPException(404, msg)
+    if any(msg.startswith(m) for m in _SAFE_ERROR_MARKERS):
+        # Known "data not available" case — 404 is correct.
+        return HTTPException(404, msg)
+    # Unknown/transient error — sanitize and return 503 so clients (and caches)
+    # don't treat a temporary upstream outage as a permanent "not found".
+    logger.warning("filings route error (sanitized): %s", msg)
+    return HTTPException(503, fallback)
 
 
 def build_filings_router() -> APIRouter:

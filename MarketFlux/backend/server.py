@@ -106,22 +106,28 @@ app.add_middleware(LimitRequestSizeMiddleware)
 # Treat an empty/whitespace ALLOWED_ORIGINS the same as unset — otherwise the
 # split produces [''] and CORS silently blocks the local frontend (a "Failed to
 # fetch" footgun). Always include the localhost dev origins as a baseline.
+_is_prod = os.environ.get("NODE_ENV", "").lower() == "production"
 _DEFAULT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 _origins_env = os.environ.get('ALLOWED_ORIGINS', '').strip()
-_allowed_origins = [o.strip() for o in _origins_env.split(',') if o.strip()] or _DEFAULT_ORIGINS
-for _o in _DEFAULT_ORIGINS:
-    if _o not in _allowed_origins:
-        _allowed_origins.append(_o)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed_origins,
-    # Accept the dev frontend on ANY localhost/127.0.0.1 port so a port mismatch
-    # never silently breaks the app with a CORS "Failed to fetch".
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_allowed_origins = [o.strip() for o in _origins_env.split(',') if o.strip()]
+if not _allowed_origins:
+    _allowed_origins = list(_DEFAULT_ORIGINS)
+elif not _is_prod:
+    # In dev append localhost defaults so a port mismatch never silently
+    # breaks the local frontend; in prod ALLOWED_ORIGINS is authoritative.
+    for _o in _DEFAULT_ORIGINS:
+        if _o not in _allowed_origins:
+            _allowed_origins.append(_o)
+_cors_kwargs: dict = {
+    "allow_origins": _allowed_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if not _is_prod:
+    # Accept the dev frontend on any localhost/127.0.0.1 port.
+    _cors_kwargs["allow_origin_regex"] = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 @app.get("/")
 def read_root():

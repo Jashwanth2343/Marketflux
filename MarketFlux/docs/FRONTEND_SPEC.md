@@ -8,23 +8,27 @@
 
 ## 0. Design Language (global)
 
-**Theme:** Retrofuturism / Cyberpunk Trader — "high-visibility terminal for the modern age."
-Emotional tone: intense, precise, nostalgic, electric. Data density over whitespace.
+**Theme:** Warm-ink canvas — "a financial terminal that feels like a well-made object."
+Emotional tone: calm authority, precision, warmth. Substance over spectacle; data density with
+breathing room.
 
-- **Colors:** background `#050505`, card `#0A0A0A`, primary neon green `#00FF41`, secondary cyan
-  `#00F3FF`, accent amber `#FFB000`, destructive red `#FF3333`, border `#1E293B`. Green/cyan are for
-  **data values only**; body text stays `#EDEDED`/white.
-- **Typography:** headings/mono = Space Mono; body = Inter; data/numbers = JetBrains Mono. Headings
-  are `uppercase tracking-tighter`. Numbers are tabular/`font-data`.
-- **Shape:** sharp edges — no radius larger than ~2px. 1px solid borders everywhere; depth comes from
-  borders, not shadows. Cards get optional "corner bracket" accents.
-- **Motion:** mechanical / glitchy, not fluid. Framer Motion staggered fades (`y:10 → 0`, linear ease,
-  ~0.2s). Hover states **invert** (black text on green) or add a glow `shadow-[0_0_10px_rgba(0,255,65,0.3)]`.
-- **Atmosphere:** fixed scanline overlay (`ScanlineOverlay`), subtle SVG grid background, pulse-dot for
-  "live" states.
-- **Layout:** Bento Grid Mode B (high density), `grid-cols-1 md:grid-cols-4 gap-4`. Containers fill
-  height. Default theme is **dark**; a light theme exists via `ThemeContext` (sun/moon toggle).
-- **Charts:** Recharts, neon green/cyan lines, subtle/hidden gridlines, dark tooltips.
+- **Colors (dark mode — default):** background `hsl(40 14% 4%)`, card `hsl(40 17% 7%)`, primary
+  champagne-gold accent `#E3B85F` (`hsl(40 70% 63%)`), pewter neutral `hsl(222 10% 61%)`,
+  price-up green `hsl(142 71% 45%)`, price-down red `hsl(0 84% 60%)`, border `hsl(40 17% 14%)`.
+  Foreground (body text) `hsl(44 43% 90%)` — warm cream. **Gold is the single brand accent;**
+  green/red are **price-semantic only.**
+- **Colors (light mode):** background `hsl(42 43% 91%)` warm cream paper, card `hsl(42 62% 96%)`,
+  accent `#C99A35`, border `hsl(42 32% 83%)`.
+- **Typography:** display/headings = DM Serif Display (400); UI labels/body = DM Sans (400–700);
+  code/numbers = JetBrains Mono (400–700). Numbers use tabular figures (`font-variant-numeric:
+  tabular-nums`).
+- **Shape:** rounded corners (`--radius: 0.75rem`). Depth comes from subtle border and card
+  background steps, not drop-shadows. Cards use `hsl(40 17% 7%)` on the near-black canvas.
+- **Motion:** smooth but purposeful — no glitch effects. Hover states shift to gold accent or
+  add a warm glow. Transitions ~150–200ms ease-out.
+- **Layout:** responsive grid, `grid-cols-1 md:grid-cols-4 gap-4`. Default theme is **dark**; light
+  theme toggleable via header sun/moon control.
+- **Charts:** Recharts; gold/pewter accent lines, muted gridlines, dark tooltips.
 - **Notifications:** `sonner` toasts, top-right.
 
 ---
