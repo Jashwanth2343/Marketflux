@@ -38,11 +38,11 @@ class ThesisCreate(BaseModel):
 def build_ledger_router(db, get_current_user: Callable[[Request], Any]) -> APIRouter:
     router = APIRouter(prefix="/api/ledger", tags=["ledger"])
 
-    async def _resolve_user_id(request: Request) -> str:
-        user = await get_current_user(request)
-        return user["user_id"] if user else _ANON_ID
-
     async def _resolve_user_id_required(request: Request) -> str:
+        """Reads AND writes require auth in production: theses are personal
+        records, and letting anonymous traffic share the local fallback id
+        would leak one anonymous user's ledger to another. Local/dev keeps
+        the shared id so the app works without login."""
         user = await get_current_user(request)
         if user:
             return user["user_id"]
@@ -53,7 +53,7 @@ def build_ledger_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.get("/theses")
     async def theses_list(request: Request, status: Optional[str] = None,
                           agent_id: Optional[str] = None, limit: int = 200):
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         items = await ledger.list_theses(db, user_id, status=status,
                                          agent_id=agent_id, limit=limit)
         return {"items": items, "count": len(items)}
@@ -85,12 +85,12 @@ def build_ledger_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
     @router.get("/stats")
     async def ledger_stats(request: Request):
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         return await ledger.get_stats(db, user_id)
 
     @router.get("/audit/{thesis_id}")
     async def thesis_audit(thesis_id: str, request: Request):
-        user_id = await _resolve_user_id(request)
+        user_id = await _resolve_user_id_required(request)
         t = await db[ledger.COLLECTION].find_one({"id": thesis_id, "user_id": user_id})
         if not t:
             raise HTTPException(404, "thesis not found")
