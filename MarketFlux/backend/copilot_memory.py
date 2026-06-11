@@ -145,6 +145,28 @@ async def add_turn(user_id: str, user_message: str, assistant_message: str) -> N
         logger.warning("memory add failed: %s", exc)
 
 
+async def add_fact(user_id: str, fact: str, category: str = "lesson") -> bool:
+    """Store a single durable fact (e.g. a self-review lesson) in long-term memory.
+
+    Unlike add_turn (which extracts facts from a dialogue), this writes one explicit
+    statement so the self-improvement loop can persist graded lessons directly.
+    """
+    mem = await _memory_async()
+    if not mem or not (fact or "").strip():
+        return False
+    try:
+        await asyncio.to_thread(
+            lambda: mem.add(
+                [{"role": "assistant", "content": fact[:4000]}],
+                user_id=user_id, metadata={"category": category},
+            )
+        )
+        return True
+    except Exception as exc:
+        logger.warning("memory add_fact failed: %s", exc)
+        return False
+
+
 def schedule_add_turn(user_id: str, user_message: str, assistant_message: str) -> None:
     """Fire-and-forget memory write — never blocks the chat response."""
     try:
