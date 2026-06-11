@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, ArrowLeft, Zap, BarChart3, DollarSign, Activi
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, Bar, Cell, ReferenceLine, CartesianGrid } from 'recharts';
 import { useTheme } from '@/contexts/ThemeContext';
 import NewsCard from '@/components/NewsCard';
+import FilingsPanel from '@/components/FilingsPanel';
 import api from '@/lib/api';
 
 function fmt(val, opts = {}) {
@@ -59,7 +60,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     const change = data.change_from_prev;
 
     return (
-      <div className="bg-[#0A0A0A] border border-border p-2 shadow-2xl rounded-none font-mono text-[10px] min-w-[140px] z-50">
+      <div className="bg-[#15130F] border border-border p-2 shadow-2xl rounded-none font-mono text-[10px] min-w-[140px] z-50">
         <div className="text-muted-foreground mb-1 border-b border-border/50 pb-1 flex justify-between">
           <span>{label}</span>
           <Clock className="w-3 h-3 opacity-50" />
@@ -329,7 +330,7 @@ export default function StockDetail() {
               <h1 className="text-2xl md:text-4xl font-bold tracking-tighter uppercase text-foreground flex items-center gap-3">
                 {stock.symbol}
                 <button onClick={toggleWatchlist} className="focus:outline-none transition-transform hover:scale-110">
-                  <Star className={`w-6 h-6 ${isWatched ? 'fill-[#00FF41] dark:text-[#00FF41] text-[#059669] drop-shadow-[0_0_8px_rgba(0,255,65,0.6)]' : 'text-muted-foreground/50 hover:text-foreground'}`} />
+                  <Star className={`w-6 h-6 ${isWatched ? 'fill-[#E3B85F] dark:text-[#E3B85F] text-[#059669] drop-shadow-[0_0_8px_rgba(227,184,95,0.6)]' : 'text-muted-foreground/50 hover:text-foreground'}`} />
                 </button>
               </h1>
               {stock.exchange && <Badge variant="outline" className="rounded-none text-[8px] font-mono border-border text-muted-foreground ml-2">{stock.exchange}</Badge>}
@@ -342,7 +343,7 @@ export default function StockDetail() {
           </div>
           <div className="text-right">
             <p className="font-data text-3xl text-foreground">${fmt(stock.price)}</p>
-            <div className={`flex items-center justify-end gap-1 font-data text-sm ${isPositive ? 'dark:text-[#00FF41] text-[#059669]' : 'text-[#FF3333]'}`}>
+            <div className={`flex items-center justify-end gap-1 font-data text-sm ${isPositive ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
               {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
               {isPositive ? '+' : ''}{fmt(stock.change)} ({isPositive ? '+' : ''}{stock.change_percent?.toFixed(2)}%)
             </div>
@@ -523,7 +524,7 @@ export default function StockDetail() {
       </Card>
 
       {/* Flux AI Digest - Moved to Top */}
-      <Card className="rounded-xl border border-primary/40 bg-background/60 backdrop-blur-xl shadow-[0_0_30px_rgba(0,255,65,0.15)] mb-6 relative overflow-hidden" data-testid="ai-digest-section">
+      <Card className="rounded-xl border border-primary/40 bg-background/60 backdrop-blur-xl shadow-[0_0_30px_rgba(227,184,95,0.15)] mb-6 relative overflow-hidden" data-testid="ai-digest-section">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50 pointer-events-none" />
         <CardHeader className="pb-2 pt-4 px-5 flex flex-row items-center justify-between relative z-10 border-b border-border/30">
           <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
@@ -563,6 +564,9 @@ export default function StockDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* SEC Filings — EDGAR full text, risk-factor diff, search inside */}
+      <FilingsPanel ticker={ticker} />
 
       {/* Stats + Fundamentals Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -622,7 +626,7 @@ export default function StockDetail() {
         <Card className="rounded-none border-border dark:bg-card/50 bg-card corner-brackets">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-[#FFB000]" /> Dividends & Growth
+              <DollarSign className="w-4 h-4 text-[#E3B85F]" /> Dividends & Growth
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-3">
@@ -642,7 +646,7 @@ export default function StockDetail() {
                     {stock.recent_moves.slice(-5).map((m, i) => (
                       <div key={i} className="flex justify-between py-1 border-b border-border/30 text-[10px]">
                         <span className="font-mono text-muted-foreground">{m.date}</span>
-                        <span className={`font-data ${m.change_pct > 0 ? 'dark:text-[#00FF41] text-[#059669]' : 'text-[#FF3333]'}`}>
+                        <span className={`font-data ${m.change_pct > 0 ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
                           {m.change_pct > 0 ? '+' : ''}{m.change_pct}%
                         </span>
                       </div>
@@ -661,7 +665,7 @@ export default function StockDetail() {
         <Card className="rounded-none border-border dark:bg-card/50 bg-card corner-brackets" data-testid="analyst-targets">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
-              <Target className="w-4 h-4 text-[#00F3FF]" /> Analyst Price Targets
+              <Target className="w-4 h-4 text-[#9298A6]" /> Analyst Price Targets
               <button
                 title="Price targets are forecasts by Wall Street analysts for where a stock's price may trade in the next 12 months. The bar shows the range from lowest to highest target. The mean (average) target represents the consensus view. The analyst score ranges from 1 (Strong Buy) to 5 (Strong Sell)."
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -690,8 +694,8 @@ export default function StockDetail() {
                     const pricePct = ((price - min) / range) * 100;
                     return (
                       <>
-                        <div className="absolute top-0 h-full rounded-full border border-[rgba(0,255,136,0.3)] transition-all duration-500" 
-                             style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%`, background: 'linear-gradient(to right, rgba(0,255,136,0.1), rgba(0,255,136,0.4))' }} />
+                        <div className="absolute top-0 h-full rounded-full border border-[rgba(227,184,95,0.3)] transition-all duration-500" 
+                             style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%`, background: 'linear-gradient(to right, rgba(227,184,95,0.1), rgba(227,184,95,0.4))' }} />
 
                         {/* Low Target Label */}
                         <div className="absolute top-1/2 -mt-1 w-2 h-2 rounded-full bg-muted-foreground/40 z-10" style={{ left: `${lowPct}%`, transform: 'translateX(-50%)' }} />
@@ -718,11 +722,11 @@ export default function StockDetail() {
                         </div>
 
                         {/* Current Price Marker */}
-                        <div className="absolute top-1/2 -mt-[5px] w-2.5 h-2.5 rounded-full bg-[#FFB000] shadow-[0_0_8px_rgba(255,176,0,0.6)] z-30 ring-2 ring-background" title={`Current: $${price}`} style={{ left: `${pricePct}%`, transform: 'translateX(-50%)' }} />
+                        <div className="absolute top-1/2 -mt-[5px] w-2.5 h-2.5 rounded-full bg-[#E3B85F] shadow-[0_0_8px_rgba(227,184,95,0.6)] z-30 ring-2 ring-background" title={`Current: $${price}`} style={{ left: `${pricePct}%`, transform: 'translateX(-50%)' }} />
                         <div className="absolute" style={{ left: `${pricePct}%`, bottom: '-46px', transform: 'translateX(-50%)' }}>
                           <div className="flex flex-col items-center bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded border border-border/50">
-                            <span className="text-[9px] font-mono text-[#FFB000] whitespace-nowrap">Current</span>
-                            <span className="text-[10px] font-mono text-[#FFB000] font-bold">${price}</span>
+                            <span className="text-[9px] font-mono text-[#E3B85F] whitespace-nowrap">Current</span>
+                            <span className="text-[10px] font-mono text-[#E3B85F] font-bold">${price}</span>
                           </div>
                         </div>
                       </>
@@ -769,7 +773,7 @@ export default function StockDetail() {
         <Card className="rounded-none border-border dark:bg-card/50 bg-card corner-brackets" data-testid="insider-activity">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-[#FFB000]" /> Insider Activity
+              <UserCheck className="w-4 h-4 text-[#E3B85F]" /> Insider Activity
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-3">

@@ -100,7 +100,6 @@ async def get_yield_curve() -> Dict:
     """
     maturities = {
         "3M": "^IRX",
-        "2Y": "^TWOYEAR",
         "5Y": "^FVX",
         "10Y": "^TNX",
         "30Y": "^TYX",
@@ -109,7 +108,6 @@ async def get_yield_curve() -> Dict:
     # Use yfinance tickers for Treasury rates
     treasury_tickers = {
         "3M": "^IRX",
-        "2Y": "^TWOYEAR",
         "5Y": "^FVX",
         "10Y": "^TNX",
         "30Y": "^TYX",
@@ -136,6 +134,12 @@ async def get_yield_curve() -> Dict:
         if not yields:
             # Fallback: use approximate current values
             yields = {"3M": 5.25, "2Y": 4.90, "5Y": 4.60, "10Y": 4.40, "30Y": 4.55}
+
+        # Yahoo has no reliable 2Y yield ticker, so interpolate it from the 3M
+        # and 5Y points (keeps the 2s10s spread meaningful without a 404 symbol).
+        if "2Y" not in yields and "3M" in yields and "5Y" in yields:
+            y3m, y5y = yields["3M"], yields["5Y"]
+            yields["2Y"] = round(y3m + (y5y - y3m) * (2 - 0.25) / (5 - 0.25), 3)
 
         spread_2s10s = None
         if "2Y" in yields and "10Y" in yields:

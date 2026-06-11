@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Activity,
   Bot,
   BriefcaseBusiness,
   Cpu,
@@ -125,21 +124,19 @@ export default function Copilot() {
       </div>
 
       <main className="px-4 py-5 md:px-6 md:py-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <ActiveIcon className="h-4 w-4 text-primary" />
-              {activeMeta.longLabel}
+        {/* The Agent tab is a self-contained, centered chat canvas — it carries its
+            own status row, so the per-tab sub-header would be redundant there. */}
+        {activeTab !== 'copilot' && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <ActiveIcon className="h-4 w-4 text-primary" />
+                {activeMeta.longLabel}
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">{activeMeta.description}</p>
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">{activeMeta.description}</p>
           </div>
-          {activeTab === 'copilot' && (
-            <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-mono uppercase tracking-[0.14em] text-emerald-300">
-              <Activity className="h-3.5 w-3.5" />
-              Live chat first
-            </div>
-          )}
-        </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsContent value="copilot" className="mt-0">

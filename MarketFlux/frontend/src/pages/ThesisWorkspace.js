@@ -300,7 +300,7 @@ export default function ThesisWorkspace() {
           <>
             <Card className="thesis-panel overflow-hidden rounded-[32px] border-white/10">
               <CardContent className="relative p-6 md:p-8">
-                <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(0,243,255,0.16),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,176,0,0.1),transparent_32%)] lg:block" />
+                <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(146,152,166,0.16),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(227,184,95,0.1),transparent_32%)] lg:block" />
                 <div className="relative grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
                   <div className="space-y-5">
                     <div className="flex flex-wrap items-center gap-2">

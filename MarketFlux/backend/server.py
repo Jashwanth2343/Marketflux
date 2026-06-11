@@ -50,7 +50,12 @@ db = client[os.environ['DB_NAME']]
 _raw_jwt_secret = os.environ.get('JWT_SECRET') or os.environ.get('JWT_SECRET_KEY')
 _supabase_url = os.environ.get('SUPABASE_URL', '')
 _supabase_service_key = os.environ.get('SUPABASE_SERVICE_KEY', '')
-_supabase_auth_enabled = bool(_supabase_url and _supabase_service_key)
+# Auth works with EITHER the service_role key OR the anon/publishable key:
+# Supabase's auth.get_user(jwt) validates the token server-side regardless of
+# which client key is used. Requiring the service key here was the bug that
+# 401'd every logged-in user when only the anon key was configured.
+_supabase_anon_key = os.environ.get('SUPABASE_ANON_KEY', '')
+_supabase_auth_enabled = bool(_supabase_url and (_supabase_service_key or _supabase_anon_key))
 
 if not _raw_jwt_secret or len(_raw_jwt_secret) < 32:
     if not _supabase_auth_enabled:
@@ -97,9 +102,21 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
 
 app = FastAPI()
 app.add_middleware(LimitRequestSizeMiddleware)
+# Treat an empty/whitespace ALLOWED_ORIGINS the same as unset — otherwise the
+# split produces [''] and CORS silently blocks the local frontend (a "Failed to
+# fetch" footgun). Always include the localhost dev origins as a baseline.
+_DEFAULT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+_origins_env = os.environ.get('ALLOWED_ORIGINS', '').strip()
+_allowed_origins = [o.strip() for o in _origins_env.split(',') if o.strip()] or _DEFAULT_ORIGINS
+for _o in _DEFAULT_ORIGINS:
+    if _o not in _allowed_origins:
+        _allowed_origins.append(_o)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')],
+    allow_origins=_allowed_origins,
+    # Accept the dev frontend on ANY localhost/127.0.0.1 port so a port mismatch
+    # never silently breaks the app with a CORS "Failed to fetch".
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -233,8 +250,10 @@ async def _verify_supabase_token(token: str) -> Optional[Dict]:
     for backward compat with existing code that reads from db.users.
     """
     try:
-        from vnext.supabase_client import get_service_client
-        client = get_service_client()
+        from vnext.supabase_client import get_service_client, get_client
+        # Prefer the service client; fall back to the anon client — auth.get_user
+        # validates the JWT server-side either way.
+        client = get_service_client() or get_client()
         if not client:
             return None
 
@@ -1749,6 +1768,8 @@ from vnext.alpaca_router import build_alpaca_router
 from vnext.pilot_router import build_pilot_router
 from backtest.router import build_backtest_router
 from copilot_router import build_copilot_router
+from ledger_router import build_ledger_router
+from filings_router import build_filings_router
 
 app.include_router(build_vnext_router(db, get_current_user))
 app.include_router(build_adapter_router(db, get_current_user))
@@ -1757,3 +1778,5 @@ app.include_router(build_alpaca_router(db, get_current_user))
 app.include_router(build_pilot_router(db, get_current_user))
 app.include_router(build_backtest_router(get_current_user))
 app.include_router(build_copilot_router(db, get_current_user))
+app.include_router(build_ledger_router(db, get_current_user))
+app.include_router(build_filings_router())

@@ -16,9 +16,9 @@ function formatPrice(val) {
 
 function ChangeDisplay({ change, percent, isVolatility = false }) {
   const isPositive = percent >= 0;
-  let colorClass = isPositive ? 'text-[#00FF88] flash-up' : 'text-[#FF4444] flash-down';
+  let colorClass = isPositive ? 'text-[#4ADE80] flash-up' : 'text-[#FF4444] flash-down';
   if (isVolatility) {
-    colorClass = isPositive ? 'text-[#FF4444] flash-down' : 'text-[#00FF88] flash-up';
+    colorClass = isPositive ? 'text-[#FF4444] flash-down' : 'text-[#4ADE80] flash-up';
   }
 
   return (
@@ -56,8 +56,8 @@ function SpeedometerGauge({ score, mood }) {
         <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.06)" className="dark:stroke-[rgba(255,255,255,0.06)] stroke-slate-200" strokeWidth="12" strokeLinecap="round" />
         <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#speedGradient)" strokeWidth="12" strokeLinecap="round" />
         <g transform={`rotate(${angle} 100 100)`} className="transition-transform duration-1000 ease-out">
-          <line x1="100" y1="100" x2="100" y2="25" stroke="var(--color-accent, #00ff88)" strokeWidth="3" strokeLinecap="round" />
-          <circle cx="100" cy="100" r="4" fill="var(--color-accent, #00ff88)" />
+          <line x1="100" y1="100" x2="100" y2="25" stroke="var(--color-accent, #E3B85F)" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="100" cy="100" r="4" fill="var(--color-accent, #E3B85F)" />
         </g>
         <text x="20" y="115" fontSize="9" fill="#ef4444" textAnchor="middle" className="font-mono font-bold tracking-wider">FEAR</text>
         <text x="100" y="115" fontSize="9" fill="#eab308" textAnchor="middle" className="font-mono font-bold tracking-wider">NEUTRAL</text>
@@ -162,15 +162,15 @@ export default function Dashboard() {
     <div className="p-4 lg:p-6 space-y-5 min-h-screen" data-testid="dashboard-page">
 
       {/* ── Hero: Product Identity ── */}
-      <section className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-[rgba(0,255,65,0.04)] via-card/60 to-card/40">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(0,255,65,0.06),transparent_60%)]" />
+      <section className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-[rgba(227,184,95,0.04)] via-card/60 to-card/40">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(227,184,95,0.06),transparent_60%)]" />
         <div className="relative px-5 py-6 sm:px-8 sm:py-8 lg:py-10">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             {/* Left — Identity */}
             <div className="max-w-xl">
               <div className="flex items-center gap-2 mb-3">
-                <Activity className="w-5 h-5 text-[#00FF41]" />
-                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#00FF41]/80">
+                <Activity className="w-5 h-5 text-[#E3B85F]" />
+                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#E3B85F]/80">
                   AI-Powered Trading Platform
                 </span>
               </div>
@@ -189,9 +189,9 @@ export default function Dashboard() {
                     to="/copilot"
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200"
                     style={{
-                      background: '#00FF41',
+                      background: '#E3B85F',
                       color: '#000',
-                      boxShadow: '0 0 20px rgba(0,255,65,0.15)',
+                      boxShadow: '0 0 20px rgba(227,184,95,0.15)',
                     }}
                   >
                     <Plane className="w-4 h-4" />
@@ -213,9 +213,9 @@ export default function Dashboard() {
             {user ? (
               <div className="flex items-center gap-4 lg:gap-6 flex-wrap">
                 {[
-                  { label: 'Market', value: isMarketOpen ? 'Open' : 'Closed', color: isMarketOpen ? '#00FF41' : '#888' },
+                  { label: 'Market', value: isMarketOpen ? 'Open' : 'Closed', color: isMarketOpen ? '#4ADE80' : '#888' },
                   { label: 'Fear/Greed', value: mood.fng_index ? `${mood.fng_index}/100` : '--', color: mood.fng_index > 55 ? '#22c55e' : mood.fng_index < 45 ? '#ef4444' : '#eab308' },
-                  { label: 'VIX', value: indices['VIX']?.price?.toFixed(1) || indices['^VIX']?.price?.toFixed(1) || '--', color: '#FFB000' },
+                  { label: 'VIX', value: indices['VIX']?.price?.toFixed(1) || indices['^VIX']?.price?.toFixed(1) || '--', color: '#E3B85F' },
                 ].map(s => (
                   <div key={s.label} className="text-center min-w-[70px]">
                     <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground mb-1">{s.label}</div>
@@ -231,7 +231,7 @@ export default function Dashboard() {
                   { icon: Shield, text: 'Paper-only — zero financial risk' },
                 ].map(({ icon: Icon, text }) => (
                   <div key={text} className="flex items-center gap-2.5 text-xs text-muted-foreground">
-                    <Icon className="w-3.5 h-3.5 text-[#00FF41]/70 flex-shrink-0" />
+                    <Icon className="w-3.5 h-3.5 text-[#E3B85F]/70 flex-shrink-0" />
                     <span>{text}</span>
                   </div>
                 ))}
@@ -247,10 +247,10 @@ export default function Dashboard() {
           <Link
             key={to}
             to={to}
-            className="group relative flex flex-col gap-2 rounded-xl border border-border/50 bg-card/50 px-4 py-4 transition-all hover:border-primary/40 hover:bg-primary/[0.06] hover:shadow-[0_0_20px_rgba(0,255,65,0.04)]"
+            className="group relative flex flex-col gap-2 rounded-xl border border-border/50 bg-card/50 px-4 py-4 transition-all hover:border-primary/40 hover:bg-primary/[0.06] hover:shadow-[0_0_20px_rgba(227,184,95,0.04)]"
           >
             {tag && (
-              <span className="absolute top-2.5 right-2.5 text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#00FF41]/10 text-[#00FF41] border border-[#00FF41]/20">
+              <span className="absolute top-2.5 right-2.5 text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#E3B85F]/10 text-[#E3B85F] border border-[#E3B85F]/20">
                 {tag}
               </span>
             )}
@@ -320,7 +320,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between px-4 py-2 border-b dark:border-border/20 border-border">
                 <span className="text-xs font-mono uppercase tracking-wider font-bold">Top Movers</span>
                 {isMarketOpen !== null && (
-                  <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${isMarketOpen ? 'bg-[#00FF41]/20 text-[#00FF41]' : 'bg-muted text-muted-foreground'}`}>
+                  <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${isMarketOpen ? 'bg-[#4ADE80]/20 text-[#4ADE80]' : 'bg-muted text-muted-foreground'}`}>
                     {isMarketOpen ? '● MARKET OPEN' : 'MARKET CLOSED'}
                   </span>
                 )}
@@ -328,7 +328,7 @@ export default function Dashboard() {
               <div className="flex w-full">
                 <button
                   onClick={() => setActiveTab('gainers')}
-                  className={`flex-1 py-3 text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'gainers' ? 'border-b-2 dark:border-[#00FF41] border-[#059669] dark:text-[#00FF41] text-[#059669]' : 'text-muted-foreground hover:dark:bg-muted/30 hover:bg-muted'}`}
+                  className={`flex-1 py-3 text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-colors ${activeTab === 'gainers' ? 'border-b-2 dark:border-[#4ADE80] border-[#059669] dark:text-[#4ADE80] text-[#059669]' : 'text-muted-foreground hover:dark:bg-muted/30 hover:bg-muted'}`}
                 >
                   <TrendingUp className="w-3 h-3" /> Gainers
                 </button>
@@ -341,13 +341,13 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
-              <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: activeTab === 'gainers' ? '#00FF41 transparent' : '#FF3333 transparent' }}>
+              <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: activeTab === 'gainers' ? '#4ADE80 transparent' : '#FF3333 transparent' }}>
                 {activeMovers.map((stock) => (
                   <Link
                     key={stock.symbol}
                     to={`/stock/${stock.symbol}`}
                     state={{ initialData: stock }}
-                    className={`flex items-center justify-between py-2.5 px-4 border-b border-border/10 transition-colors ${activeTab === 'gainers' ? 'hover:dark:bg-[#00FF41]/10 hover:bg-[#059669]/10' : 'hover:dark:bg-[#FF3333]/10 hover:bg-[#FF3333]/10'}`}
+                    className={`flex items-center justify-between py-2.5 px-4 border-b border-border/10 transition-colors ${activeTab === 'gainers' ? 'hover:dark:bg-[#4ADE80]/10 hover:bg-[#059669]/10' : 'hover:dark:bg-[#FF3333]/10 hover:bg-[#FF3333]/10'}`}
                   >
                     <div className="min-w-0 pr-2">
                       <span className="font-mono text-xs font-bold text-foreground block truncate">{stock.symbol}</span>
@@ -355,7 +355,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <span className="font-data text-xs text-foreground block">${formatPrice(stock.price)}</span>
-                      <span className={`font-data text-[10px] ${activeTab === 'gainers' ? 'dark:text-[#00FF41] text-[#059669]' : 'text-[#FF3333]'}`}>
+                      <span className={`font-data text-[10px] ${activeTab === 'gainers' ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
                         {activeTab === 'gainers' ? '+' : ''}{stock.change_percent?.toFixed(2)}%
                       </span>
                     </div>
@@ -413,12 +413,12 @@ export default function Dashboard() {
             <CardHeader className="pb-2 pt-3 px-4 border-b dark:border-border/20 border-border">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
-                  <BarChart2 className="w-4 h-4 text-[#FFB000]" />
+                  <BarChart2 className="w-4 h-4 text-[#E3B85F]" />
                   Fear & Greed Index
                 </CardTitle>
                 {mood.fng_index !== undefined && (
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${mood.dominant === 'bullish' ? 'dark:bg-[#00FF41] bg-[#059669]/20 dark:text-[#00FF41] text-[#059669]' :
-                    mood.dominant === 'bearish' ? 'bg-[#FF3333]/20 text-[#FF3333]' : 'bg-[#FFB000]/20 text-[#FFB000]'
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${mood.dominant === 'bullish' ? 'dark:bg-[#4ADE80] bg-[#059669]/20 dark:text-[#4ADE80] text-[#059669]' :
+                    mood.dominant === 'bearish' ? 'bg-[#FF3333]/20 text-[#FF3333]' : 'bg-[#E3B85F]/20 text-[#E3B85F]'
                     }`}>
                     {mood.fng_index}/100
                   </span>
@@ -444,7 +444,7 @@ export default function Dashboard() {
                 </div>
                 <div className="dark:bg-[rgba(255,255,255,0.03)] bg-slate-50 border dark:border-[rgba(255,255,255,0.08)] border-slate-200 rounded-[8px] p-2 flex flex-col items-center justify-center text-center">
                   <span className="text-[9px] text-[#666] uppercase tracking-[0.08em] font-mono mb-1">SENTIMENT</span>
-                  <span className={`text-[13px] font-bold font-sans ${mood.dominant === 'bullish' ? 'text-[#00FF41]' : mood.dominant === 'bearish' ? 'text-[#FF4444]' : 'text-[#FFB000]'}`}>
+                  <span className={`text-[13px] font-bold font-sans ${mood.dominant === 'bullish' ? 'text-[#4ADE80]' : mood.dominant === 'bearish' ? 'text-[#FF4444]' : 'text-[#E3B85F]'}`}>
                     {mood.fng_index ? `${mood.fng_index}/100` : '--'}
                   </span>
                 </div>

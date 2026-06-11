@@ -1,66 +1,79 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display:wght@400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ===================================================================
+   MarketFlux design system — warm-dark ink canvas, cream paper
+   foreground, one confident champagne-gold accent. Green/red are
+   price-semantic only; pewter carries neutral. (Tokens mirror the
+   colors_and_type.css handoff, expressed as HSL for Tailwind.)
+   =================================================================== */
+
 @layer base {
 
-    /* LIGHT MODE */
+    /* LIGHT MODE — warm cream paper */
     :root {
-        --color-accent: #059669;
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
-        /* Adjusted primary brand colors for contrast on white */
-        --primary: 135 100% 35%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 187 100% 35%;
-        --secondary-foreground: 0 0% 100%;
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 210 40% 98%;
-        --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
-        --ring: 135 100% 35%;
-        --radius: 0.125rem;
-        --chart-1: 135 100% 35%;
-        --chart-2: 187 100% 35%;
-        --chart-3: 41 100% 45%;
-        --chart-4: 0 100% 60%;
-        --chart-5: 270 50% 50%;
-        --grid-line: 215 25% 17% / 0.1;
+        --color-accent: #C99A35;
+        --background: 42 43% 91%;
+        --foreground: 38 17% 9%;
+        --card: 42 62% 96%;
+        --card-foreground: 38 17% 9%;
+        --popover: 42 62% 96%;
+        --popover-foreground: 38 17% 9%;
+        /* Champagne-gold brand accent */
+        --primary: 41 58% 50%;
+        --primary-foreground: 42 62% 96%;
+        /* Pewter neutral (replaces old cyan secondary) */
+        --secondary: 42 39% 88%;
+        --secondary-foreground: 39 12% 33%;
+        --muted: 42 39% 88%;
+        --muted-foreground: 39 12% 33%;
+        --accent: 41 58% 50%;
+        --accent-foreground: 42 62% 96%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 42 62% 96%;
+        --border: 42 32% 83%;
+        --input: 42 32% 83%;
+        --ring: 41 58% 50%;
+        --radius: 0.75rem;
+        --chart-1: 140 68% 37%;
+        --chart-2: 41 58% 50%;
+        --chart-3: 0 72% 51%;
+        --chart-4: 39 12% 33%;
+        --chart-5: 41 10% 50%;
+        --grid-line: 38 17% 9% / 0.06;
     }
 
-    /* DARK MODE (Matching Original Website Theme) */
+    /* DARK MODE — warm near-black ink (default app theme) */
     .dark {
-        --color-accent: #00ff88;
-        --background: 0 0% 2%;
-        --foreground: 0 0% 93%;
-        --card: 0 0% 4%;
-        --card-foreground: 0 0% 100%;
-        --popover: 0 0% 4%;
-        --popover-foreground: 0 0% 100%;
-        --primary: 135 100% 50%;
-        --primary-foreground: 0 0% 0%;
-        --secondary: 187 100% 50%;
-        --secondary-foreground: 0 0% 0%;
-        --muted: 0 0% 10%;
-        --muted-foreground: 240 4% 66%;
-        --accent: 41 100% 50%;
-        --accent-foreground: 0 0% 0%;
-        --destructive: 0 100% 60%;
-        --destructive-foreground: 0 0% 100%;
-        --border: 215 25% 17%;
-        --input: 215 25% 17%;
-        --ring: 135 100% 50%;
-        --radius: 0.125rem;
-        --grid-line: 215 25% 50% / 0.15;
+        --color-accent: #E3B85F;
+        --background: 40 14% 4%;
+        --foreground: 44 43% 90%;
+        --card: 40 17% 7%;
+        --card-foreground: 44 43% 90%;
+        --popover: 40 17% 7%;
+        --popover-foreground: 44 43% 90%;
+        --primary: 40 70% 63%;
+        --primary-foreground: 38 69% 6%;
+        --secondary: 222 10% 61%;
+        --secondary-foreground: 40 14% 4%;
+        --muted: 40 18% 10%;
+        --muted-foreground: 39 12% 61%;
+        --accent: 40 70% 63%;
+        --accent-foreground: 38 69% 6%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 44 43% 90%;
+        --border: 40 17% 14%;
+        --input: 40 17% 14%;
+        --ring: 40 70% 63%;
+        --radius: 0.75rem;
+        --chart-1: 142 71% 45%;
+        --chart-2: 40 70% 63%;
+        --chart-3: 0 84% 60%;
+        --chart-4: 39 12% 61%;
+        --chart-5: 46 10% 42%;
+        --grid-line: 44 43% 90% / 0.06;
     }
 
     * {
@@ -69,7 +82,10 @@
 
     body {
         @apply bg-background text-foreground;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        font-feature-settings: 'ss01';
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }
 
     h1,
@@ -78,7 +94,7 @@
     h4,
     h5,
     h6 {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         font-weight: 600;
         letter-spacing: -0.02em;
     }
@@ -103,22 +119,22 @@
 }
 
 ::-webkit-scrollbar-track {
-    background: #050505;
+    background: #0C0B09;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #1E293B;
-    border-radius: 0;
+    background: #29251D;
+    border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #00FF41;
+    background: rgba(227, 184, 95, 0.55);
 }
 
 /* FIX 4: Global Text Visibility overrides */
 /* All label/key text */
 .dark .text-\[10px\].text-muted-foreground.uppercase {
-    color: #b0b0b0 !important;
+    color: #A8A091 !important;
 }
 
 .text-\[10px\].text-muted-foreground.uppercase {
@@ -128,7 +144,7 @@
 
 /* All value text */
 .dark div>.font-medium.text-foreground {
-    color: #ffffff !important;
+    color: #F0EAD9 !important;
 }
 
 div>.font-medium.text-foreground {
@@ -138,7 +154,7 @@ div>.font-medium.text-foreground {
 
 /* Table column headers */
 .dark th {
-    color: #aaaaaa !important;
+    color: #A8A091 !important;
 }
 
 th {
@@ -150,7 +166,7 @@ th {
 /* Table row values */
 .dark td,
 .dark td .text-foreground {
-    color: #e0e0e0 !important;
+    color: #E0DAC9 !important;
 }
 
 td,
