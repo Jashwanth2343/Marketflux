@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from typing import Any, Callable, Optional
 
@@ -28,6 +29,7 @@ class CopilotChatRequest(BaseModel):
     session_id: Optional[str] = None
     model: Optional[str] = None
     confirm: bool = True  # confirm-before-execute (safe default); false = autonomous
+    mode: str = Field(default="trade", pattern="^(trade|research)$")  # research = no execution tools
 
 
 class StandingAgentCreate(BaseModel):
@@ -53,16 +55,22 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         return user["user_id"] if user else _ANON_ID
 
     async def _resolve_user_id_required(request: Request) -> str:
-        """Like _resolve_user_id but raises 401 for unauthenticated requests.
+        """Resolve the user id for write endpoints (chat/stream, trade approve,
+        agents CRUD).
 
-        Used on all write endpoints (chat/stream, trade approve/reject, agents
-        CRUD) to prevent anonymous callers from sharing the 'local-copilot'
-        namespace and approving each other's staged trades.
+        In PRODUCTION this requires a verified user — anonymous callers must not
+        share the 'local-copilot' namespace and approve each other's staged
+        trades. In local/dev (NODE_ENV != 'production') we fall back to the shared
+        anon id so a missing/expired session never fully bricks the copilot;
+        anonymous turns are forced into safe confirm-before-trade mode by the
+        chat endpoint regardless.
         """
         user = await get_current_user(request)
-        if not user:
+        if user:
+            return user["user_id"]
+        if os.environ.get("NODE_ENV", "").lower() == "production":
             raise HTTPException(401, "Authentication required for this endpoint.")
-        return user["user_id"]
+        return _ANON_ID
 
     @router.get("/status")
     async def copilot_status():
@@ -85,6 +93,21 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
             payload = payload.model_copy(update={"confirm": True})
         session_id = payload.session_id or str(uuid.uuid4())
 
+        # Per-user daily LLM budget (lean-v1 cost guardrail). One copilot turn
+        # fans out to many model calls, so the cap is on turns, not tokens.
+        daily_cap = int(os.environ.get("COPILOT_DAILY_TURNS", "50") or 50)
+        if daily_cap > 0:
+            from datetime import datetime, timezone
+            midnight = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            turns_today = await db.copilot_messages.count_documents(
+                {"user_id": user_id, "created_at": {"$gte": midnight}})
+            if turns_today >= daily_cap:
+                raise HTTPException(
+                    429,
+                    f"Daily copilot budget reached ({daily_cap} turns). Resets at midnight UTC; "
+                    "raise COPILOT_DAILY_TURNS to change it.",
+                )
+
         history = await db.copilot_messages.find(
             {"user_id": user_id, "session_id": session_id}
         ).sort("created_at", -1).limit(8).to_list(8)
@@ -106,6 +129,7 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
                 session_id=session_id,
                 model=payload.model,
                 confirm=payload.confirm,
+                mode=payload.mode,
             )
             async for chunk in gen:
                 if await request.is_disconnected():

@@ -1,0 +1,28 @@
+name: Nightly conviction-ledger grading
+
+# Fires after US market close (20:00 UTC) once closes have settled.
+# Works even if the backend host's free tier sleeps — the request wakes it.
+# Requires two repository secrets:
+#   LEDGER_GRADE_URL    e.g. https://your-backend.example.com/api/ledger/grade
+#   LEDGER_GRADE_TOKEN  must match the backend's LEDGER_GRADE_TOKEN env var
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"  # 21:30 UTC, weekdays
+  workflow_dispatch: {}
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Grade open theses
+        run: |
+          if [ -z "${{ secrets.LEDGER_GRADE_URL }}" ]; then
+            echo "LEDGER_GRADE_URL secret not set — skipping (configure it once the backend is deployed)."
+            exit 0
+          fi
+          curl --fail-with-body -sS -X POST \
+            -H "X-Grade-Token: ${{ secrets.LEDGER_GRADE_TOKEN }}" \
+            --retry 3 --retry-delay 30 --retry-all-errors \
+            --max-time 300 \
+            "${{ secrets.LEDGER_GRADE_URL }}"

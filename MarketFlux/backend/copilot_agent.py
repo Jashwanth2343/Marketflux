@@ -30,6 +30,9 @@ import google.generativeai as genai
 from google.generativeai.types import HarmBlockThreshold, HarmCategory
 
 import agent_tools
+import compliance_engine
+import copilot_intelligence_tools as intel
+import sec_filings
 import copilot_trading_tools as trading
 import copilot_memory
 import copilot_models
@@ -38,7 +41,14 @@ from ai_service import GEMINI_FLASH, configure_gemini
 
 logger = logging.getLogger(__name__)
 
-MAX_TOOL_CALLS = 14
+MAX_TOOL_CALLS = 18
+
+# Tools that fan out to multiple LLM calls or do heavy compute need a longer
+# timeout than the default per-tool budget.
+_HEAVY_TIMEOUT = 110.0
+_HEAVY_TOOLS = {"deep_research", "run_strategy_backtest", "review_and_learn",
+                "debate_thesis", "get_market_regime", "get_earnings_intel",
+                "search_filings", "diff_risk_factors"}
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +78,47 @@ automatically; you don't need to do anything to remember them.
 Research: stock snapshots, fundamentals, analyst targets, technical indicators,
 news, SEC financials, insider activity, macro/FRED data, sector performance, and
 web search.
+Intelligence (the fund's quant brain — use it to ground conviction in systematic factors):
+- get_quant_signals — a 20+ signal institutional scorecard for one ticker across
+  momentum/value/quality/sentiment/technical → one composite conviction score
+  (-100..+100) with a label. Run this before forming a buy/sell view on a name.
+- scan_signals — rank a basket of tickers by composite score; use to pick the
+  strongest idea from a candidate set.
+Risk (manage the book like a real PM):
+- analyze_portfolio_risk — beta, 95% VaR, stress tests, sector concentration,
+  factor tilt for your CURRENT live positions. Use for "what's my risk / how would
+  I do in a crash" and before large adds.
+- analyze_stock_risk — beta, volatility, VaR, and a sizing recommendation
+  (suggested %, max %, stop %) for one name. Use BEFORE sizing a new position.
+- get_market_regime — classify the tape (risk-on…risk-off, vol band, trend,
+  breadth) with a suggested gross-exposure band. Read it FIRST on "how should I
+  position" questions and scale conviction/size to it.
+- simulate_trade — what-if: project the book AFTER a hypothetical order (new
+  weight, cash, buying power, concentration) AND whether it clears compliance, with
+  nothing placed. Use to right-size before committing.
+- get_earnings_intel — next earnings date, beat rate, surprise probability, and a
+  pre/post-earnings brief. Check it before sizing — avoid getting caught into a print.
+Backtest (prove ideas instead of guessing):
+- run_strategy_backtest — backtest a rules-based strategy (DSL JSON) over history
+  and get Sharpe, return, drawdown, win rate. Use when asked "does this work / would
+  this have made money", or to validate a systematic entry before sizing into it.
+Delegation (span a team when one pass isn't enough):
+- deep_research — convene 5 specialist analyst sub-agents (Fundamentals, Technical,
+  Macro, Sentiment, Risk) IN PARALLEL plus a Director synthesis → a committee-grade
+  research memo with rating + price target. Reserve for high-stakes / ambiguous calls.
+- debate_thesis — stage an adversarial BULL vs BEAR debate on the same evidence,
+  then a Research-Manager verdict (Bullish/Neutral/Bearish + conviction + action +
+  what would change the call). Use to stress-test the bear case before high
+  conviction; it's your antidote to overconfidence.
+Self-improvement (get better over time):
+- review_and_learn — review your OWN track record (account, positions, performance,
+  your executed trades), grade what worked vs hurt, and write durable lessons into
+  your long-term memory so future decisions improve. Use when asked "how am I doing /
+  what have you learned", and run it periodically — this is how you compound.
+Compliance:
+- compliance_precheck — pre-flight an order against buying power, the per-order cap,
+  single-name concentration ceiling, short-sale/PDT/penny/wash-sale controls,
+  WITHOUT placing it. Run it before a non-trivial order so you size it to clear.
 Trading (these really execute on the paper account):
 - get_account_summary — equity, cash, buying power, day P&L
 - get_open_positions  — what you currently hold
@@ -83,23 +134,45 @@ Compute:
   weights/optimization, quick simulations. Embed numbers as literals and print
   results. Prefer it over doing nontrivial arithmetic in your head.
 
-== HOW TO OPERATE ==
+== OPERATING DOCTRINE (how an elite PM works the book) ==
 1. GROUND IN REALITY FIRST. Before trading, call get_account_summary and
    get_open_positions so you size against real buying power and avoid
-   over-concentration. The current snapshot is also injected below.
-2. RESEARCH BEFORE CONVICTION. For a buy/sell decision, pull a snapshot plus at
-   least one of: technicals, fundamentals, news, or analyst targets. Briefly cite
-   the numbers that drove your decision.
-3. EXECUTE WHEN INTENT IS CLEAR. If the user says buy / sell / trade / take profit
-   / cut / trim / add / rebalance / deploy / hedge, you MUST call the trading tools
-   to actually do it — do not merely suggest. After executing, confirm fills.
-4. PROPOSE WHEN ASKED FOR IDEAS. If they ask "what should I do / any ideas / your
-   take", research and give a concrete, sized recommendation, then offer to execute.
-5. SIZE SENSIBLY. Default to position sizes that keep any single name under ~20% of
-   equity unless told otherwise. Never knowingly exceed buying power. If the market
-   is closed, say so — market orders will queue for the next open.
-6. MANAGE RISK. Think about downside and mention a stop level or invalidation when
-   you open a position. Diversify. Don't chase.
+   over-concentration. The current snapshot is also injected below. For "how should
+   I position / is now a good time" questions, also read get_market_regime and let
+   it scale your conviction and size (smaller in risk-off / high-vol regimes).
+2. SCORE THE CONVICTION. For a buy/sell decision, run get_quant_signals (and
+   scan_signals across alternatives when picking among names). Combine the
+   composite score with a snapshot plus at least one of technicals / fundamentals /
+   news / analyst targets. Cite the composite score and the numbers that drove you.
+3. SIZE TO RISK, NOT HOPE. Before sizing a new position, call analyze_stock_risk and
+   respect its suggested %, max %, and stop. For portfolio-level questions or large
+   adds, run analyze_portfolio_risk and keep beta, VaR, and concentration sane.
+4. VALIDATE SYSTEMATIC IDEAS. If the user proposes a rules-based strategy, or you
+   do, run_strategy_backtest it before trading. A negative Sharpe or ugly drawdown
+   is a reason to decline, and you should say so.
+5. CLEAR COMPLIANCE, THEN EXECUTE. For any non-trivial order, run compliance_precheck
+   and size so it returns PASS (or an acceptable WARN you explain). Then, when the
+   user's intent is clear (buy / sell / trade / take profit / cut / trim / add /
+   rebalance / deploy / hedge), you MUST call the trading tools to actually do it —
+   do not merely suggest. After executing, confirm fills. NOTE: every order also
+   passes a hard compliance gate automatically; a BLOCK there means it will NOT run,
+   so pre-check and resize rather than retrying the same order.
+6. PROPOSE WHEN ASKED FOR IDEAS. If they ask "what should I do / any ideas / your
+   take", research, score, risk-size, and give a concrete, sized recommendation,
+   then offer to execute.
+7. MANAGE RISK & FOLLOW THE RULES. Default to keeping any single name under ~20% of
+   equity unless told otherwise. Never knowingly exceed buying power. Mention a stop
+   level or invalidation when you open a position. Honor the user's stated mandate
+   (e.g. "never short"). If the market is closed, say so — market orders queue for
+   the next open.
+8. PRESSURE-TEST & PROJECT. For a high-stakes or ambiguous call, run debate_thesis
+   to stress-test the bear case, and/or deep_research to convene the analyst team,
+   before committing real size. Right-size with simulate_trade — confirm the
+   projected weight, buying power, and that it clears compliance — before you place.
+9. LEARN FROM YOURSELF. Treat recalled "Trading lesson (from self-review)" memories
+   as hard-won guidance and apply them. When asked how you're doing — or periodically
+   on your own — call review_and_learn so your mistakes don't repeat and your edge
+   compounds over time.
 
 == OUTPUT FORMAT — write like a research note, never a wall of text ==
 - Open with a one-line **bold takeaway** — the answer or action, up front.
@@ -143,6 +216,9 @@ _RESEARCH_TOOLS = [
     agent_tools.get_sec_financials,
     agent_tools.get_fred_macro,
     agent_tools.get_earnings_transcript,
+    sec_filings.get_recent_filings,
+    sec_filings.search_filings,
+    sec_filings.diff_risk_factors,
 ]
 
 _TRADING_TOOLS = [
@@ -156,9 +232,32 @@ _TRADING_TOOLS = [
     trading.cancel_all_open_orders,
 ]
 
+_INTELLIGENCE_TOOLS = [
+    intel.get_quant_signals,
+    intel.scan_signals,
+    intel.analyze_portfolio_risk,
+    intel.analyze_stock_risk,
+    intel.get_market_regime,
+    intel.simulate_trade,
+    intel.get_earnings_intel,
+    intel.run_strategy_backtest,
+    intel.deep_research,
+    intel.debate_thesis,
+    intel.review_and_learn,
+    intel.compliance_precheck,
+]
+
 _CODE_TOOLS = [run_python]
 
-_ALL_TOOLS = _RESEARCH_TOOLS + _TRADING_TOOLS + _CODE_TOOLS
+_ALL_TOOLS = _RESEARCH_TOOLS + _TRADING_TOOLS + _INTELLIGENCE_TOOLS + _CODE_TOOLS
+
+# Research-only mode keeps every read (including account/positions — portfolio-
+# aware research is the differentiator) but removes the three execution tools.
+_RESEARCH_MODE_TOOLS = [t for t in _ALL_TOOLS if t.__name__ not in trading.EXECUTION_TOOLS]
+
+
+def _tools_for_mode(mode: str):
+    return _RESEARCH_MODE_TOOLS if mode == "research" else _ALL_TOOLS
 
 # name -> callable
 _TOOL_MAP: Dict[str, Any] = {fn.__name__: fn for fn in _ALL_TOOLS}
@@ -167,7 +266,7 @@ _TOOL_MAP["get_market_overview"] = agent_tools.get_market_overview_tool
 _TOOL_MAP["get_company_profile"] = agent_tools.get_company_profile_tool
 
 
-def _build_model(system_instruction: str, model_name: str = GEMINI_FLASH):
+def _build_model(system_instruction: str, model_name: str = GEMINI_FLASH, tools=None):
     configure_gemini()
     safety = {
         HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -179,21 +278,21 @@ def _build_model(system_instruction: str, model_name: str = GEMINI_FLASH):
         model_name=model_name,
         system_instruction=system_instruction,
         safety_settings=safety,
-        tools=_ALL_TOOLS,
+        tools=tools if tools is not None else _ALL_TOOLS,
     )
 
 
-# OpenAI-compatible tool schemas, generated once by introspecting the Python tools.
-_OPENAI_TOOLS_CACHE: Optional[List[dict]] = None
+# OpenAI-compatible tool schemas, generated once per mode by introspection.
+_OPENAI_TOOLS_CACHE: Dict[str, List[dict]] = {}
 
 
-def _openai_tool_schemas() -> List[dict]:
-    global _OPENAI_TOOLS_CACHE
-    if _OPENAI_TOOLS_CACHE is not None:
-        return _OPENAI_TOOLS_CACHE
+def _openai_tool_schemas(mode: str = "trade") -> List[dict]:
+    cached = _OPENAI_TOOLS_CACHE.get(mode)
+    if cached is not None:
+        return cached
     type_map = {float: "number", int: "integer", bool: "boolean", str: "string"}
     schemas = []
-    for fn in _ALL_TOOLS:
+    for fn in _tools_for_mode(mode):
         props: Dict[str, Any] = {}
         required: List[str] = []
         for pname, p in inspect.signature(fn).parameters.items():
@@ -205,7 +304,7 @@ def _openai_tool_schemas() -> List[dict]:
             "description": (fn.__doc__ or "").strip()[:1024],
             "parameters": {"type": "object", "properties": props, "required": required},
         }})
-    _OPENAI_TOOLS_CACHE = schemas
+    _OPENAI_TOOLS_CACHE[mode] = schemas
     return schemas
 
 
@@ -219,14 +318,36 @@ async def _exec_tool(name: str, args: Dict[str, Any], db=None, user_id: str = ""
         import copilot_trades
         return await copilot_trades.stage(db, user_id, name, args)
 
+    # Context-aware tools run with (db, user_id) injected by the runtime rather
+    # than filled by the LLM. Their registered callable is only a schema stub.
+    if name in intel.CONTEXT_TOOLS:
+        try:
+            if name == "review_and_learn":
+                import copilot_learning
+                result = await asyncio.wait_for(
+                    copilot_learning.review_and_learn_impl(db, user_id, **args), timeout=_HEAVY_TIMEOUT)
+                return _sanitize(result)
+            if name == "debate_thesis":
+                import copilot_debate
+                result = await asyncio.wait_for(
+                    copilot_debate.run_debate_impl(db, user_id, **args), timeout=_HEAVY_TIMEOUT)
+                return _sanitize(result)
+        except asyncio.TimeoutError:
+            return {"ok": False, "error": f"{name} timed out"}
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"copilot context tool {name} failed: {exc}")
+            return {"ok": False, "error": f"{name} failed: {exc}"}
+
     func = _TOOL_MAP.get(name) or getattr(agent_tools, name, None)
     if func is None:
         return {"ok": False, "error": f"unknown tool {name}"}
+    # Multi-LLM-call tools (research team, backtests) need a longer leash.
+    timeout = _HEAVY_TIMEOUT if name in _HEAVY_TOOLS else 40.0
     try:
         if asyncio.iscoroutinefunction(func):
-            result = await asyncio.wait_for(func(**args), timeout=40.0)
+            result = await asyncio.wait_for(func(**args), timeout=timeout)
         else:
-            result = await asyncio.wait_for(asyncio.to_thread(func, **args), timeout=40.0)
+            result = await asyncio.wait_for(asyncio.to_thread(func, **args), timeout=timeout)
     except asyncio.TimeoutError:
         result = {"ok": False, "error": f"{name} timed out"}
     except Exception as exc:
@@ -329,8 +450,38 @@ def _tool_label(name: str, args: Dict[str, Any]) -> str:
         return "Checking if market is open"
     if name == "get_portfolio_history":
         return "Pulling performance history"
+    if name == "get_quant_signals":
+        return f"Scoring {sym}: 20+ quant signals" if sym else "Scoring quant signals"
+    if name == "scan_signals":
+        return "Ranking candidates by quant score"
+    if name == "analyze_portfolio_risk":
+        return "Running a portfolio risk X-ray"
+    if name == "analyze_stock_risk":
+        return f"Risk profile: {sym}" if sym else "Risk profile"
+    if name == "run_strategy_backtest":
+        return "Backtesting the strategy on history"
+    if name == "get_market_regime":
+        return "Reading the market regime"
+    if name == "simulate_trade":
+        return f"Simulating the trade impact: {sym}" if sym else "Simulating the trade impact"
+    if name == "get_earnings_intel":
+        return f"Checking earnings catalyst: {sym}" if sym else "Checking earnings catalyst"
+    if name == "debate_thesis":
+        return f"Bull vs Bear debate on {sym}" if sym else "Bull vs Bear debate"
+    if name == "deep_research":
+        return f"Convening the research team on {sym}" if sym else "Convening the research team"
+    if name == "review_and_learn":
+        return "Reviewing my track record to learn"
+    if name == "compliance_precheck":
+        return f"Pre-trade compliance check: {sym}" if sym else "Pre-trade compliance check"
     if name == "run_python":
         return "Running a Python calculation"
+    if name == "get_recent_filings":
+        return f"Listing SEC filings: {sym}" if sym else "Listing SEC filings"
+    if name == "search_filings":
+        return f"Reading the {args.get('form', '10-K')}: {sym}" if sym else "Reading the filing"
+    if name == "diff_risk_factors":
+        return f"Diffing risk factors YoY: {sym}" if sym else "Diffing risk factors"
     pretty = name.replace("get_", "").replace("_", " ")
     if sym:
         return f"Researching {sym}: {pretty}"
@@ -356,6 +507,34 @@ def _result_summary(name: str, result: Dict[str, Any]) -> str:
         return f"closed {result.get('closed_symbol')} → {result.get('status')}"
     if name == "get_orders":
         return f"{result.get('count', 0)} order(s)"
+    if name == "get_quant_signals":
+        return f"{result.get('signal_label')} · composite {result.get('composite_score')}"
+    if name == "scan_signals":
+        return f"ranked {result.get('count', 0)} name(s)"
+    if name == "analyze_portfolio_risk":
+        if result.get("empty"):
+            return "all cash — no market risk"
+        return f"beta {result.get('portfolio_beta')}, 95% VaR {result.get('var_95')}%"
+    if name == "analyze_stock_risk":
+        return f"beta {result.get('beta')}, vol {result.get('annualised_volatility_pct')}%"
+    if name == "run_strategy_backtest":
+        m = result.get("metrics", {})
+        return f"return {m.get('total_return_pct')}%, Sharpe {m.get('sharpe')}, {m.get('num_trades')} trades"
+    if name == "get_market_regime":
+        return f"{result.get('regime_label')} · exposure {result.get('suggested_gross_exposure')}"
+    if name == "simulate_trade":
+        a = result.get("after", {})
+        return f"{result.get('symbol')} → {a.get('weight_pct')}% of book · {result.get('compliance_decision')}"
+    if name == "get_earnings_intel":
+        return f"next earnings {result.get('next_earnings_date') or result.get('earnings_date') or '—'}"
+    if name == "debate_thesis":
+        return f"verdict {result.get('verdict') or '—'} ({result.get('conviction') or '—'} conviction)"
+    if name == "deep_research":
+        return f"5-analyst memo: {result.get('signal_label')} · {result.get('signal_score')}"
+    if name == "review_and_learn":
+        return f"grade {result.get('grade') or '—'} · learned {result.get('lessons_learned_count', 0)} lesson(s)"
+    if name == "compliance_precheck":
+        return f"{result.get('decision')} — {(result.get('summary') or '')[:64]}"
     if name == "run_python":
         out = (result.get("stdout") or "").strip().splitlines()
         return out[-1][:80] if out else (result.get("note") or "ran")
@@ -402,6 +581,210 @@ def _trade_event_payload(name: str, args: Dict[str, Any], result: Dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
+# Intelligence "insight" cards — structured payloads the UI renders richly.
+# ---------------------------------------------------------------------------
+def _insight_payload(name: str, result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if not isinstance(result, dict) or not result.get("ok"):
+        return None
+    if name == "get_quant_signals":
+        return {
+            "kind": "signals",
+            "symbol": result.get("symbol"),
+            "name": result.get("name"),
+            "composite_score": result.get("composite_score"),
+            "signal_label": result.get("signal_label"),
+            "category_scores": result.get("category_scores"),
+        }
+    if name == "scan_signals":
+        return {"kind": "scan", "ranked": result.get("ranked")}
+    if name == "analyze_portfolio_risk":
+        if result.get("empty"):
+            return None
+        return {
+            "kind": "portfolio_risk",
+            "portfolio_beta": result.get("portfolio_beta"),
+            "var_95": result.get("var_95"),
+            "max_drawdown": result.get("max_drawdown"),
+            "concentration_warning": result.get("concentration_warning"),
+            "sector_concentration": result.get("sector_concentration"),
+            "factor_exposure": result.get("factor_exposure"),
+            "stress_tests": result.get("stress_tests"),
+            "risk_summary": result.get("risk_summary"),
+        }
+    if name == "analyze_stock_risk":
+        return {
+            "kind": "stock_risk",
+            "ticker": result.get("ticker"),
+            "beta": result.get("beta"),
+            "annualised_volatility_pct": result.get("annualised_volatility_pct"),
+            "var_95_daily_pct": result.get("var_95_daily_pct"),
+            "max_drawdown_pct": result.get("max_drawdown_pct"),
+            "sizing_recommendation": result.get("sizing_recommendation"),
+        }
+    if name == "run_strategy_backtest":
+        return {
+            "kind": "backtest",
+            "strategy_name": result.get("strategy_name"),
+            "universe": result.get("universe"),
+            "period": result.get("period"),
+            "metrics": result.get("metrics"),
+        }
+    if name == "deep_research":
+        return {
+            "kind": "research",
+            "symbol": result.get("symbol"),
+            "name": result.get("name"),
+            "signal_score": result.get("signal_score"),
+            "signal_label": result.get("signal_label"),
+            "specialists": list((result.get("specialist_reports") or {}).keys()),
+        }
+    if name == "review_and_learn":
+        return {
+            "kind": "review",
+            "grade": result.get("grade"),
+            "assessment": result.get("assessment"),
+            "lessons": result.get("lessons"),
+            "lessons_learned_count": result.get("lessons_learned_count"),
+            "stats": result.get("stats"),
+        }
+    if name == "get_market_regime":
+        return {
+            "kind": "regime",
+            "regime_label": result.get("regime_label"),
+            "risk_state": result.get("risk_state"),
+            "spy_trend": result.get("spy_trend"),
+            "trend_strength_pct": result.get("trend_strength_pct"),
+            "vix": result.get("vix"),
+            "vix_band": result.get("vix_band"),
+            "breadth_pct": result.get("breadth_pct"),
+            "suggested_gross_exposure": result.get("suggested_gross_exposure"),
+            "playbook": result.get("playbook"),
+        }
+    if name == "simulate_trade":
+        return {
+            "kind": "simulation",
+            "symbol": result.get("symbol"),
+            "side": result.get("side"),
+            "qty": result.get("qty"),
+            "notional": result.get("notional"),
+            "before": result.get("before"),
+            "after": result.get("after"),
+            "largest_position_after": result.get("largest_position_after"),
+            "compliance_decision": result.get("compliance_decision"),
+            "compliance_summary": result.get("compliance_summary"),
+        }
+    if name == "debate_thesis":
+        return {
+            "kind": "debate",
+            "symbol": result.get("symbol"),
+            "verdict": result.get("verdict"),
+            "conviction": result.get("conviction"),
+            "bull_case": result.get("bull_case"),
+            "bear_case": result.get("bear_case"),
+            "recommended_action": result.get("recommended_action"),
+            "key_swing_factor": result.get("key_swing_factor"),
+            "would_change_my_mind": result.get("would_change_my_mind"),
+            "summary": result.get("summary"),
+        }
+    if name == "get_earnings_intel":
+        if result.get("error"):
+            return None
+        return {
+            "kind": "earnings",
+            "symbol": result.get("symbol"),
+            "next_earnings_date": result.get("next_earnings_date"),
+            "days_until_earnings": result.get("days_until_earnings"),
+            "beat_statistics": result.get("beat_statistics"),
+            "surprise_probability": result.get("surprise_probability"),
+        }
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Pre-trade compliance chokepoint — runs before any order is staged/executed.
+# ---------------------------------------------------------------------------
+async def _compliance_for_order(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Run the pre-trade gate for a place_order call. Returns the report, or
+    None if the controls themselves errored (fail-open: place_order + the broker
+    still enforce notional and buying-power independently)."""
+    try:
+        symbol = (args.get("symbol") or "").upper()
+        side = (args.get("side") or "").lower()
+        account, positions, est_price = await intel._order_context(symbol)
+        return compliance_engine.pre_trade_check(
+            symbol=symbol,
+            side=side,
+            quantity=args.get("quantity"),
+            est_price=est_price,
+            order_type=(args.get("order_type") or "market"),
+            limit_price=args.get("limit_price") or 0.0,
+            account=account,
+            positions=positions,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("compliance chokepoint failed (fail-open): %s", exc)
+        return None
+
+
+def _compliance_event(report: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "decision": report.get("decision"),
+        "symbol": report.get("symbol"),
+        "side": report.get("side"),
+        "qty": report.get("qty"),
+        "notional": report.get("notional"),
+        "projected_weight_pct": report.get("projected_weight_pct"),
+        "summary": report.get("summary"),
+        "checks": report.get("checks"),
+    }
+
+
+async def _run_one_tool(name, args, db, user_id, confirm, emit, out: List[Any]):
+    """Execute one tool call with full SSE transparency, shared by both LLM loops.
+
+    Yields SSE event strings (compliance, tool_call, tool_result, insight, trade)
+    and appends the result dict (the payload to feed back to the model) to ``out``.
+    The compliance gate is a HARD chokepoint: a BLOCK on an order means it is
+    never staged or executed — the model gets a blocked result instead.
+    """
+    # Hard pre-trade compliance gate for real orders.
+    if name == "place_order":
+        report = await _compliance_for_order(args)
+        if report is not None:
+            yield emit("compliance", **_compliance_event(report))
+            if report.get("decision") == compliance_engine.BLOCK:
+                blocked = {
+                    "ok": False,
+                    "executed": False,
+                    "blocked_by_compliance": True,
+                    "decision": "BLOCK",
+                    "summary": report.get("summary"),
+                    "checks": report.get("checks"),
+                }
+                yield emit("tool_result", name=name, ok=False,
+                           summary=f"⛔ Blocked by compliance: {report.get('summary')}")
+                out.append(blocked)
+                return
+
+    yield emit("tool_call", name=name, label=_tool_label(name, args),
+               args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
+    result = await _exec_tool(name, args, db, user_id, confirm)
+    yield emit("tool_result", name=name, ok=bool(result.get("ok", True)),
+               summary=_result_summary(name, result))
+
+    insight = _insight_payload(name, result)
+    if insight:
+        yield emit("insight", **insight)
+
+    tp = _trade_event_payload(name, args, result)
+    if tp:
+        yield emit("trade", **tp)
+        if db is not None and not tp.get("pending"):
+            await _log_trade(db, user_id, tp)
+    out.append(result)
+
+
+# ---------------------------------------------------------------------------
 # Response-parsing helpers
 # ---------------------------------------------------------------------------
 def _function_calls(resp) -> List[Any]:
@@ -438,6 +821,7 @@ async def run_copilot_agent(
     session_id: str = "",
     model: Optional[str] = None,
     confirm: bool = True,
+    mode: str = "trade",
 ) -> AsyncGenerator[str, None]:
     """Run one turn of the trading copilot, streaming SSE events.
 
@@ -450,16 +834,31 @@ async def run_copilot_agent(
     turn) so clients can use ``Last-Event-ID`` to detect dropped events.
     """
     seq: List[int] = [0]  # mutable counter shared with sub-generators
+    # Insight/trade events from this turn, inspected at finalize by the
+    # conviction ledger's auto-log rule (structured events, no text parsing).
+    turn_events: List[Dict[str, Any]] = []
 
     def sse(event_type: str, **data) -> str:
         seq[0] += 1
+        if event_type in ("insight", "trade"):
+            turn_events.append({"type": event_type, **data})
         return _sse(event_type, seq=seq[0], **data)
 
     resolved = copilot_models.resolve(model)
     yield sse("model", key=resolved.key, label=resolved.label, provider=resolved.provider)
     yield sse("thinking", step="plan", message=f"Reading your portfolio and planning… (via {resolved.label})")
 
+    mode = mode if mode in ("trade", "research") else "trade"
     system_prompt = _system_prompt()
+    if mode == "research":
+        system_prompt += (
+            "\n\n== RESEARCH-ONLY MODE ==\n"
+            "Trading execution is DISABLED for this session: you have no order tools. "
+            "You can still read the account and positions and use every research, "
+            "intelligence, risk, backtest, and filings tool. When the user asks you to "
+            "trade, give the fully-sized recommendation instead and note that trading "
+            "is switched off in this mode."
+        )
     if confirm:
         system_prompt += (
             "\n\n== TRADE CONFIRMATION IS ON ==\n"
@@ -483,9 +882,9 @@ async def run_copilot_agent(
     holder: Dict[str, Any] = {"final_text": ""}
     try:
         if resolved.provider == "gemini":
-            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse)
+            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse, mode=mode)
         else:
-            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse)
+            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse, mode=mode)
         async for ev in sub:
             yield ev
 
@@ -498,7 +897,7 @@ async def run_copilot_agent(
             yield sse("token", content=final_text[i:i + 60])
             await asyncio.sleep(0.004)
         yield sse("done")
-        await _finalize(db, user_id, session_id, message, final_text)
+        await _finalize(db, user_id, session_id, message, final_text, turn_events)
 
     except Exception as exc:
         logger.critical(f"copilot agent crashed: {exc}", exc_info=True)
@@ -506,7 +905,8 @@ async def run_copilot_agent(
         yield sse("done", error=str(exc))
 
 
-async def _finalize(db, user_id: str, session_id: str, message: str, final_text: str) -> None:
+async def _finalize(db, user_id: str, session_id: str, message: str, final_text: str,
+                    turn_events: Optional[List[Dict[str, Any]]] = None) -> None:
     """Persist the turn + schedule the background memory write (shared)."""
     if db is None:
         return
@@ -518,11 +918,18 @@ async def _finalize(db, user_id: str, session_id: str, message: str, final_text:
     except Exception as exc:
         logger.error(f"copilot db save failed: {exc}")
     copilot_memory.schedule_add_turn(user_id, message, final_text)
+    # Conviction ledger auto-log: a turn that both scored a name (|composite|
+    # >= threshold) and sized/traded it becomes a recorded, gradeable thesis.
+    try:
+        import conviction_ledger
+        await conviction_ledger.auto_log_from_turn(db, user_id, turn_events or [], final_text)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"conviction ledger auto-log failed: {exc}")
 
 
-async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None):
+async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None, mode="trade"):
     """Native Gemini function-calling loop."""
-    model = _build_model(system_prompt, model_name=resolved.model_id)
+    model = _build_model(system_prompt, model_name=resolved.model_id, tools=_tools_for_mode(mode))
     gemini_history: List[Dict[str, Any]] = []
     for h in (history or [])[-8:]:
         msg, resp = h.get("message", ""), h.get("response", "")
@@ -555,16 +962,10 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
             called_signatures.add(signature)
             tool_calls += 1
             _emit = sse_fn or _sse
-            yield _emit("tool_call", name=name, label=_tool_label(name, args),
-                        args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
-            result = await _exec_tool(name, args, db, user_id, confirm)
-            yield _emit("tool_result", name=name, ok=bool(result.get("ok", True)),
-                        summary=_result_summary(name, result))
-            tp = _trade_event_payload(name, args, result)
-            if tp:
-                yield _emit("trade", **tp)
-                if db is not None and not tp.get("pending"):
-                    await _log_trade(db, user_id, tp)
+            out: List[Any] = []
+            async for ev in _run_one_tool(name, args, db, user_id, confirm, _emit, out):
+                yield ev
+            result = out[0] if out else {"ok": False, "error": "no result"}
             function_responses.append({"function_response": {"name": name, "response": result}})
         if not function_responses:
             break
@@ -587,7 +988,7 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
     holder["final_text"] = final_text
 
 
-async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None):
+async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None, mode="trade"):
     """OpenAI-compatible tool-calling loop (OpenRouter / NVIDIA NIM)."""
     from openai import AsyncOpenAI
 
@@ -595,7 +996,7 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
         if resolved.provider == "openrouter" else None
     client = AsyncOpenAI(api_key=resolved.api_key, base_url=resolved.base_url,
                          default_headers=headers, timeout=120.0)
-    tools = _openai_tool_schemas()
+    tools = _openai_tool_schemas(mode)
 
     messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     for h in (history or [])[-8:]:
@@ -647,16 +1048,10 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
             called.add(signature)
             tool_calls += 1
             _emit = sse_fn or _sse
-            yield _emit("tool_call", name=name, label=_tool_label(name, args),
-                        args=_sanitize(args), is_trade=(name in trading.EXECUTION_TOOLS))
-            result = await _exec_tool(name, args, db, user_id, confirm)
-            yield _emit("tool_result", name=name, ok=bool(result.get("ok", True)),
-                        summary=_result_summary(name, result))
-            tp = _trade_event_payload(name, args, result)
-            if tp:
-                yield _emit("trade", **tp)
-                if db is not None and not tp.get("pending"):
-                    await _log_trade(db, user_id, tp)
+            out: List[Any] = []
+            async for ev in _run_one_tool(name, args, db, user_id, confirm, _emit, out):
+                yield ev
+            result = out[0] if out else {"ok": False, "error": "no result"}
             messages.append({"role": "tool", "tool_call_id": tc.id,
                              "content": json.dumps(result, default=str)[:8000]})
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, LayoutDashboard, Briefcase, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Plane, Trophy, FlaskConical } from 'lucide-react';
+import { Activity, LayoutDashboard, Briefcase, Sun, Moon, LogIn, LogOut, User, Menu, X, Brain, Plane, Trophy, FlaskConical, BookMarked } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -10,6 +10,7 @@ const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/intelligence', icon: Brain, label: 'Intelligence' },
     { path: '/copilot', icon: Plane, label: 'Copilot' },
+    { path: '/ledger', icon: BookMarked, label: 'Ledger' },
     { path: '/backtest', icon: FlaskConical, label: 'Backtest' },
     { path: '/portfolio', icon: Briefcase, label: 'Portfolio' },
     { path: '/leaderboard', icon: Trophy, label: 'Leaderboard' },

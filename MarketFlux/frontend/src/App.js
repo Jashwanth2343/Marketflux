@@ -20,6 +20,7 @@ import ThesisTradeLab from "@/pages/ThesisTradeLab";
 import Auth from "@/pages/Auth";
 import PilotLeaderboard from "@/pages/PilotLeaderboard";
 import PilotPublicProfile from "@/pages/PilotPublicProfile";
+import Ledger from "@/pages/Ledger";
 import { Toaster } from "@/components/ui/sonner";
 
 function ThesisRedirect() {
@@ -117,6 +118,7 @@ function AppRouter() {
               <Route path="/intelligence/thesis/:thesisId" element={<ThesisWorkspace />} />
               <Route path="/intelligence/thesis/:thesisId/trade-lab" element={<ThesisTradeLab />} />
               <Route path="/copilot" element={<Copilot />} />
+              <Route path="/ledger" element={<Ledger />} />
               <Route path="/backtest" element={<Backtest />} />
               <Route path="/portfolio" element={<PortfolioRisk />} />
               <Route path="/leaderboard" element={<PilotLeaderboard />} />

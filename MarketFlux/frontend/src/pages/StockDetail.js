@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, ArrowLeft, Zap, BarChart3, DollarSign, Activi
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ComposedChart, Bar, Cell, ReferenceLine, CartesianGrid } from 'recharts';
 import { useTheme } from '@/contexts/ThemeContext';
 import NewsCard from '@/components/NewsCard';
+import FilingsPanel from '@/components/FilingsPanel';
 import api from '@/lib/api';
 
 function fmt(val, opts = {}) {
@@ -563,6 +564,9 @@ export default function StockDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* SEC Filings — EDGAR full text, risk-factor diff, search inside */}
+      <FilingsPanel ticker={ticker} />
 
       {/* Stats + Fundamentals Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

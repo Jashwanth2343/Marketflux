@@ -61,6 +61,19 @@ async def initialize_indexes(db):
         )
         await db.pilot_personalities.create_index("public_visibility", background=True)
 
+        # Conviction ledger
+        await db.ledger_theses.create_index("id", unique=True, background=True)
+        await db.ledger_theses.create_index(
+            [("user_id", 1), ("status", 1), ("created_at", -1)], background=True
+        )
+        await db.ledger_theses.create_index(
+            [("user_id", 1), ("agent_id", 1), ("ticker", 1), ("status", 1)], background=True
+        )
+        await db.ledger_audit.create_index([("thesis_id", 1), ("at", 1)], background=True)
+        await db.ledger_daily_closes.create_index(
+            [("symbol", 1), ("date", 1)], unique=True, background=True
+        )
+
         logger.info("All MongoDB indexes initialized successfully.")
     except Exception as e:
         logger.warning(f"Error initializing indexes: {e}")
