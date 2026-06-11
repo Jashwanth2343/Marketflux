@@ -36,7 +36,10 @@ jobs:
             tests/test_policy_engine_unittest.py \
             tests/test_thesis_backfill_unittest.py \
             tests/test_conviction_ledger.py \
-            tests/test_sec_filings.py
+            tests/test_sec_filings.py \
+            tests/test_compliance_engine.py \
+            tests/test_intelligence_tools.py \
+            tests/test_filings_router.py
 
   frontend-build:
     runs-on: ubuntu-latest

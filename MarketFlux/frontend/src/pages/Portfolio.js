@@ -28,7 +28,7 @@ function renderMarkdown(text) {
     .replace(/\n/g, '<br/>');
 }
 
-const DONUT_COLORS = ['#E3B85F', '#9298A6', '#E3B85F', '#FF3333', '#8B5CF6', '#F472B6', '#34D399', '#FBBF24', '#60A5FA', '#C084FC'];
+const DONUT_COLORS = ['#E3B85F', '#9298A6', '#D4963A', '#FF3333', '#8B5CF6', '#F472B6', '#34D399', '#FBBF24', '#60A5FA', '#C084FC'];
 
 export default function Portfolio({ embedded = false }) {
   const { user } = useAuth();

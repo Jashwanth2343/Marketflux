@@ -68,7 +68,10 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         user = await get_current_user(request)
         if user:
             return user["user_id"]
-        if os.environ.get("NODE_ENV", "").lower() == "production":
+        # Require auth by default; only allow the anon fallback when explicitly
+        # running in local dev mode so a missing NODE_ENV in a deployed env never
+        # silently opens the shared namespace to unauthenticated callers.
+        if os.environ.get("NODE_ENV", "").lower() not in ("development", "dev"):
             raise HTTPException(401, "Authentication required for this endpoint.")
         return _ANON_ID
 
