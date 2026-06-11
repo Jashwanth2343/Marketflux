@@ -797,7 +797,9 @@ export default function CopilotAgent() {
 
     const toggleConfirm = useCallback(() => {
         setConfirm((c) => { localStorage.setItem('copilot_confirm', String(!c)); return !c; });
-    const toggleMode = () =>
+    }, []);
+
+    const toggleMode = useCallback(() => {
         setMode((m) => { const n = m === 'trade' ? 'research' : 'trade'; localStorage.setItem('copilot_mode', n); return n; });
     }, []);
 
