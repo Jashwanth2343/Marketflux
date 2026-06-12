@@ -9,9 +9,9 @@ const SENTIMENT_STYLES = {
   BEARISH:  { color: '#FF4444', bg: 'rgba(255,51,51,0.08)',  border: 'rgba(255,51,51,0.2)',  label: '▼ Bearish' },
   NEGATIVE: { color: '#FF4444', bg: 'rgba(255,51,51,0.08)',  border: 'rgba(255,51,51,0.2)',  label: '▼ Bearish' },
   negative: { color: '#FF4444', bg: 'rgba(255,51,51,0.08)',  border: 'rgba(255,51,51,0.2)',  label: '▼ Bearish' },
-  neutral:  { color: '#9298A6', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
-  NEUTRAL:  { color: '#9298A6', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
-  Neutral:  { color: '#9298A6', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
+  neutral:  { color: 'hsl(var(--secondary))', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
+  NEUTRAL:  { color: 'hsl(var(--secondary))', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
+  Neutral:  { color: 'hsl(var(--secondary))', bg: 'rgba(146,152,166,0.08)',  border: 'rgba(146,152,166,0.2)',  label: '◆ Neutral' },
 };
 
 function SentimentPill({ sentiment }) {
@@ -49,14 +49,14 @@ export default function NewsCard({ article, compact = false }) {
         target="_blank"
         rel="noopener noreferrer"
         className="group flex gap-3 p-3 rounded-lg border transition-all duration-200"
-        style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.07)' }}
+        style={{ background: 'hsl(var(--muted) / 0.35)', borderColor: 'hsl(var(--muted) / 0.5)' }}
         onMouseEnter={e => {
-          e.currentTarget.style.borderColor = 'rgba(227,184,95,0.2)';
-          e.currentTarget.style.background = 'rgba(227,184,95,0.03)';
+          e.currentTarget.style.borderColor = 'hsl(var(--primary) / 0.2)';
+          e.currentTarget.style.background = 'hsl(var(--primary) / 0.03)';
         }}
         onMouseLeave={e => {
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
-          e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+          e.currentTarget.style.borderColor = 'hsl(var(--muted) / 0.5)';
+          e.currentTarget.style.background = 'hsl(var(--muted) / 0.35)';
         }}
       >
         {hasThumbnail && (
@@ -73,18 +73,18 @@ export default function NewsCard({ article, compact = false }) {
             <div className="flex flex-wrap gap-1 mb-1.5">
               {article.tickers.slice(0, 3).map(t => (
                 <span key={t} className="px-1.5 py-px text-[8px] font-mono font-bold rounded"
-                  style={{ background: 'rgba(227,184,95,0.08)', color: '#E3B85F', border: '1px solid rgba(227,184,95,0.15)' }}>
+                  style={{ background: 'hsl(var(--primary) / 0.08)', color: '#E3B85F', border: '1px solid rgba(227,184,95,0.15)' }}>
                   {t}
                 </span>
               ))}
             </div>
           )}
-          <p className="text-sm text-foreground leading-snug line-clamp-2 group-hover:text-[#E3B85F] transition-colors duration-150">
+          <p className="text-sm text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-150">
             {article.title}
           </p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className="text-[10px] font-mono text-muted-foreground">{article.source}</span>
-            <span className="text-[rgba(255,255,255,0.2)] text-[10px]">·</span>
+            <span className="text-muted-foreground/60 text-[10px]">·</span>
             <span className="text-[10px] font-mono text-muted-foreground/50 flex items-center gap-0.5">
               <Clock className="w-2.5 h-2.5" /> {timeAgo(article.published_at)}
             </span>
@@ -102,14 +102,14 @@ export default function NewsCard({ article, compact = false }) {
       target="_blank"
       rel="noopener noreferrer"
       className="group flex flex-col rounded-lg border overflow-hidden transition-all duration-200"
-      style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.07)' }}
+      style={{ background: 'hsl(var(--muted) / 0.35)', borderColor: 'hsl(var(--muted) / 0.5)' }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'rgba(227,184,95,0.2)';
+        e.currentTarget.style.borderColor = 'hsl(var(--primary) / 0.2)';
         e.currentTarget.style.transform = 'translateY(-2px)';
         e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(227,184,95,0.08)';
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
+        e.currentTarget.style.borderColor = 'hsl(var(--muted) / 0.5)';
         e.currentTarget.style.transform = 'translateY(0)';
         e.currentTarget.style.boxShadow = 'none';
       }}
@@ -133,14 +133,14 @@ export default function NewsCard({ article, compact = false }) {
           <div className="flex flex-wrap gap-1">
             {article.tickers.slice(0, 3).map(t => (
               <span key={t} className="px-1.5 py-px text-[9px] font-mono font-bold rounded"
-                style={{ background: 'rgba(227,184,95,0.08)', color: '#E3B85F', border: '1px solid rgba(227,184,95,0.15)' }}>
+                style={{ background: 'hsl(var(--primary) / 0.08)', color: '#E3B85F', border: '1px solid rgba(227,184,95,0.15)' }}>
                 {t}
               </span>
             ))}
           </div>
         )}
 
-        <p className="text-sm text-foreground font-medium leading-snug line-clamp-2 group-hover:text-[#E3B85F] transition-colors duration-150 flex-1">
+        <p className="text-sm text-foreground font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors duration-150 flex-1">
           {article.title}
         </p>
 
@@ -148,10 +148,10 @@ export default function NewsCard({ article, compact = false }) {
           <p className="text-xs text-muted-foreground/60 line-clamp-2 leading-relaxed">{article.summary}</p>
         )}
 
-        <div className="flex items-center justify-between pt-2 border-t border-[rgba(255,255,255,0.05)] mt-auto">
+        <div className="flex items-center justify-between pt-2 border-t border-border mt-auto">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] font-mono text-muted-foreground">{article.source}</span>
-            <span className="text-[rgba(255,255,255,0.2)]">·</span>
+            <span className="text-muted-foreground/60">·</span>
             <span className="text-[10px] font-mono text-muted-foreground/50 flex items-center gap-0.5">
               <Clock className="w-2.5 h-2.5" /> {timeAgo(article.published_at)}
             </span>

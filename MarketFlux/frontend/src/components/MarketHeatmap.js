@@ -129,7 +129,7 @@ export default memo(function MarketHeatmap({ heatmapData }) {
                             className={`whitespace-nowrap px-3 py-1.5 text-[10px] uppercase tracking-wider font-mono rounded-[6px] transition-all duration-200 ${
                                 isActive 
                                 ? 'bg-[var(--color-accent)] text-black font-bold shadow-sm' 
-                                : 'bg-transparent dark:text-[#666] text-[#444] border border-[rgba(255,255,255,0.1)] dark:border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.3)]'
+                                : 'bg-transparent dark:text-[#666] text-[#444] border border-border dark:border-border hover:border-border'
                             }`}
                         >
                             {tab}

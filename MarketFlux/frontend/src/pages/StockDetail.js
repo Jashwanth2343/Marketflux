@@ -60,7 +60,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     const change = data.change_from_prev;
 
     return (
-      <div className="bg-[#15130F] border border-border p-2 shadow-2xl rounded-none font-mono text-[10px] min-w-[140px] z-50">
+      <div className="bg-popover border border-border p-2 shadow-2xl rounded-none font-mono text-[10px] min-w-[140px] z-50">
         <div className="text-muted-foreground mb-1 border-b border-border/50 pb-1 flex justify-between">
           <span>{label}</span>
           <Clock className="w-3 h-3 opacity-50" />
@@ -73,7 +73,7 @@ const CustomTooltip = ({ active, payload, label }) => {
           {change !== undefined && (
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">CHANGE</span>
-              <span className={change >= 0 ? 'text-[#3FB950]' : 'text-[#F85149]'}>
+              <span className={change >= 0 ? 'text-gain' : 'text-loss'}>
                 {change >= 0 ? '+' : ''}{change.toFixed(2)}%
               </span>
             </div>
@@ -330,7 +330,7 @@ export default function StockDetail() {
               <h1 className="text-2xl md:text-4xl font-bold tracking-tighter uppercase text-foreground flex items-center gap-3">
                 {stock.symbol}
                 <button onClick={toggleWatchlist} className="focus:outline-none transition-transform hover:scale-110">
-                  <Star className={`w-6 h-6 ${isWatched ? 'fill-[#E3B85F] dark:text-[#E3B85F] text-[#059669] drop-shadow-[0_0_8px_rgba(227,184,95,0.6)]' : 'text-muted-foreground/50 hover:text-foreground'}`} />
+                  <Star className={`w-6 h-6 ${isWatched ? 'fill-[#E3B85F] dark:text-primary text-gain drop-shadow-[0_0_8px_rgba(227,184,95,0.6)]' : 'text-muted-foreground/50 hover:text-foreground'}`} />
                 </button>
               </h1>
               {stock.exchange && <Badge variant="outline" className="rounded-none text-[8px] font-mono border-border text-muted-foreground ml-2">{stock.exchange}</Badge>}
@@ -343,7 +343,7 @@ export default function StockDetail() {
           </div>
           <div className="text-right">
             <p className="font-data text-3xl text-foreground">${fmt(stock.price)}</p>
-            <div className={`flex items-center justify-end gap-1 font-data text-sm ${isPositive ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
+            <div className={`flex items-center justify-end gap-1 font-data text-sm ${isPositive ? 'text-gain' : 'text-loss'}`}>
               {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
               {isPositive ? '+' : ''}{fmt(stock.change)} ({isPositive ? '+' : ''}{stock.change_percent?.toFixed(2)}%)
             </div>
@@ -413,8 +413,8 @@ export default function StockDetail() {
                       const pct = (diff / first) * 100;
                       const isUp = pct >= 0;
                       return (
-                        <div className={`px-2 py-1 bg-background/80 backdrop-blur-md border rounded-md font-mono text-[10px] flex items-center gap-1.5 shadow-sm ${isUp ? 'border-[#3FB950]/30 text-[#3FB950]' : 'border-[#F85149]/30 text-[#F85149]'}`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${isUp ? 'bg-[#3FB950]' : 'bg-[#F85149]'} animate-pulse`} />
+                        <div className={`px-2 py-1 bg-background/80 backdrop-blur-md border rounded-md font-mono text-[10px] flex items-center gap-1.5 shadow-sm ${isUp ? 'border-gain/30 text-gain' : 'border-loss/30 text-loss'}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${isUp ? 'bg-gain' : 'bg-loss'} animate-pulse`} />
                           <span className="font-bold">{isUp ? '+' : ''}{pct.toFixed(2)}%</span>
                           <span className="opacity-70 uppercase tracking-tighter">Past {period === '1mo' ? 'Month' : period === '1d' ? 'Day' : period === '1y' ? 'Year' : period}</span>
                         </div>
@@ -512,8 +512,8 @@ export default function StockDetail() {
               {chart.length > 0 && (
                 <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4 text-[10px] font-mono text-muted-foreground border-t border-border/30 pt-4">
                   <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30"/> Open: <span className="text-foreground tracking-tighter">${fmt(stock?.open)}</span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-[#3FB950]/40"/> High: <span className="text-foreground tracking-tighter">${fmt(stock?.day_high)}</span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-[#F85149]/40"/> Low: <span className="text-foreground tracking-tighter">${fmt(stock?.day_low)}</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-gain/40"/> High: <span className="text-foreground tracking-tighter">${fmt(stock?.day_high)}</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-loss/40"/> Low: <span className="text-foreground tracking-tighter">${fmt(stock?.day_low)}</span></div>
                   <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30"/> Prev Close: <span className="text-foreground tracking-tighter">${fmt(stock?.previous_close)}</span></div>
                 </div>
               )}
@@ -626,7 +626,7 @@ export default function StockDetail() {
         <Card className="rounded-none border-border dark:bg-card/50 bg-card corner-brackets">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-[#E3B85F]" /> Dividends & Growth
+              <DollarSign className="w-4 h-4 text-primary" /> Dividends & Growth
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-3">
@@ -646,7 +646,7 @@ export default function StockDetail() {
                     {stock.recent_moves.slice(-5).map((m, i) => (
                       <div key={i} className="flex justify-between py-1 border-b border-border/30 text-[10px]">
                         <span className="font-mono text-muted-foreground">{m.date}</span>
-                        <span className={`font-data ${m.change_pct > 0 ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
+                        <span className={`font-data ${m.change_pct > 0 ? 'text-gain' : 'text-loss'}`}>
                           {m.change_pct > 0 ? '+' : ''}{m.change_pct}%
                         </span>
                       </div>
@@ -665,7 +665,7 @@ export default function StockDetail() {
         <Card className="rounded-none border-border dark:bg-card/50 bg-card corner-brackets" data-testid="analyst-targets">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
-              <Target className="w-4 h-4 text-[#9298A6]" /> Analyst Price Targets
+              <Target className="w-4 h-4 text-secondary" /> Analyst Price Targets
               <button
                 title="Price targets are forecasts by Wall Street analysts for where a stock's price may trade in the next 12 months. The bar shows the range from lowest to highest target. The mean (average) target represents the consensus view. The analyst score ranges from 1 (Strong Buy) to 5 (Strong Sell)."
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -694,7 +694,7 @@ export default function StockDetail() {
                     const pricePct = ((price - min) / range) * 100;
                     return (
                       <>
-                        <div className="absolute top-0 h-full rounded-full border border-[rgba(227,184,95,0.3)] transition-all duration-500" 
+                        <div className="absolute top-0 h-full rounded-full border border-primary/20 transition-all duration-500" 
                              style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%`, background: 'linear-gradient(to right, rgba(227,184,95,0.1), rgba(227,184,95,0.4))' }} />
 
                         {/* Low Target Label */}
@@ -722,11 +722,11 @@ export default function StockDetail() {
                         </div>
 
                         {/* Current Price Marker */}
-                        <div className="absolute top-1/2 -mt-[5px] w-2.5 h-2.5 rounded-full bg-[#E3B85F] shadow-[0_0_8px_rgba(227,184,95,0.6)] z-30 ring-2 ring-background" title={`Current: $${price}`} style={{ left: `${pricePct}%`, transform: 'translateX(-50%)' }} />
+                        <div className="absolute top-1/2 -mt-[5px] w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(227,184,95,0.6)] z-30 ring-2 ring-background" title={`Current: $${price}`} style={{ left: `${pricePct}%`, transform: 'translateX(-50%)' }} />
                         <div className="absolute" style={{ left: `${pricePct}%`, bottom: '-46px', transform: 'translateX(-50%)' }}>
                           <div className="flex flex-col items-center bg-background/80 backdrop-blur-sm px-2 py-0.5 rounded border border-border/50">
-                            <span className="text-[9px] font-mono text-[#E3B85F] whitespace-nowrap">Current</span>
-                            <span className="text-[10px] font-mono text-[#E3B85F] font-bold">${price}</span>
+                            <span className="text-[9px] font-mono text-primary whitespace-nowrap">Current</span>
+                            <span className="text-[10px] font-mono text-primary font-bold">${price}</span>
                           </div>
                         </div>
                       </>
@@ -743,7 +743,7 @@ export default function StockDetail() {
                   if (lower === 'strong buy') badgeColor = 'bg-[#00d26a] text-black border-[#00d26a] hover:bg-[#00d26a]/90';
                   else if (lower === 'buy') badgeColor = 'bg-[#1db954] text-black border-[#1db954] hover:bg-[#1db954]/90';
                   else if (lower === 'hold') badgeColor = 'bg-[#f59e0b] text-black border-[#f59e0b] hover:bg-[#f59e0b]/90';
-                  else if (lower === 'sell') badgeColor = 'bg-[#ef4444] text-white border-[#ef4444] hover:bg-[#ef4444]/90';
+                  else if (lower === 'sell') badgeColor = 'bg-loss text-white border-loss hover:bg-loss/90';
                   else if (lower === 'strong sell') badgeColor = 'bg-[#b91c1c] text-white border-[#b91c1c] hover:bg-[#b91c1c]/90';
 
                   return (
@@ -773,7 +773,7 @@ export default function StockDetail() {
         <Card className="rounded-none border-border dark:bg-card/50 bg-card corner-brackets" data-testid="insider-activity">
           <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-sm font-mono uppercase tracking-wider flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-[#E3B85F]" /> Insider Activity
+              <UserCheck className="w-4 h-4 text-primary" /> Insider Activity
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-3">
@@ -796,7 +796,7 @@ export default function StockDetail() {
                     if (typeLower.includes('buy') || typeLower.includes('purchase')) {
                       typeBadge = <Badge className="bg-[#00d26a] text-black rounded font-mono text-[9px] uppercase hover:bg-[#00d26a]">BUY</Badge>;
                     } else if (typeLower.includes('sell') || typeLower.includes('sale')) {
-                      typeBadge = <Badge className="bg-[#ef4444] text-white rounded font-mono text-[9px] uppercase hover:bg-[#ef4444]">SELL</Badge>;
+                      typeBadge = <Badge className="bg-loss text-white rounded font-mono text-[9px] uppercase hover:bg-loss">SELL</Badge>;
                     } else if (typeLower.includes('award') || typeLower.includes('exercise') || typeLower.includes('withhold')) {
                       typeBadge = <Badge className="bg-[#444] text-white rounded font-mono text-[9px] uppercase hover:bg-[#444]">{tx.transaction_type}</Badge>;
                     } else if (tx.transaction_type && tx.transaction_type !== '--') {

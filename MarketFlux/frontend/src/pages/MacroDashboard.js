@@ -98,7 +98,7 @@ function AssetPanel({ assets }) {
                   {d.price != null ? (key === 'BITCOIN' ? `$${(d.price / 1000).toFixed(1)}K` : d.price?.toLocaleString('en-US', { maximumFractionDigits: 2 })) : '--'}
                 </p>
               </div>
-              <span className={`font-mono text-[10px] font-bold ${up ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
+              <span className={`font-mono text-[10px] font-bold ${up ? 'text-gain' : 'text-loss'}`}>
                 {up ? '+' : ''}{d.change_pct?.toFixed(2)}%
               </span>
             </div>
@@ -130,14 +130,14 @@ function SectorTable({ sectors }) {
           {sectors.map(s => (
             <tr key={s.etf} className="border-b border-border/10 hover:bg-muted/5">
               <td className="font-mono text-[10px] text-foreground py-1.5 pr-2">{s.sector}</td>
-              <td className={`font-mono text-[10px] text-right px-2 font-bold ${s.return_1m >= 0 ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
+              <td className={`font-mono text-[10px] text-right px-2 font-bold ${s.return_1m >= 0 ? 'text-gain' : 'text-loss'}`}>
                 {s.return_1m >= 0 ? '+' : ''}{s.return_1m}%
               </td>
-              <td className={`font-mono text-[10px] text-right px-2 ${s.return_3m >= 0 ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
+              <td className={`font-mono text-[10px] text-right px-2 ${s.return_3m >= 0 ? 'text-gain' : 'text-loss'}`}>
                 {s.return_3m >= 0 ? '+' : ''}{s.return_3m}%
               </td>
               <td className="text-right pl-2">
-                <span className={`font-mono text-[9px] px-1.5 py-0.5 ${s.momentum_acceleration > 1 ? 'text-[#4ADE80] bg-[#4ADE80]/10' : s.momentum_acceleration < -1 ? 'text-[#F85149] bg-[#F85149]/10' : 'text-muted-foreground'}`}>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 ${s.momentum_acceleration > 1 ? 'text-gain bg-gain/10' : s.momentum_acceleration < -1 ? 'text-loss bg-loss/10' : 'text-muted-foreground'}`}>
                   {s.momentum_acceleration > 0.5 ? '↑ ACCEL' : s.momentum_acceleration < -0.5 ? '↓ DECEL' : '→ FLAT'}
                 </span>
               </td>
@@ -224,10 +224,10 @@ export default function MacroDashboard({ embedded = false }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <Globe className="w-5 h-5 text-[#9298A6]" />
+          <Globe className="w-5 h-5 text-secondary" />
           <div>
             <h1 className="font-mono text-xl font-bold tracking-tight text-foreground">
-              Macro <span style={{ color: '#9298A6', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>Dashboard</span>
+              Macro <span style={{ color: 'hsl(var(--secondary))', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>Dashboard</span>
             </h1>
             <p className="font-mono text-[11px] text-muted-foreground">
               Yield Curve · VIX Regime · Sector Rotation · Economic Calendar
@@ -247,7 +247,7 @@ export default function MacroDashboard({ embedded = false }) {
             size="sm"
             className="h-8 px-3 text-[11px] font-mono uppercase tracking-wider gap-1.5"
             style={{
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid hsl(var(--border))',
               color: refreshing ? '#9298A6' : 'rgba(255,255,255,0.4)',
             }}
           >
@@ -262,7 +262,7 @@ export default function MacroDashboard({ embedded = false }) {
           className="p-3.5 rounded-xl"
           style={{ border: '1px solid rgba(146,152,166,0.18)', background: 'rgba(146,152,166,0.05)' }}
         >
-          <p className="font-mono text-[10px] text-[#9298A6] uppercase tracking-wider mb-1.5">Macro Intelligence Summary</p>
+          <p className="font-mono text-[10px] text-secondary uppercase tracking-wider mb-1.5">Macro Intelligence Summary</p>
           <p className="font-mono text-xs text-foreground/80 leading-relaxed">{macro_summary}</p>
         </div>
       )}
@@ -289,8 +289,8 @@ export default function MacroDashboard({ embedded = false }) {
                     style={{ marginLeft: `${(fear_greed.value - 3) / 97 * 100}%` }} />
                 </div>
                 <div className="flex justify-between mt-1">
-                  <span className="font-mono text-[9px] text-[#F85149]">Extreme Fear</span>
-                  <span className="font-mono text-[9px] text-[#E3B85F]">Extreme Greed</span>
+                  <span className="font-mono text-[9px] text-loss">Extreme Fear</span>
+                  <span className="font-mono text-[9px] text-primary">Extreme Greed</span>
                 </div>
               </CardContent>
             </Card>
@@ -313,7 +313,7 @@ export default function MacroDashboard({ embedded = false }) {
                 {yield_curve.spread_2s10s != null && (
                   <div className="mt-3 p-2 border border-border/20 bg-muted/5">
                     <p className="font-mono text-[10px] text-muted-foreground">2s10s Spread</p>
-                    <p className={`font-mono text-sm font-bold ${yield_curve.spread_2s10s >= 0 ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
+                    <p className={`font-mono text-sm font-bold ${yield_curve.spread_2s10s >= 0 ? 'text-gain' : 'text-loss'}`}>
                       {yield_curve.spread_2s10s >= 0 ? '+' : ''}{yield_curve.spread_2s10s?.toFixed(2)}%
                     </p>
                     <p className="font-mono text-[10px] text-muted-foreground/60 mt-1">{yield_curve.curve_interpretation}</p>

@@ -176,7 +176,7 @@ export default function SearchBar({ variant = 'default', className = '' }) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={cn("font-mono text-sm font-bold", result.kind === 'strategy' ? "text-[#E3B85F]" : "text-primary")}>
+                      <span className={cn("font-mono text-sm font-bold", result.kind === 'strategy' ? "text-primary" : "text-primary")}>
                         {result.kind === 'strategy' ? result.title : result.symbol}
                       </span>
                     </div>

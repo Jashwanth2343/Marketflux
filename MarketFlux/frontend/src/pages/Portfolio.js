@@ -245,9 +245,9 @@ export default function Portfolio({ embedded = false }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Briefcase className="w-5 h-5 text-[#9298A6]" />
+            <Briefcase className="w-5 h-5 text-secondary" />
             <h1 className="text-xl md:text-2xl font-mono font-bold tracking-tight text-foreground">
-              Portfolio <span style={{ color: '#9298A6', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>Manager</span>
+              Portfolio <span style={{ color: 'hsl(var(--secondary))', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>Manager</span>
             </h1>
           </div>
           <p className="text-[11px] font-mono text-muted-foreground">
@@ -267,7 +267,7 @@ export default function Portfolio({ embedded = false }) {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div
             className="rounded-xl p-4"
-            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+            style={{ background: 'hsl(var(--muted) / 0.35)', border: '1px solid hsl(var(--border))' }}
           >
             <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <DollarSign className="w-3 h-3" /> Total Value
@@ -278,10 +278,10 @@ export default function Portfolio({ embedded = false }) {
           </div>
           <div
             className="rounded-xl p-4"
-            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+            style={{ background: 'hsl(var(--muted) / 0.35)', border: '1px solid hsl(var(--border))' }}
           >
             <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5">Total Gain/Loss</div>
-            <div className={`font-data text-xl flex items-center gap-1 ${totalPL >= 0 ? 'text-[#4ADE80]' : 'text-[#FF4444]'}`}>
+            <div className={`font-data text-xl flex items-center gap-1 ${totalPL >= 0 ? 'text-gain' : 'text-loss'}`}>
               {pricesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 <>
                   {totalPL >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
@@ -293,16 +293,16 @@ export default function Portfolio({ embedded = false }) {
           </div>
           <div
             className="rounded-xl p-4"
-            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+            style={{ background: 'hsl(var(--muted) / 0.35)', border: '1px solid hsl(var(--border))' }}
           >
             <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5">Today's Change</div>
-            <div className={`font-data text-xl ${todayChangeTotal >= 0 ? 'text-[#4ADE80]' : 'text-[#FF4444]'}`}>
+            <div className={`font-data text-xl ${todayChangeTotal >= 0 ? 'text-gain' : 'text-loss'}`}>
               {pricesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${todayChangeTotal >= 0 ? '+' : ''}$${formatPrice(todayChangeTotal)}`}
             </div>
           </div>
           <div
             className="rounded-xl p-4"
-            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}
+            style={{ background: 'hsl(var(--muted) / 0.35)', border: '1px solid hsl(var(--border))' }}
           >
             <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <PieChartIcon className="w-3 h-3" /> Holdings
@@ -360,7 +360,7 @@ export default function Portfolio({ embedded = false }) {
             {/* Image Upload */}
             <div className="border-t border-border pt-3">
               <div className="flex items-center gap-2 mb-2">
-                <Upload className="w-3.5 h-3.5 text-[#E3B85F]" />
+                <Upload className="w-3.5 h-3.5 text-primary" />
                 <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Upload Portfolio Screenshot</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -376,7 +376,7 @@ export default function Portfolio({ embedded = false }) {
                   variant="outline"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  className="rounded-none border-[#E3B85F]/30 text-[#E3B85F] font-mono text-xs uppercase hover:bg-[#E3B85F]/10"
+                  className="rounded-none border-primary/30 text-primary font-mono text-xs uppercase hover:bg-primary/10"
                 >
                   <Image className="w-3 h-3 mr-1.5" /> Choose Image
                 </Button>
@@ -387,7 +387,7 @@ export default function Portfolio({ embedded = false }) {
                       size="sm"
                       onClick={parseImage}
                       disabled={parsing}
-                      className="rounded-none bg-[#E3B85F] text-black font-mono text-xs uppercase hover:bg-[#E3B85F]/80 disabled:opacity-50"
+                      className="rounded-none bg-primary text-black font-mono text-xs uppercase hover:bg-primary/80 disabled:opacity-50"
                     >
                       {parsing ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
                       {parsing ? 'Parsing...' : 'Parse Holdings'}
@@ -413,13 +413,13 @@ export default function Portfolio({ embedded = false }) {
 
               {/* Parsed Results */}
               {parsedHoldings.length > 0 && (
-                <div className="mt-3 border border-[#E3B85F]/30 bg-[#E3B85F]/5 p-3 space-y-2">
-                  <div className="text-[10px] font-mono text-[#E3B85F] uppercase tracking-wider">
+                <div className="mt-3 border border-primary/30 bg-primary/5 p-3 space-y-2">
+                  <div className="text-[10px] font-mono text-primary uppercase tracking-wider">
                     Parsed {parsedHoldings.length} holdings from image
                   </div>
                   <table className="w-full text-[10px] font-mono">
                     <thead>
-                      <tr className="border-b border-[#E3B85F]/20 text-muted-foreground">
+                      <tr className="border-b border-primary/20 text-muted-foreground">
                         <th className="text-left py-1 pr-2 w-6"></th>
                         <th className="text-left py-1 pr-2">Ticker</th>
                         <th className="text-right py-1 pr-2">Shares</th>
@@ -428,7 +428,7 @@ export default function Portfolio({ embedded = false }) {
                     </thead>
                     <tbody>
                       {parsedHoldings.map((ph, i) => (
-                        <tr key={i} className="border-b border-[#E3B85F]/10">
+                        <tr key={i} className="border-b border-primary/10">
                           <td className="py-1 pr-2">
                             <input
                               type="checkbox"
@@ -448,7 +448,7 @@ export default function Portfolio({ embedded = false }) {
                     size="sm"
                     onClick={addParsedHoldings}
                     disabled={selectedParsed.length === 0}
-                    className="rounded-none bg-[#E3B85F] text-black font-mono text-xs uppercase hover:bg-[#E3B85F]/80"
+                    className="rounded-none bg-primary text-black font-mono text-xs uppercase hover:bg-primary/80"
                   >
                     <CheckSquare className="w-3 h-3 mr-1" /> Add Selected ({selectedParsed.length})
                   </Button>
@@ -559,13 +559,13 @@ export default function Portfolio({ embedded = false }) {
                       <TableCell className="font-data text-foreground text-right">
                         {h.currentValue ? `$${formatPrice(h.currentValue)}` : '--'}
                       </TableCell>
-                      <TableCell className={`font-data text-right ${h.plDollar >= 0 ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
+                      <TableCell className={`font-data text-right ${h.plDollar >= 0 ? 'text-gain' : 'text-loss'}`}>
                         {h.currentPrice ? `${h.plDollar >= 0 ? '+' : ''}$${formatPrice(h.plDollar)}` : '--'}
                       </TableCell>
-                      <TableCell className={`font-data text-right ${h.plPercent >= 0 ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
+                      <TableCell className={`font-data text-right ${h.plPercent >= 0 ? 'text-gain' : 'text-loss'}`}>
                         {h.currentPrice ? `${h.plPercent >= 0 ? '+' : ''}${h.plPercent.toFixed(2)}%` : '--'}
                       </TableCell>
-                      <TableCell className={`font-data text-right hidden sm:table-cell ${h.todayChange >= 0 ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
+                      <TableCell className={`font-data text-right hidden sm:table-cell ${h.todayChange >= 0 ? 'text-gain' : 'text-loss'}`}>
                         {h.currentPrice ? `${h.todayChange >= 0 ? '+' : ''}${h.todayChange.toFixed(2)}%` : '--'}
                       </TableCell>
                       <TableCell>
@@ -581,10 +581,10 @@ export default function Portfolio({ embedded = false }) {
                     <TableCell className="font-data text-muted-foreground text-right">${formatPrice(totalInvested)}</TableCell>
                     <TableCell></TableCell>
                     <TableCell className="font-data text-primary text-right">${formatPrice(totalCurrentValue)}</TableCell>
-                    <TableCell className={`font-data text-right ${totalPL >= 0 ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
+                    <TableCell className={`font-data text-right ${totalPL >= 0 ? 'text-gain' : 'text-loss'}`}>
                       {totalPL >= 0 ? '+' : ''}${formatPrice(totalPL)}
                     </TableCell>
-                    <TableCell className={`font-data text-right ${totalPLPercent >= 0 ? 'dark:text-[#4ADE80] text-[#059669]' : 'text-[#FF3333]'}`}>
+                    <TableCell className={`font-data text-right ${totalPLPercent >= 0 ? 'text-gain' : 'text-loss'}`}>
                       {totalPLPercent >= 0 ? '+' : ''}{totalPLPercent.toFixed(2)}%
                     </TableCell>
                     <TableCell className="hidden sm:table-cell"></TableCell>

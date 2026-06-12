@@ -113,21 +113,21 @@ export default function Auth() {
       }} />
 
       {/* Floating stat pills — trust signals */}
-      <div className="absolute top-8 left-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(227,184,95,0.15)] bg-[rgba(227,184,95,0.04)]">
-        <BarChart2 className="w-3 h-3 text-[#E3B85F]" />
-        <span className="text-[10px] font-mono text-[#E3B85F]">Live Market Data</span>
+      <div className="absolute top-8 left-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/10">
+        <BarChart2 className="w-3 h-3 text-primary" />
+        <span className="text-[10px] font-mono text-primary">Live Market Data</span>
       </div>
       <div className="absolute top-8 right-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(146,152,166,0.15)] bg-[rgba(146,152,166,0.04)]">
-        <ShieldCheck className="w-3 h-3 text-[#9298A6]" />
-        <span className="text-[10px] font-mono text-[#9298A6]">Secure &amp; Encrypted</span>
+        <ShieldCheck className="w-3 h-3 text-secondary" />
+        <span className="text-[10px] font-mono text-secondary">Secure &amp; Encrypted</span>
       </div>
-      <div className="absolute bottom-8 left-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[rgba(227,184,95,0.15)] bg-[rgba(227,184,95,0.04)]">
-        <Zap className="w-3 h-3 text-[#E3B85F]" />
-        <span className="text-[10px] font-mono text-[#E3B85F]">AI-Powered Research</span>
+      <div className="absolute bottom-8 left-8 hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/10">
+        <Zap className="w-3 h-3 text-primary" />
+        <span className="text-[10px] font-mono text-primary">AI-Powered Research</span>
       </div>
 
       <Card
-        className="w-full max-w-md relative z-10 border-[rgba(227,184,95,0.15)] shadow-2xl"
+        className="w-full max-w-md relative z-10 border-primary/20 shadow-2xl"
         style={{
           background: 'linear-gradient(160deg, rgba(12,20,14,0.97) 0%, rgba(8,14,10,0.99) 100%)',
           backdropFilter: 'blur(24px)',
@@ -140,13 +140,13 @@ export default function Auth() {
         <CardHeader className="text-center pb-3 pt-8">
           <div className="flex items-center justify-center gap-2.5 mb-5">
             <div className="relative">
-              <Activity className="w-8 h-8 text-[#E3B85F]" style={{ filter: 'drop-shadow(0 0 8px rgba(227,184,95,0.6))' }} />
+              <Activity className="w-8 h-8 text-primary" style={{ filter: 'drop-shadow(0 0 8px rgba(227,184,95,0.6))' }} />
             </div>
-            <span className="font-mono text-2xl font-bold text-[#E3B85F] tracking-tight" style={{ textShadow: '0 0 20px rgba(227,184,95,0.4)' }}>
+            <span className="font-mono text-2xl font-bold text-primary tracking-tight" style={{ textShadow: '0 0 20px rgba(227,184,95,0.4)' }}>
               MARKET FLUX
             </span>
           </div>
-          <p className="text-[10px] font-mono text-[rgba(255,255,255,0.35)] uppercase tracking-[0.3em]">
+          <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-[0.3em]">
             AI-Native Quant Research Terminal
           </p>
         </CardHeader>
@@ -177,10 +177,10 @@ export default function Auth() {
 
           <div className="relative mb-5">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-[rgba(255,255,255,0.07)]" />
+              <span className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center">
-              <span className="px-3 text-[10px] uppercase font-mono tracking-widest text-[rgba(255,255,255,0.25)]"
+              <span className="px-3 text-[10px] uppercase font-mono tracking-widest text-muted-foreground/60"
                 style={{ background: 'rgba(10,17,12,0.98)' }}>
                 or
               </span>
@@ -234,7 +234,7 @@ export default function Auth() {
             <TabsContent value="login" className="mt-0 space-y-4">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-mono uppercase tracking-widest text-[rgba(255,255,255,0.4)]">
+                  <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                     Email
                   </Label>
                   <Input
@@ -255,12 +255,12 @@ export default function Auth() {
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label className="text-[10px] font-mono uppercase tracking-widest text-[rgba(255,255,255,0.4)]">
+                    <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                       Password
                     </Label>
                     <button
                       type="button"
-                      className="text-[10px] font-mono text-[rgba(146,152,166,0.5)] hover:text-[#9298A6] transition-colors"
+                      className="text-[10px] font-mono text-[rgba(146,152,166,0.5)] hover:text-secondary transition-colors"
                       onClick={() => {}}
                       tabIndex={-1}
                     >
@@ -285,7 +285,7 @@ export default function Auth() {
                     <button
                       type="button"
                       onClick={() => setShowLoginPw(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.7)] transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       tabIndex={-1}
                     >
                       {showLoginPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -322,7 +322,7 @@ export default function Auth() {
             <TabsContent value="register" className="mt-0 space-y-4">
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-mono uppercase tracking-widest text-[rgba(255,255,255,0.4)]">
+                  <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                     Full Name
                   </Label>
                   <Input
@@ -340,7 +340,7 @@ export default function Auth() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-mono uppercase tracking-widest text-[rgba(255,255,255,0.4)]">
+                  <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                     Email
                   </Label>
                   <Input
@@ -359,7 +359,7 @@ export default function Auth() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-mono uppercase tracking-widest text-[rgba(255,255,255,0.4)]">
+                  <Label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                     Password
                   </Label>
                   <div className="relative">
@@ -379,7 +379,7 @@ export default function Auth() {
                     <button
                       type="button"
                       onClick={() => setShowRegPw(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgba(255,255,255,0.3)] hover:text-[rgba(255,255,255,0.7)] transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       tabIndex={-1}
                     >
                       {showRegPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
