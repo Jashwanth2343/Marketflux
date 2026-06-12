@@ -101,7 +101,11 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
                 return Response("Request too large", status_code=413)
         return await call_next(request)
 
-app = FastAPI()
+try:
+    from fastapi.responses import ORJSONResponse
+    app = FastAPI(default_response_class=ORJSONResponse)
+except ImportError:  # orjson not installed — plain JSON still works
+    app = FastAPI()
 app.add_middleware(LimitRequestSizeMiddleware)
 # Treat an empty/whitespace ALLOWED_ORIGINS the same as unset — otherwise the
 # split produces [''] and CORS silently blocks the local frontend (a "Failed to
