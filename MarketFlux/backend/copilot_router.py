@@ -176,6 +176,14 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         import copilot_enrich
         return await copilot_enrich.enrich_positions()
 
+    @router.get("/trades/pending")
+    async def copilot_trades_pending(request: Request):
+        """Staged trades awaiting approval, so the queue survives a refresh."""
+        import copilot_trades
+        user_id = await _resolve_user_id(request)
+        items = await copilot_trades.list_pending(db, user_id)
+        return {"items": items}
+
     @router.post("/trades/{pid}/approve")
     async def copilot_trade_approve(pid: str, request: Request):
         """Execute a staged trade after explicit user approval (confirm mode)."""

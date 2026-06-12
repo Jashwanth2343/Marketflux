@@ -13,7 +13,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,14 @@ async def stage(db, user_id: str, name: str, args: Dict[str, Any]) -> Dict[str, 
         "message": "Trade staged — awaiting the user's approval. Tell them what you prepared and why.",
         **pv,
     }
+
+
+async def list_pending(db, user_id: str) -> List[Dict[str, Any]]:
+    """Staged trades still awaiting approval — lets the UI rehydrate after a
+    page refresh instead of silently losing the approval queue."""
+    return await db[COLLECTION].find(
+        {"user_id": user_id, "status": "pending"}, {"_id": 0}
+    ).sort("created_at", 1).to_list(50)
 
 
 async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:

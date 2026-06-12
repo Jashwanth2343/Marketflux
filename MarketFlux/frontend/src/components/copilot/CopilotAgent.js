@@ -795,6 +795,12 @@ export default function CopilotAgent() {
         localStorage.setItem('copilot_model', key);
     }, []);
 
+    // Model choice is a developer concern — keep the picker collapsed unless asked for.
+    const [showModelPicker, setShowModelPicker] = useState(() => localStorage.getItem('copilot_show_model') === 'true');
+    const toggleModelPicker = useCallback(() => {
+        setShowModelPicker((v) => { localStorage.setItem('copilot_show_model', String(!v)); return !v; });
+    }, []);
+
     const toggleConfirm = useCallback(() => {
         setConfirm((c) => { localStorage.setItem('copilot_confirm', String(!c)); return !c; });
     }, []);
@@ -834,6 +840,24 @@ export default function CopilotAgent() {
             toast.error('Action failed', { description: err?.message });
         }
     }, [patchTradeByProposal]);
+
+    // Rehydrate staged trades that survived a refresh — they're persisted
+    // server-side, so the approval queue must not silently vanish with the tab.
+    useEffect(() => {
+        api.get('/copilot/trades/pending').then(({ data }) => {
+            const items = data?.items || [];
+            if (!items.length) return;
+            setMessages((prev) => prev.length ? prev : [{
+                id: nextId(), role: 'assistant', streaming: false,
+                content: items.length === 1
+                    ? 'A staged trade from a previous session is still awaiting your decision:'
+                    : `${items.length} staged trades from a previous session are still awaiting your decision:`,
+                activity: items.map((t) => ({
+                    kind: 'trade', pending: true, proposal_id: t.id, ...(t.preview || {}),
+                })),
+            }]);
+        }).catch(() => { /* backend offline — keep the landing */ });
+    }, []);
 
     // Pick up a strategy handed off from the Strategy Studio.
     useEffect(() => {
@@ -1006,21 +1030,32 @@ export default function CopilotAgent() {
                 {confirm ? <ShieldCheck className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
                 {confirm ? 'Confirm trades' : 'Auto-execute'}
             </button>
-            <div className="flex items-center gap-1.5 rounded-full border border-border bg-card py-1 pl-2.5 pr-1.5" title="Model">
-                <Cpu className="h-3.5 w-3.5 text-primary" />
-                <select
-                    value={model}
-                    onChange={(e) => onModelChange(e.target.value)}
-                    className="max-w-[150px] cursor-pointer bg-transparent pr-1 font-mono text-[11px] text-foreground outline-none"
-                >
-                    {models.length === 0 && <option value={model}>{model}</option>}
-                    {models.map((m) => (
-                        <option key={m.key} value={m.key} className="bg-popover text-popover-foreground">
-                            {m.label}{m.experimental ? ' · beta' : ''}
-                        </option>
-                    ))}
-                </select>
-            </div>
+            {showModelPicker && (
+                <div className="flex items-center gap-1.5 rounded-full border border-border bg-card py-1 pl-2.5 pr-1.5 animate-in fade-in duration-150" title="Model">
+                    <select
+                        value={model}
+                        onChange={(e) => onModelChange(e.target.value)}
+                        className="max-w-[150px] cursor-pointer bg-transparent pr-1 font-mono text-[11px] text-foreground outline-none"
+                    >
+                        {models.length === 0 && <option value={model}>{model}</option>}
+                        {models.map((m) => (
+                            <option key={m.key} value={m.key} className="bg-popover text-popover-foreground">
+                                {m.label}{m.experimental ? ' · beta' : ''}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+            <button
+                onClick={toggleModelPicker}
+                title="Developer setting: choose the underlying model"
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                    showModelPicker ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                }`}
+                data-testid="copilot-model-toggle"
+            >
+                <Cpu className="h-3.5 w-3.5" />
+            </button>
             <button
                 onClick={() => setShowMemory((v) => !v)}
                 title="What the copilot remembers about you"
