@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 import httpx
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from database import initialize_indexes
 from cache import cache_get as redis_cache_get, cache_set as redis_cache_set
 
@@ -132,6 +132,30 @@ if not _is_prod:
     # Accept the dev frontend on any localhost/127.0.0.1 port.
     _cors_kwargs["allow_origin_regex"] = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
 app.add_middleware(CORSMiddleware, **_cors_kwargs)
+
+
+def _cors_headers_for(request: Request) -> dict:
+    """CORS headers for responses built outside the middleware stack."""
+    origin = request.headers.get("origin", "")
+    ok = origin in _allowed_origins or (
+        not _is_prod and re.match(r"https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin))
+    if not ok:
+        return {}
+    return {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"}
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    """Return JSON 500s with CORS headers so the browser surfaces a real HTTP
+    error instead of an opaque 'failed to fetch'. The generic Exception handler
+    runs outside CORSMiddleware, hence the manual headers."""
+    logger.error(f"unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Check backend logs for the traceback."},
+        headers=_cors_headers_for(request),
+    )
+
 
 @app.get("/")
 def read_root():
@@ -308,6 +332,16 @@ async def check_and_increment_ai_usage(request: Request) -> bool:
     user = await get_current_user(request)
     if user:
         return True
+    try:
+        return await _check_and_increment_ai_usage_anon(request)
+    except Exception as exc:
+        # Rate limiting is a cost guardrail, not a security boundary — when the
+        # legacy Mongo store is unreachable, fail open instead of 500ing chat.
+        logger.warning(f"AI usage rate-limit check skipped, Mongo unreachable: {exc}")
+        return True
+
+
+async def _check_and_increment_ai_usage_anon(request: Request) -> bool:
     client_ip = request.client.host if request.client else "unknown"
     now_utc = datetime.now(timezone.utc)
     current_minute = now_utc.strftime("%Y%m%d%H%M")

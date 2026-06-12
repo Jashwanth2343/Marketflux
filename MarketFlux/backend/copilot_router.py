@@ -98,12 +98,19 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
 
         # Per-user daily LLM budget (lean-v1 cost guardrail). One copilot turn
         # fans out to many model calls, so the cap is on turns, not tokens.
+        # Both the budget gate and the history load fail open when Mongo is
+        # unreachable: losing the cap/history for a turn beats taking the whole
+        # copilot down with the legacy datastore.
         daily_cap = int(os.environ.get("COPILOT_DAILY_TURNS", "50") or 50)
         if daily_cap > 0:
             from datetime import datetime, timezone
             midnight = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-            turns_today = await db.copilot_messages.count_documents(
-                {"user_id": user_id, "created_at": {"$gte": midnight}})
+            try:
+                turns_today = await db.copilot_messages.count_documents(
+                    {"user_id": user_id, "created_at": {"$gte": midnight}})
+            except Exception as exc:
+                logger.warning(f"copilot daily-cap check skipped, Mongo unreachable: {exc}")
+                turns_today = 0
             if turns_today >= daily_cap:
                 raise HTTPException(
                     429,
@@ -111,10 +118,14 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
                     "raise COPILOT_DAILY_TURNS to change it.",
                 )
 
-        history = await db.copilot_messages.find(
-            {"user_id": user_id, "session_id": session_id}
-        ).sort("created_at", -1).limit(8).to_list(8)
-        history.reverse()
+        try:
+            history = await db.copilot_messages.find(
+                {"user_id": user_id, "session_id": session_id}
+            ).sort("created_at", -1).limit(8).to_list(8)
+            history.reverse()
+        except Exception as exc:
+            logger.warning(f"copilot history load skipped, Mongo unreachable: {exc}")
+            history = []
 
         async def _stream_with_disconnect_guard():
             """Wrap the agent generator so we stop as soon as the client disconnects.
