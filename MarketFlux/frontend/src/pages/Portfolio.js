@@ -125,19 +125,34 @@ export default function Portfolio({ embedded = false }) {
 
   if (!user) {
     return (
-      <div className="p-6 grid-bg min-h-screen flex items-center justify-center" data-testid="portfolio-page">
-        <Card className="rounded-none border-border dark:bg-card/50 bg-card max-w-md w-full">
+      <div className="p-6 min-h-[55vh] flex items-center justify-center" data-testid="portfolio-page">
+        <Card className="rounded-xl border-border dark:bg-card/50 bg-card max-w-md w-full">
           <CardContent className="p-8 text-center">
             <Lock className="w-8 h-8 text-primary mx-auto mb-4" />
             <h2 className="font-mono text-lg text-foreground uppercase tracking-wider mb-2">Login Required</h2>
-            <p className="text-xs text-muted-foreground mb-4">Portfolio management requires authentication</p>
-            <Button
-              data-testid="portfolio-login-btn"
-              onClick={() => navigate('/auth')}
-              className="rounded-none bg-primary text-black font-mono text-xs uppercase tracking-wider hover:bg-primary/80"
-            >
-              Login to Continue
-            </Button>
+            <p className="text-xs text-muted-foreground leading-relaxed mb-1">
+              Your portfolio is private, so it needs an account.
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed mb-5">
+              Once you're in: track positions and P&amp;L, monitor risk exposure, and get
+              AI rebalancing suggestions — all on your paper account.
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                data-testid="portfolio-login-btn"
+                onClick={() => navigate('/auth')}
+                className="font-mono text-xs uppercase tracking-wider"
+              >
+                Login to Continue
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate('/')}
+                className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
+              >
+                Explore First
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

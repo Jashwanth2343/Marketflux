@@ -1102,8 +1102,8 @@ export default function CopilotAgent() {
 
                     <div className="mt-6 w-full max-w-2xl">
                         <Composer input={input} setInput={setInput} onSend={() => send()} onStop={stop} loading={loading} onCommand={send} autoFocus />
-                        <div className={`mx-auto mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] ${
-                            confirm ? 'border-primary/25 bg-primary/[0.06] text-primary' : 'border-amber-500/35 bg-amber-500/[0.06] text-amber-500'
+                        <div className={`mx-auto mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+                            confirm ? 'border-primary/30 bg-primary/10 text-primary' : 'border-amber-500/40 bg-amber-500/10 text-amber-500'
                         }`}>
                             {confirm ? <ShieldCheck className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
                             {confirm ? 'Confirm-before-trade is on — nothing executes without your approval.'
