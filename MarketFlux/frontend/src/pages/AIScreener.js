@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -89,12 +89,13 @@ export default function AIScreener({ embedded = false }) {
   const [error, setError] = useState('');
   const [cache, setCache] = useState({});
 
-  const handleScreen = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const runScreen = useCallback(async (q) => {
+    const screenQuery = (q ?? '').trim();
+    if (!screenQuery) return;
+    setQuery(screenQuery);
 
-    if (cache[query]) {
-      setResults(cache[query]);
+    if (cache[screenQuery]) {
+      setResults(cache[screenQuery]);
       return;
     }
 
@@ -103,9 +104,9 @@ export default function AIScreener({ embedded = false }) {
     setResults(null);
 
     try {
-      const res = await api.post('/ai/screen', { query });
+      const res = await api.post('/ai/screen', { query: screenQuery });
       setResults(res.data);
-      setCache(prev => ({ ...prev, [query]: res.data }));
+      setCache(prev => ({ ...prev, [screenQuery]: res.data }));
     } catch (err) {
       if (err.response?.status === 429) {
         setError('AI usage limit reached. Please login for unlimited access.');
@@ -115,7 +116,30 @@ export default function AIScreener({ embedded = false }) {
     } finally {
       setLoading(false);
     }
+  }, [cache]);
+
+  const handleScreen = (e) => {
+    e.preventDefault();
+    runScreen(query);
   };
+
+  // Accept a screen query handed off from the Intelligence command line
+  // (stashed in sessionStorage just before this tab mounts, plus a live event).
+  useEffect(() => {
+    const consume = (q) => {
+      const screenQuery = (q || '').trim();
+      if (!screenQuery) return;
+      setUseAIScreener(true);
+      runScreen(screenQuery);
+      try { sessionStorage.removeItem('mf_screener_query'); } catch { /* ignore */ }
+    };
+    let stashed = null;
+    try { stashed = sessionStorage.getItem('mf_screener_query'); } catch { /* ignore */ }
+    if (stashed) consume(stashed);
+    const handler = (e) => consume(e.detail);
+    window.addEventListener('mf:screener-query', handler);
+    return () => window.removeEventListener('mf:screener-query', handler);
+  }, [runScreen]);
 
   const suggestions = [
     'Show me large cap tech stocks with low P/E',
