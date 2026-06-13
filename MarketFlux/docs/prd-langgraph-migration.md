@@ -1,5 +1,14 @@
 # PRD: LangGraph Migration
 
+> **Status — updated 2026-06-13 (post-PR #30):** ⏸️ **NOT PURSUED — superseded by a simpler design.**
+> The copilot did **not** migrate to LangGraph. Instead the architecture settled on a **manual ReAct
+> loop over Gemini function calling** (`copilot_agent.py`) plus **parallel `asyncio` tool fan-out**
+> (`multi_agent.py`; PR #30's `8a39280` extended this to read-tool fan-out). The human-in-the-loop
+> approval gate is enforced **deterministically** by `compliance_engine.py` (PASS/WARN/BLOCK) rather
+> than a graph `interrupt()`. The observability intent survives via the audit tables
+> (`copilot_debates`, `copilot_reviews`). Kept for historical context; acceptance criteria below
+> intentionally remain unchecked. Revisit only if graph-based checkpointing becomes a real need.
+
 ## Problem Statement
 The current multi-agent orchestration uses raw `asyncio.gather()` which works but lacks state management, checkpointing, traceability, and the human-in-the-loop primitives needed for the approval-gated trading copilot.
 

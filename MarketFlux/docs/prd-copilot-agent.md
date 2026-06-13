@@ -1,5 +1,15 @@
 # PRD — Autonomous Trading Copilot Agent
 
+> **Status — updated 2026-06-13 (post-PR #30):** ✅ **SHIPPED, and extended by**
+> [`prd-copilot-godtier.md`](prd-copilot-godtier.md). The agent grew from **23 → 35 tools** (added the
+> quant-signal library, portfolio/stock risk, backtest, market-regime, Bull/Bear debate,
+> compliance-precheck, what-if simulator, earnings catalyst, and self-review engines). Several "Future
+> ideas (not built)" below have since **shipped**: scheduled/standing autonomous runs, a
+> confirm-before-execute toggle, and an approval queue that survives refresh (PR #30 `47ad627`). PR #30
+> also moved the trade/trust path **off Mongo onto Supabase Postgres** (`copilot_store.py`) and added
+> perf (parallel read-tool fan-out + uvloop/httptools/orjson, `8a39280`). Tool/structure counts below
+> reflect the original 23-tool cut; see the god-tier PRD for the current 35.
+
 ## Summary
 A conversational, autonomous paper-trading agent that researches markets **and**
 executes trades on the shared Alpaca paper account, streaming every step
