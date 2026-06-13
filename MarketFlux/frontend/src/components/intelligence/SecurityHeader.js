@@ -23,6 +23,14 @@ function compact(v, money) {
   return `${p}${n.toLocaleString('en-US')}`;
 }
 
+const signalTone = (s) => {
+  const n = num(s);
+  if (n == null) return 'border-border bg-muted/40 text-muted-foreground';
+  if (n >= 10) return 'border-gain/40 bg-gain/10 text-gain';
+  if (n <= -10) return 'border-loss/40 bg-loss/10 text-loss';
+  return 'border-border bg-muted/40 text-muted-foreground';
+};
+
 function Sparkline({ closes }) {
   if (!Array.isArray(closes) || closes.length < 2) return null;
   const W = 132, H = 38, pad = 2;
@@ -53,6 +61,7 @@ function Stat({ label, value }) {
 export default function SecurityHeader({ ticker }) {
   const [quote, setQuote] = useState({ status: 'idle' });
   const [closes, setCloses] = useState(null);
+  const [signal, setSignal] = useState(null);
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -64,10 +73,15 @@ export default function SecurityHeader({ ticker }) {
     abortRef.current = controller;
     setQuote({ status: 'loading' });
     setCloses(null);
+    setSignal(null);
 
     api.get(`/market/stock/${encodeURIComponent(t)}`, { signal: controller.signal })
       .then(({ data }) => setQuote({ status: 'done', data }))
       .catch((err) => { if (!controller.signal.aborted) setQuote({ status: 'error' }); });
+
+    api.get(`/research/signals/${encodeURIComponent(t)}`, { signal: controller.signal })
+      .then(({ data }) => setSignal(data))
+      .catch(() => { /* proprietary signal is optional */ });
 
     api.get(`/market/chart/${encodeURIComponent(t)}?period=1mo&interval=1d`, { signal: controller.signal })
       .then(({ data }) => {
@@ -122,6 +136,17 @@ export default function SecurityHeader({ ticker }) {
 
         {data?.sector && (
           <span className="text-[10px] uppercase tracking-wide text-primary border border-primary/30 bg-primary/10 rounded px-2 py-0.5">{data.sector}</span>
+        )}
+
+        {signal && num(signal.composite_score) != null && (
+          <span
+            className={cn('text-[10px] uppercase tracking-wide rounded px-2 py-0.5 border', signalTone(signal.composite_score))}
+            title="MarketFlux composite quant signal (-100…+100)"
+            data-testid="signal-chip"
+          >
+            Signal {num(signal.composite_score) >= 0 ? '+' : ''}{num(signal.composite_score).toFixed(0)}
+            {signal.signal_label ? ` · ${signal.signal_label}` : ''}
+          </span>
         )}
       </div>
 
