@@ -58,17 +58,21 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         """Resolve the user id for write endpoints (chat/stream, trade approve,
         agents CRUD).
 
-        In PRODUCTION this requires a verified user — anonymous callers must not
-        share the 'local-copilot' namespace and approve each other's staged
-        trades. In local/dev (NODE_ENV != 'production') we fall back to the shared
-        anon id so a missing/expired session never fully bricks the copilot;
-        anonymous turns are forced into safe confirm-before-trade mode by the
-        chat endpoint regardless.
+        Requires a verified user by DEFAULT — anonymous callers must not share
+        the 'local-copilot' namespace and approve each other's staged trades.
+        The shared anon fallback is opt-in: only when NODE_ENV is explicitly
+        'development'/'dev', so a missing/unset NODE_ENV in any deployed env
+        fails closed (401) rather than silently opening the namespace. In that
+        local-dev mode anonymous turns are still forced into safe
+        confirm-before-trade mode by the chat endpoint.
         """
         user = await get_current_user(request)
         if user:
             return user["user_id"]
-        if os.environ.get("NODE_ENV", "").lower() == "production":
+        # Require auth by default; only allow the anon fallback when explicitly
+        # running in local dev mode so a missing NODE_ENV in a deployed env never
+        # silently opens the shared namespace to unauthenticated callers.
+        if os.environ.get("NODE_ENV", "").lower() not in ("development", "dev"):
             raise HTTPException(401, "Authentication required for this endpoint.")
         return _ANON_ID
 
@@ -95,12 +99,19 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
 
         # Per-user daily LLM budget (lean-v1 cost guardrail). One copilot turn
         # fans out to many model calls, so the cap is on turns, not tokens.
+        # Both the budget gate and the history load fail open when Mongo is
+        # unreachable: losing the cap/history for a turn beats taking the whole
+        # copilot down with the legacy datastore.
         daily_cap = int(os.environ.get("COPILOT_DAILY_TURNS", "50") or 50)
         if daily_cap > 0:
             from datetime import datetime, timezone
             midnight = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-            turns_today = await db.copilot_messages.count_documents(
-                {"user_id": user_id, "created_at": {"$gte": midnight}})
+            try:
+                import copilot_store
+                turns_today = await copilot_store.count_turns_today(db, user_id)
+            except Exception as exc:
+                logger.warning(f"copilot daily-cap check skipped, store unreachable: {exc}")
+                turns_today = 0
             if turns_today >= daily_cap:
                 raise HTTPException(
                     429,
@@ -108,10 +119,12 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
                     "raise COPILOT_DAILY_TURNS to change it.",
                 )
 
-        history = await db.copilot_messages.find(
-            {"user_id": user_id, "session_id": session_id}
-        ).sort("created_at", -1).limit(8).to_list(8)
-        history.reverse()
+        try:
+            import copilot_store
+            history = await copilot_store.recent_history(db, user_id, session_id, limit=8)
+        except Exception as exc:
+            logger.warning(f"copilot history load skipped, store unreachable: {exc}")
+            history = []
 
         async def _stream_with_disconnect_guard():
             """Wrap the agent generator so we stop as soon as the client disconnects.
@@ -172,6 +185,14 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         short price history for a sparkline."""
         import copilot_enrich
         return await copilot_enrich.enrich_positions()
+
+    @router.get("/trades/pending")
+    async def copilot_trades_pending(request: Request):
+        """Staged trades awaiting approval, so the queue survives a refresh."""
+        import copilot_trades
+        user_id = await _resolve_user_id(request)
+        items = await copilot_trades.list_pending(db, user_id)
+        return {"items": items}
 
     @router.post("/trades/{pid}/approve")
     async def copilot_trade_approve(pid: str, request: Request):
@@ -258,9 +279,8 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     async def copilot_trades(request: Request, limit: int = 25):
         """Recent trades the agent has executed (for the activity history)."""
         user_id = await _resolve_user_id(request)
-        rows = await db.copilot_trade_log.find(
-            {"user_id": user_id}, {"_id": 0}
-        ).sort("timestamp", -1).limit(min(limit, 100)).to_list(min(limit, 100))
+        import copilot_store
+        rows = await copilot_store.recent_trades(db, user_id, limit)
         return {"items": rows}
 
     return router

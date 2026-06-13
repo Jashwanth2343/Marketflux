@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 import httpx
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from database import initialize_indexes
 from cache import cache_get as redis_cache_get, cache_set as redis_cache_set
 
@@ -61,7 +61,8 @@ if not _raw_jwt_secret or len(_raw_jwt_secret) < 32:
     if not _supabase_auth_enabled:
         raise RuntimeError(
             "SECURITY: JWT_SECRET env var is missing or too short (must be ≥32 chars). "
-            "Either set JWT_SECRET or configure SUPABASE_URL + SUPABASE_SERVICE_KEY."
+            "Either set JWT_SECRET or configure SUPABASE_URL plus SUPABASE_SERVICE_KEY "
+            "(or SUPABASE_ANON_KEY)."
         )
     import secrets as _secrets
     import logging as _logging
@@ -100,27 +101,61 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
                 return Response("Request too large", status_code=413)
         return await call_next(request)
 
-app = FastAPI()
+try:
+    from fastapi.responses import ORJSONResponse
+    app = FastAPI(default_response_class=ORJSONResponse)
+except ImportError:  # orjson not installed — plain JSON still works
+    app = FastAPI()
 app.add_middleware(LimitRequestSizeMiddleware)
 # Treat an empty/whitespace ALLOWED_ORIGINS the same as unset — otherwise the
 # split produces [''] and CORS silently blocks the local frontend (a "Failed to
 # fetch" footgun). Always include the localhost dev origins as a baseline.
+_is_prod = os.environ.get("NODE_ENV", "").lower() == "production"
 _DEFAULT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 _origins_env = os.environ.get('ALLOWED_ORIGINS', '').strip()
-_allowed_origins = [o.strip() for o in _origins_env.split(',') if o.strip()] or _DEFAULT_ORIGINS
-for _o in _DEFAULT_ORIGINS:
-    if _o not in _allowed_origins:
-        _allowed_origins.append(_o)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed_origins,
-    # Accept the dev frontend on ANY localhost/127.0.0.1 port so a port mismatch
-    # never silently breaks the app with a CORS "Failed to fetch".
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_allowed_origins = [o.strip() for o in _origins_env.split(',') if o.strip()]
+if not _allowed_origins:
+    _allowed_origins = list(_DEFAULT_ORIGINS)
+elif not _is_prod:
+    # In dev append localhost defaults so a port mismatch never silently
+    # breaks the local frontend; in prod ALLOWED_ORIGINS is authoritative.
+    for _o in _DEFAULT_ORIGINS:
+        if _o not in _allowed_origins:
+            _allowed_origins.append(_o)
+_cors_kwargs: dict = {
+    "allow_origins": _allowed_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if not _is_prod:
+    # Accept the dev frontend on any localhost/127.0.0.1 port.
+    _cors_kwargs["allow_origin_regex"] = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
+
+
+def _cors_headers_for(request: Request) -> dict:
+    """CORS headers for responses built outside the middleware stack."""
+    origin = request.headers.get("origin", "")
+    ok = origin in _allowed_origins or (
+        not _is_prod and re.match(r"https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin))
+    if not ok:
+        return {}
+    return {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"}
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    """Return JSON 500s with CORS headers so the browser surfaces a real HTTP
+    error instead of an opaque 'failed to fetch'. The generic Exception handler
+    runs outside CORSMiddleware, hence the manual headers."""
+    logger.error(f"unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Check backend logs for the traceback."},
+        headers=_cors_headers_for(request),
+    )
+
 
 @app.get("/")
 def read_root():
@@ -297,6 +332,16 @@ async def check_and_increment_ai_usage(request: Request) -> bool:
     user = await get_current_user(request)
     if user:
         return True
+    try:
+        return await _check_and_increment_ai_usage_anon(request)
+    except Exception as exc:
+        # Rate limiting is a cost guardrail, not a security boundary — when the
+        # legacy Mongo store is unreachable, fail open instead of 500ing chat.
+        logger.warning(f"AI usage rate-limit check skipped, Mongo unreachable: {exc}")
+        return True
+
+
+async def _check_and_increment_ai_usage_anon(request: Request) -> bool:
     client_ip = request.client.host if request.client else "unknown"
     now_utc = datetime.now(timezone.utc)
     current_minute = now_utc.strftime("%Y%m%d%H%M")
@@ -676,6 +721,72 @@ async def ticker_news(ticker: str, response: Response):
     redis_cache_set(cache_key, result, ttl=300)
     response.headers["X-Cache"] = "MISS"
     return result
+
+@api_router.get("/intelligence/explain/{ticker}")
+async def explain_ticker_move(ticker: str, response: Response):
+    """'Why is this moving?' — live quote + recent headlines distilled into a
+    grounded two-sentence explanation, with the sources returned alongside so
+    the answer is never a black box. Cached 10 minutes per ticker."""
+    ticker = validate_ticker(ticker)
+    cache_key = f"explain:{ticker}"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    from ai_service import _fetch_yf_info_sync, get_gemini_model, GEMINI_FLASH
+
+    info = await asyncio.to_thread(_fetch_yf_info_sync, ticker)
+    price = info.get("currentPrice") or info.get("regularMarketPrice")
+    prev = info.get("previousClose")
+    change_pct = round(((price - prev) / prev) * 100, 2) if price and prev else None
+
+    try:
+        articles = (await get_ticker_news(ticker)) or []
+    except Exception:
+        articles = []
+    headlines = [
+        {"title": a.get("title", ""),
+         "source": a.get("source") or a.get("publisher") or "",
+         "url": a.get("url") or a.get("link") or ""}
+        for a in articles[:6] if a.get("title")
+    ]
+
+    direction = "flat" if not change_pct else ("up" if change_pct > 0 else "down")
+    news_block = "\n".join(f"- {h['title']} ({h['source']})" for h in headlines) \
+        or "(no recent headlines found)"
+    prompt = (
+        f"{ticker} is {direction} {abs(change_pct or 0):.2f}% today "
+        f"(price {price}, previous close {prev}).\n"
+        f"Recent headlines:\n{news_block}\n\n"
+        "In at most two sentences, explain the most likely driver of today's move, "
+        "grounded ONLY in the headlines and data above. If the headlines don't "
+        "explain it, say the move looks like broad market/sector action rather than "
+        "company news. No investment advice, no hedging boilerplate."
+    )
+
+    explanation = ""
+    try:
+        model = get_gemini_model(GEMINI_FLASH)
+        resp = await asyncio.to_thread(model.generate_content, prompt)
+        explanation = (getattr(resp, "text", "") or "").strip()
+    except Exception as exc:
+        logger.warning(f"explain/{ticker} LLM call failed: {exc}")
+    if not explanation:
+        explanation = "No AI read available right now — the latest headlines are below."
+
+    result = {
+        "ticker": ticker,
+        "price": price,
+        "change_percent": change_pct,
+        "explanation": explanation,
+        "sources": headlines[:3],
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+    redis_cache_set(cache_key, result, ttl=600)
+    response.headers["X-Cache"] = "MISS"
+    return result
+
 
 @api_router.post("/news/refresh")
 async def refresh_news(request: Request, background_tasks: BackgroundTasks):
@@ -1707,6 +1818,14 @@ async def startup():
             logger.info("Shared vNext Postgres pool skipped: SUPABASE_DB_URL/MARKETFLUX_VNEXT_DATABASE_URL/FUNDOS_DATABASE_URL not configured")
     except Exception as exc:
         logger.warning(f"Postgres pool initialization failed: {exc}")
+
+    try:
+        # Copilot trust path (pending trades / messages / trade log) lives in
+        # Postgres now; idempotent schema apply at every boot.
+        import copilot_store
+        await copilot_store.ensure_schema()
+    except Exception as exc:
+        logger.warning(f"copilot_store schema apply failed: {exc}")
 
     asyncio.create_task(periodic_news_fetch())
     asyncio.create_task(pilot_expire_sweep())

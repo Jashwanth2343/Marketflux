@@ -97,6 +97,22 @@ already forbid training-data prices — the right guard).
 - **Slash commands** in the composer (`/debate`, `/regime`, `/whatif`, `/score`, `/research`,
   `/earnings`, `/risk`, `/backtest`, `/review`) for power-user speed.
 
+### 4. Production hardening, perf & evals (round 4 — PR #30, 2026-06-13)
+- **Trust path → Supabase Postgres** ([`copilot_store.py`](../backend/copilot_store.py),
+  [`sql/copilot_core_schema.sql`](../backend/sql/copilot_core_schema.sql)) — staged trades / approval
+  state moved off Mongo onto Postgres, with a real integration suite
+  ([`tests/test_copilot_store_pg.py`](../backend/tests/test_copilot_store_pg.py), skips cleanly when no
+  PG is reachable). This is the system-of-record consolidation the master-PRD risk table called for.
+- **Standing eval harness** ([`evals/run_evals.py`](../backend/evals/run_evals.py),
+  [`evals/golden.json`](../backend/evals/golden.json)) — a golden-query suite with graded checks,
+  replacing the deleted one-off `eval_report.json`. Kicks off roadmap "Prove the AI" (Phase 3).
+- **Latency**: parallel **read-tool fan-out** in the agent loop + **uvloop/httptools/orjson** drop-ins
+  (`copilot_agent.py`, `8a39280`) — the roadmap perf note's #1 and #3 levers; covered by
+  [`tests/test_copilot_parallel.py`](../backend/tests/test_copilot_parallel.py).
+- **Resilience**: approval queue **survives refresh** + collapsed model picker (`47ad627`); chat
+  endpoints **fail open** when legacy Mongo is unreachable (`04c42b3`); fixed a render crash where
+  `toggleMode` was nested in `toggleConfirm`, tripping the Copilot error boundary on open (`d2f56ee`).
+
 ## Architecture (closed loop)
 ```
         ┌─────────────── conversation (SSE: thinking/tool/insight/compliance/trade/token) ───────────────┐

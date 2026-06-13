@@ -9,7 +9,7 @@ const SENTIMENT_OPTIONS = [
   { value: '', label: 'All' },
   { value: 'bullish', label: '▲ Bullish', color: '#4ADE80', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.25)' },
   { value: 'bearish', label: '▼ Bearish', color: '#FF4444', bg: 'rgba(255,68,68,0.08)', border: 'rgba(255,68,68,0.25)' },
-  { value: 'neutral', label: '◆ Neutral', color: '#9298A6', bg: 'rgba(146,152,166,0.08)', border: 'rgba(146,152,166,0.25)' },
+  { value: 'neutral', label: '◆ Neutral', color: 'hsl(var(--secondary))', bg: 'rgba(146,152,166,0.08)', border: 'rgba(146,152,166,0.25)' },
 ];
 
 const CATEGORY_OPTIONS = [
@@ -24,7 +24,7 @@ function SkeletonCard() {
   return (
     <div
       className="rounded-lg border overflow-hidden"
-      style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.07)' }}
+      style={{ background: 'hsl(var(--muted) / 0.35)', borderColor: 'hsl(var(--muted) / 0.5)' }}
     >
       <div className="w-full h-36 skeleton-shimmer" />
       <div className="p-3.5 space-y-2.5">
@@ -36,7 +36,7 @@ function SkeletonCard() {
           <div className="h-4 w-full rounded skeleton-shimmer" />
           <div className="h-4 w-4/5 rounded skeleton-shimmer" />
         </div>
-        <div className="flex gap-2 pt-2 border-t border-[rgba(255,255,255,0.05)]">
+        <div className="flex gap-2 pt-2 border-t border-border">
           <div className="h-3 w-16 rounded skeleton-shimmer" />
           <div className="h-3 w-12 rounded skeleton-shimmer" />
         </div>
@@ -56,9 +56,9 @@ function FilterPill({ active, label, color, bg, border, onClick, testId }) {
         border: '1px solid', boxShadow: `0 0 8px ${bg}`
       } : {
         color: active ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)',
-        background: active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+        background: active ? 'hsl(var(--muted) / 0.5)' : 'hsl(var(--muted) / 0.35)',
         border: '1px solid',
-        borderColor: active ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
+        borderColor: active ? 'rgba(255,255,255,0.2)' : 'hsl(var(--muted) / 0.5)',
       }}
     >
       {label}
@@ -134,9 +134,9 @@ export default function NewsFeed({ embedded = false }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Newspaper className="w-5 h-5 text-[#9298A6]" />
+            <Newspaper className="w-5 h-5 text-secondary" />
             <h1 className="text-xl md:text-2xl font-mono font-bold tracking-tight text-foreground">
-              News <span style={{ color: '#9298A6', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>Feed</span>
+              News <span style={{ color: 'hsl(var(--secondary))', textShadow: '0 0 10px rgba(146,152,166,0.4)' }}>Feed</span>
             </h1>
           </div>
           <p className="text-[11px] font-mono text-muted-foreground">
@@ -158,8 +158,8 @@ export default function NewsFeed({ embedded = false }) {
           style={{
             color: refreshing ? '#E3B85F' : 'rgba(255,255,255,0.4)',
             border: '1px solid',
-            borderColor: refreshing ? 'rgba(227,184,95,0.3)' : 'rgba(255,255,255,0.08)',
-            background: refreshing ? 'rgba(227,184,95,0.05)' : 'transparent',
+            borderColor: refreshing ? 'hsl(var(--primary) / 0.3)' : 'hsl(var(--muted) / 0.5)',
+            background: refreshing ? 'hsl(var(--primary) / 0.05)' : 'transparent',
           }}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -171,8 +171,8 @@ export default function NewsFeed({ embedded = false }) {
       <div
         className="rounded-xl p-4 space-y-3"
         style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: 'hsl(var(--muted) / 0.35)',
+          border: '1px solid hsl(var(--border))',
         }}
       >
         {/* Search bar */}
@@ -186,8 +186,8 @@ export default function NewsFeed({ embedded = false }) {
               placeholder="Search headlines, tickers, topics…"
               className="pl-10 h-9 text-sm font-mono rounded-lg"
               style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'hsl(var(--muted) / 0.35)',
+                border: '1px solid hsl(var(--border))',
               }}
             />
           </div>
@@ -210,7 +210,7 @@ export default function NewsFeed({ embedded = false }) {
           </div>
 
           {/* Divider */}
-          <div className="h-4 w-px bg-[rgba(255,255,255,0.1)]" />
+          <div className="h-4 w-px bg-border" />
 
           {/* Sentiment */}
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -228,7 +228,7 @@ export default function NewsFeed({ embedded = false }) {
             ))}
           </div>
 
-          <div className="h-4 w-px bg-[rgba(255,255,255,0.1)]" />
+          <div className="h-4 w-px bg-border" />
 
           {/* Category */}
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -243,23 +243,23 @@ export default function NewsFeed({ embedded = false }) {
             ))}
           </div>
 
-          <div className="h-4 w-px bg-[rgba(255,255,255,0.1)]" />
+          <div className="h-4 w-px bg-border" />
 
           {/* Watchlist toggle */}
           <button
             onClick={() => setWatchlistOnly(!watchlistOnly)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-semibold tracking-wide transition-all duration-150"
             style={watchlistOnly ? {
-              color: '#E3B85F', background: 'rgba(227,184,95,0.08)',
+              color: '#E3B85F', background: 'hsl(var(--primary) / 0.08)',
               border: '1px solid rgba(227,184,95,0.25)',
               boxShadow: '0 0 8px rgba(227,184,95,0.1)',
             } : {
               color: 'rgba(255,255,255,0.35)',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'hsl(var(--muted) / 0.35)',
+              border: '1px solid hsl(var(--border))',
             }}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${watchlistOnly ? 'bg-[#E3B85F] pulse-live' : 'bg-[rgba(255,255,255,0.2)]'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${watchlistOnly ? 'bg-primary pulse-live' : 'bg-border'}`} />
             Watchlist
           </button>
 
@@ -290,9 +290,9 @@ export default function NewsFeed({ embedded = false }) {
             style={{ background: 'rgba(146,152,166,0.07)', border: '1px solid rgba(146,152,166,0.15)' }}
           >
             {keyword || sentimentFilter || categoryFilter ? (
-              <Search className="w-7 h-7" style={{ color: '#9298A6' }} />
+              <Search className="w-7 h-7" style={{ color: 'hsl(var(--secondary))' }} />
             ) : (
-              <WifiOff className="w-7 h-7" style={{ color: '#9298A6' }} />
+              <WifiOff className="w-7 h-7" style={{ color: 'hsl(var(--secondary))' }} />
             )}
           </div>
           <div>
@@ -312,7 +312,7 @@ export default function NewsFeed({ embedded = false }) {
               variant="ghost"
               size="sm"
               onClick={() => { setSentimentFilter(''); setCategoryFilter(''); setKeyword(''); }}
-              className="text-xs font-mono text-[#9298A6] hover:bg-[rgba(146,152,166,0.06)]"
+              className="text-xs font-mono text-secondary hover:bg-[rgba(146,152,166,0.06)]"
             >
               Clear filters
             </Button>
@@ -346,7 +346,7 @@ export default function NewsFeed({ embedded = false }) {
           onClick={() => fetchNews(page + 1, true)}
           className="w-full h-10 text-[11px] font-mono uppercase tracking-wider transition-all"
           style={{
-            border: '1px solid rgba(255,255,255,0.08)',
+            border: '1px solid hsl(var(--border))',
             color: 'rgba(255,255,255,0.4)',
           }}
           onMouseEnter={e => {
@@ -355,7 +355,7 @@ export default function NewsFeed({ embedded = false }) {
             e.currentTarget.style.background = 'rgba(146,152,166,0.04)';
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.borderColor = 'hsl(var(--muted) / 0.5)';
             e.currentTarget.style.color = 'rgba(255,255,255,0.4)';
             e.currentTarget.style.background = 'transparent';
           }}

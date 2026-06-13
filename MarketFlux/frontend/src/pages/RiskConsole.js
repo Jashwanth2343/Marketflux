@@ -67,8 +67,8 @@ function CorrelationMatrix({ matrix, tickers }) {
         </tbody>
       </table>
       <p className="font-mono text-[9px] text-muted-foreground/40 mt-1">
-        <span className="text-[#F85149]">■</span> High correlation (hidden risk) &nbsp;
-        <span className="text-[#3FB950]">■</span> Negative correlation (hedge)
+        <span className="text-loss">■</span> High correlation (hidden risk) &nbsp;
+        <span className="text-gain">■</span> Negative correlation (hedge)
       </p>
     </div>
   );
@@ -90,7 +90,7 @@ function StressTestChart({ stressTests }) {
           <div key={s.scenario} className="group">
             <div className="flex items-center justify-between mb-0.5">
               <span className="font-mono text-[10px] text-foreground/80">{s.scenario}</span>
-              <span className={`font-mono text-[10px] font-bold ${isPosChange ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
+              <span className={`font-mono text-[10px] font-bold ${isPosChange ? 'text-gain' : 'text-loss'}`}>
                 {isPosChange ? '+' : ''}{s.portfolio_pct_change}%
               </span>
             </div>
@@ -121,7 +121,7 @@ function StressTestChart({ stressTests }) {
 function FactorExposure({ factors }) {
   if (!factors) return null;
   const items = [
-    { key: 'growth', label: 'Growth', color: '#9298A6' },
+    { key: 'growth', label: 'Growth', color: 'hsl(var(--secondary))' },
     { key: 'value', label: 'Value', color: '#F0A500' },
     { key: 'quality', label: 'Quality', color: '#E3B85F' },
   ];
@@ -182,11 +182,11 @@ function HoldingsRiskTable({ holdings }) {
               <tr key={h.ticker} className="border-b border-border/10 hover:bg-muted/5">
                 <td className="font-mono text-xs font-bold text-foreground py-2 px-1">{h.ticker}</td>
                 <td className="font-mono text-[10px] text-right text-muted-foreground px-1">{pct(h.weight * 100, 1)}</td>
-                <td className={`font-mono text-[10px] text-right px-1 font-bold ${h.pnl_pct >= 0 ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
+                <td className={`font-mono text-[10px] text-right px-1 font-bold ${h.pnl_pct >= 0 ? 'text-gain' : 'text-loss'}`}>
                   {h.pnl_pct >= 0 ? '+' : ''}{pct(h.pnl_pct)}
                 </td>
                 <td className="font-mono text-[10px] text-right text-foreground/80 px-1">{fmt(h.beta)}</td>
-                <td className="font-mono text-[10px] text-right text-[#F85149] px-1">
+                <td className="font-mono text-[10px] text-right text-loss px-1">
                   {h.risk_sizing ? `-${h.risk_sizing.stop_loss_pct}%` : '--'}
                 </td>
                 <td className="text-right px-1">
@@ -340,7 +340,7 @@ export default function RiskConsole({ embedded = false }) {
             size="sm"
             className="h-8 px-3 text-[11px] font-mono uppercase tracking-wider gap-1.5 transition-all"
             style={{
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid hsl(var(--border))',
               color: loading ? '#FF4444' : 'rgba(255,255,255,0.4)',
             }}
           >
@@ -371,8 +371,8 @@ export default function RiskConsole({ embedded = false }) {
           className="p-3 rounded-lg flex items-center gap-2"
           style={{ border: '1px solid rgba(255,68,68,0.25)', background: 'rgba(255,68,68,0.07)' }}
         >
-          <AlertTriangle className="w-4 h-4 text-[#FF4444] flex-shrink-0" />
-          <p className="font-mono text-xs text-[#FF4444]">{error}</p>
+          <AlertTriangle className="w-4 h-4 text-loss flex-shrink-0" />
+          <p className="font-mono text-xs text-loss">{error}</p>
         </div>
       )}
 
@@ -491,7 +491,7 @@ export default function RiskConsole({ embedded = false }) {
                     <div key={sector}>
                       <div className="flex justify-between mb-0.5">
                         <span className="font-mono text-[10px] text-foreground/80">{sector}</span>
-                        <span className={`font-mono text-[10px] font-bold ${weightPct > 40 ? 'text-[#F85149]' : weightPct > 25 ? 'text-[#F0A500]' : 'text-[#3FB950]'}`}>{weightPct}%</span>
+                        <span className={`font-mono text-[10px] font-bold ${weightPct > 40 ? 'text-loss' : weightPct > 25 ? 'text-[#F0A500]' : 'text-gain'}`}>{weightPct}%</span>
                       </div>
                       <div className="w-full bg-muted/20 h-1">
                         <div className="h-full transition-all duration-500"

@@ -16,20 +16,20 @@ import api, { API_BASE } from '@/lib/api';
 // --- Helpers ---
 function signalColor(label) {
   if (!label) return 'text-muted-foreground';
-  if (label.includes('STRONG BUY')) return 'text-[#E3B85F]';
-  if (label.includes('BUY')) return 'text-[#3FB950]';
-  if (label.includes('STRONG SELL')) return 'text-[#F85149]';
-  if (label.includes('SELL')) return 'text-[#F85149]';
-  return 'text-[#9298A6]';
+  if (label.includes('STRONG BUY')) return 'text-primary';
+  if (label.includes('BUY')) return 'text-gain';
+  if (label.includes('STRONG SELL')) return 'text-loss';
+  if (label.includes('SELL')) return 'text-loss';
+  return 'text-secondary';
 }
 
 function signalBgColor(label) {
   if (!label) return 'bg-muted/20';
-  if (label.includes('STRONG BUY')) return 'bg-[#E3B85F]/10 border-[#E3B85F]/30';
-  if (label.includes('BUY')) return 'bg-[#3FB950]/10 border-[#3FB950]/30';
-  if (label.includes('STRONG SELL')) return 'bg-[#F85149]/10 border-[#F85149]/30';
-  if (label.includes('SELL')) return 'bg-[#F85149]/10 border-[#F85149]/30';
-  return 'bg-[#9298A6]/10 border-[#9298A6]/30';
+  if (label.includes('STRONG BUY')) return 'bg-primary/10 border-primary/30';
+  if (label.includes('BUY')) return 'bg-gain/10 border-gain/30';
+  if (label.includes('STRONG SELL')) return 'bg-loss/10 border-loss/30';
+  if (label.includes('SELL')) return 'bg-loss/10 border-loss/30';
+  return 'bg-secondary/10 border-secondary/30';
 }
 
 function ScoreBar({ score }) {
@@ -223,17 +223,17 @@ function ResearchMemoPanel({ ticker }) {
       {streaming && (
         <div className="mb-4">
           {thinking && (
-            <div className="flex items-center gap-2 mb-3 text-[#9298A6] font-mono text-xs animate-pulse">
+            <div className="flex items-center gap-2 mb-3 text-secondary font-mono text-xs animate-pulse">
               <Activity className="w-3.5 h-3.5" />
               <span>{thinking}</span>
             </div>
           )}
           <div className="grid grid-cols-5 gap-1 mb-3">
             {agentList.map(agent => (
-              <div key={agent} className={`text-center p-1.5 border rounded-none text-[9px] font-mono transition-colors ${agentStatuses[agent] === 'done' ? 'border-[#E3B85F]/40 text-[#E3B85F]' : 'border-border/30 text-muted-foreground'}`}>
+              <div key={agent} className={`text-center p-1.5 border rounded-none text-[9px] font-mono transition-colors ${agentStatuses[agent] === 'done' ? 'border-primary/40 text-primary' : 'border-border/30 text-muted-foreground'}`}>
                 <div>{agentIcons[agent]}</div>
                 <div>{agentNames[agent]}</div>
-                {agentStatuses[agent] === 'done' && <div className="text-[#E3B85F]">✓</div>}
+                {agentStatuses[agent] === 'done' && <div className="text-primary">✓</div>}
               </div>
             ))}
           </div>
@@ -290,7 +290,7 @@ function IdeasFeed() {
   return (
     <div className="space-y-4">
       {market_conditions.macro_summary && (
-        <div className="p-2.5 border border-[#9298A6]/20 bg-[#9298A6]/5">
+        <div className="p-2.5 border border-secondary/20 bg-secondary/5">
           <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Macro Context</p>
           <p className="font-mono text-xs text-foreground/80">{market_conditions.macro_summary}</p>
         </div>
@@ -307,13 +307,13 @@ function IdeasFeed() {
 
       {top_buys.length > 0 && (
         <div>
-          <p className="font-mono text-[10px] text-[#E3B85F] uppercase tracking-wider mb-2">🚀 Top Buy Ideas</p>
+          <p className="font-mono text-[10px] text-primary uppercase tracking-wider mb-2">🚀 Top Buy Ideas</p>
           <div className="space-y-1.5">
             {top_buys.map(idea => (
               <button
                 key={idea.ticker}
                 onClick={() => navigate(`/stock/${idea.ticker}`)}
-                className="w-full flex items-center justify-between p-2 border border-[#E3B85F]/20 hover:border-[#E3B85F]/40 bg-[#E3B85F]/5 hover:bg-[#E3B85F]/10 transition-colors text-left"
+                className="w-full flex items-center justify-between p-2 border border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
               >
                 <div>
                   <span className="font-mono text-xs font-bold text-foreground">{idea.ticker}</span>
@@ -321,7 +321,7 @@ function IdeasFeed() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[10px] text-muted-foreground">{idea.sector}</span>
-                  <span className="font-mono text-xs text-[#4ADE80] font-bold">{idea.score > 0 ? '+' : ''}{idea.score}</span>
+                  <span className="font-mono text-xs text-gain font-bold">{idea.score > 0 ? '+' : ''}{idea.score}</span>
                   <ChevronRight className="w-3 h-3 text-muted-foreground" />
                 </div>
               </button>
@@ -332,20 +332,20 @@ function IdeasFeed() {
 
       {top_sells.length > 0 && (
         <div>
-          <p className="font-mono text-[10px] text-[#F85149] uppercase tracking-wider mb-2">📉 Avoid / Short Watch</p>
+          <p className="font-mono text-[10px] text-loss uppercase tracking-wider mb-2">📉 Avoid / Short Watch</p>
           <div className="space-y-1.5">
             {top_sells.map(idea => (
               <button
                 key={idea.ticker}
                 onClick={() => navigate(`/stock/${idea.ticker}`)}
-                className="w-full flex items-center justify-between p-2 border border-[#F85149]/20 hover:border-[#F85149]/40 bg-[#F85149]/5 hover:bg-[#F85149]/10 transition-colors text-left"
+                className="w-full flex items-center justify-between p-2 border border-loss/20 hover:border-loss/40 bg-loss/5 hover:bg-loss/10 transition-colors text-left"
               >
                 <div>
                   <span className="font-mono text-xs font-bold text-foreground">{idea.ticker}</span>
                   <span className="font-mono text-[10px] text-muted-foreground ml-2">{idea.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-[#F85149] font-bold">{idea.score}</span>
+                  <span className="font-mono text-xs text-loss font-bold">{idea.score}</span>
                   <ChevronRight className="w-3 h-3 text-muted-foreground" />
                 </div>
               </button>
@@ -366,7 +366,7 @@ function IdeasFeed() {
               >
                 <div className="flex items-center justify-between mb-0.5">
                   <span className="font-mono text-xs font-bold">{a.ticker}</span>
-                  <span className={`font-mono text-[10px] font-bold ${a.change_1d_pct >= 0 ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
+                  <span className={`font-mono text-[10px] font-bold ${a.change_1d_pct >= 0 ? 'text-gain' : 'text-loss'}`}>
                     {a.change_1d_pct >= 0 ? '+' : ''}{a.change_1d_pct}%
                   </span>
                 </div>
@@ -475,11 +475,11 @@ function ThematicResearch() {
           <div className="grid grid-cols-2 gap-3">
             {result.top_longs?.length > 0 && (
               <div>
-                <p className="font-mono text-[10px] text-[#E3B85F] uppercase tracking-wider mb-2">📈 Long Ideas</p>
+                <p className="font-mono text-[10px] text-primary uppercase tracking-wider mb-2">📈 Long Ideas</p>
                 <div className="space-y-1">
                   {result.top_longs.map(s => (
                     <button key={s.symbol} onClick={() => navigate(`/stock/${s.symbol}`)}
-                      className="w-full flex items-center justify-between p-1.5 border border-[#E3B85F]/20 hover:bg-[#E3B85F]/5 text-left transition-colors">
+                      className="w-full flex items-center justify-between p-1.5 border border-primary/20 hover:bg-primary/5 text-left transition-colors">
                       <span className="font-mono text-xs font-bold">{s.symbol}</span>
                       <span className={`font-mono text-xs ${signalColor(s.signal_label)}`}>{s.composite_score > 0 ? '+' : ''}{s.composite_score}</span>
                     </button>
@@ -489,13 +489,13 @@ function ThematicResearch() {
             )}
             {result.top_shorts?.length > 0 && (
               <div>
-                <p className="font-mono text-[10px] text-[#F85149] uppercase tracking-wider mb-2">📉 Avoid / Short</p>
+                <p className="font-mono text-[10px] text-loss uppercase tracking-wider mb-2">📉 Avoid / Short</p>
                 <div className="space-y-1">
                   {result.top_shorts.map(s => (
                     <button key={s.symbol} onClick={() => navigate(`/stock/${s.symbol}`)}
-                      className="w-full flex items-center justify-between p-1.5 border border-[#F85149]/20 hover:bg-[#F85149]/5 text-left transition-colors">
+                      className="w-full flex items-center justify-between p-1.5 border border-loss/20 hover:bg-loss/5 text-left transition-colors">
                       <span className="font-mono text-xs font-bold">{s.symbol}</span>
-                      <span className="font-mono text-xs text-[#F85149]">{s.composite_score}</span>
+                      <span className="font-mono text-xs text-loss">{s.composite_score}</span>
                     </button>
                   ))}
                 </div>
@@ -649,7 +649,7 @@ export default function ResearchCenter({ embedded = false }) {
             </CardHeader>
             <CardContent className="pt-3 space-y-1.5">
               {[
-                { label: 'Macro Dashboard', path: '/intelligence?tab=macro', icon: Activity, color: '#9298A6' },
+                { label: 'Macro Dashboard', path: '/intelligence?tab=macro', icon: Activity, color: 'hsl(var(--secondary))' },
                 { label: 'Risk Console', path: '/portfolio?tab=risk', icon: Shield, color: '#F0A500' },
                 { label: 'AI Screener', path: '/intelligence?tab=screener', icon: Search, color: '#E3B85F' },
                 { label: 'News Feed', path: '/intelligence?tab=news', icon: Star, color: '#F0A500' },

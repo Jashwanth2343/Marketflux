@@ -1,8 +1,18 @@
 # PRD: MarketFlux (Product-Level)
 
-> Master product requirements. Feature-level PRDs (`prd-copilot-trading.md`, `prd-backtest-lab.md`,
-> `prd-intelligence-hub.md`, `prd-supabase-setup.md`, `prd-langgraph-migration.md`) drill into
-> individual surfaces. Technical requirements live in [`trd-marketflux.md`](./trd-marketflux.md).
+> Master product requirements. Feature-level PRDs (`prd-copilot-agent.md`, `prd-copilot-godtier.md`,
+> `prd-copilot-trading.md`, `prd-backtest-lab.md`, `prd-intelligence-hub.md`, `prd-supabase-setup.md`,
+> `prd-langgraph-migration.md`) drill into individual surfaces. Technical requirements live in
+> [`trd-marketflux.md`](./trd-marketflux.md); the live plan is [`roadmap-lean-v1.md`](./roadmap-lean-v1.md).
+
+> **Status — updated 2026-06-13 (post-PR #30):** The product is mid **lean-v1 cut** (roadmap Phase 1
+> done): dead UI/deps removed, npm standardized, IA trimmed to **Dashboard · Intelligence · Copilot ·
+> Ledger · Backtest · Portfolio · Leaderboard**, and the UI reskinned to the **warm-ink** theme
+> (see [`FRONTEND_SPEC.md`](./FRONTEND_SPEC.md)). The Copilot reached "god-tier" (**35 tools** + a
+> deterministic `compliance_engine` gate, [`prd-copilot-godtier.md`](prd-copilot-godtier.md)), gained a
+> **golden-query eval harness** (roadmap Phase 3 started), a **terminal command line** in the search bar,
+> and had its **trust path migrated to Supabase Postgres**. Stack today: React/Tailwind/Recharts (CRA+craco)
+> · FastAPI :8000 · **Gemini 2.5 Flash** · Supabase Postgres (+ legacy Mongo being retired) · Alpaca paper.
 
 ## 1. Vision
 
@@ -96,7 +106,9 @@ MarketFlux is that missing connective tissue.
 
 | Phase | Item | Status (as-built signal) |
 |-------|------|--------------------------|
+| Done (PR #30) | **Lean-v1 cut** (dead UI/28 deps removed, npm), **warm-ink reskin**, **god-tier copilot** (35 tools + compliance gate), **eval harness**, **terminal command line**, **copilot trust path → Supabase Postgres** | Shipped on `chore/lean-v1-cleanup` |
 | Now | Auth (Supabase), market intelligence, copilot, theses, paper trading, **backtester**, **strategy swarm** | Implemented (backtest router, swarm agents, pilot subsystem present) |
+| Now | **Mongo → Supabase Postgres** migration; retire legacy Mongo fallback | In progress (trust path migrated; remaining collections pending) |
 | Next | **Conviction loop** end-to-end polish (signal→thesis→backtest→debate→approve→fill→journal) | Partially wired |
 | Next | **Trade journal** (per-pilot reflections + drift) maturation | Tables + endpoints exist (`journal_entries`, drift) |
 | Later | **SEC filing scanner** (Form 4 / filings ingestion → evidence) | Insider data present; dedicated scanner TBD |

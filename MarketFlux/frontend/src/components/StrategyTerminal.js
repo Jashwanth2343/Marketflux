@@ -389,7 +389,7 @@ export default function StrategyTerminal({ embedded = false }) {
                   </div>
                 )}
 
-                <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-[24px] border border-white/10 bg-[rgba(255,255,255,0.03)] p-5">
+                <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-[24px] border border-white/10 bg-muted/40 p-5">
                   {output ? (
                     <div className="text-sm leading-7 text-foreground prose prose-invert prose-sm max-w-none">
                       <ReactMarkdown>{output}</ReactMarkdown>

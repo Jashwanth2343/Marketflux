@@ -1,5 +1,13 @@
 # PRD: Trading Copilot
 
+> **Status — updated 2026-06-13 (post-PR #30):** ✅ **SHIPPED, then superseded/extended.** The
+> `/copilot` cockpit is live; the original proposal/personality flow moved to the **Auto-Pilot** tab,
+> and the conversational agent ([`prd-copilot-agent.md`](prd-copilot-agent.md) → 35 tools in
+> [`prd-copilot-godtier.md`](prd-copilot-godtier.md)) is now the primary surface. The "paper trading
+> broken (Postgres dependency)" blocker is **resolved** — PR #30 migrated the copilot trust path to
+> Supabase Postgres (`copilot_store.py`, `sql/copilot_core_schema.sql`). Acceptance criteria below
+> shipped.
+
 ## Problem Statement
 The AI Pilot, Strategy Terminal, and paper trading features exist but are scattered across separate pages. Paper trading is broken (Postgres dependency). Users want a single "cockpit" where an AI copilot can propose and execute trades with human approval.
 
@@ -72,10 +80,10 @@ Copilot.js (shell)
 | `components/StrategyTerminal.js` | Modify (add embedded prop) |
 
 ## Acceptance Criteria
-- [ ] `/copilot` loads with Trading Copilot tab active
-- [ ] Strategy Studio tab renders the swarm terminal
-- [ ] AI chat streams responses via SSE
-- [ ] Trade proposals render with approve/reject buttons
-- [ ] Approval triggers backend execution (not frontend)
-- [ ] Paper Portfolio shows Alpaca account data
-- [ ] Account refreshes every 15 seconds
+- [x] `/copilot` loads with Trading Copilot tab active
+- [x] Strategy Studio tab renders the swarm terminal
+- [x] AI chat streams responses via SSE
+- [x] Trade proposals render with approve/reject buttons
+- [x] Approval triggers backend execution (not frontend)
+- [x] Paper Portfolio shows Alpaca account data
+- [x] Account refreshes every 15 seconds

@@ -1,5 +1,13 @@
 # PRD: Supabase Data Foundation
 
+> **Status — updated 2026-06-13 (post-PR #30):** ✅ **FOUNDATION SHIPPED**, and scope has since grown.
+> The DSN resolution chain, `GET /api/health/db`, asyncpg pool, and pilot router are live. Two items
+> originally **out of scope are now in flight:** (1) **Supabase Auth was adopted** — the backend accepts
+> Supabase JWTs (master PRD FR1), not MongoDB auth; (2) the **Mongo→Postgres migration began** — PR #30
+> moved the copilot trust path onto Supabase Postgres (`copilot_store.py`, `sql/copilot_core_schema.sql`,
+> with an integration suite). **Row Level Security is still pending** (tracked as a roadmap risk; isolation
+> currently relies on app-layer `owner_user_id` filtering). Acceptance below verified in dev.
+
 ## Problem Statement
 Thesis creation, paper trading, and Fund OS features all fail because Postgres tables don't exist. The backend has asyncpg support but no Supabase project structure, no migration workflow, and no health checks.
 
@@ -49,9 +57,9 @@ Response:
 - Pool: asyncpg, min_size=1, max_size=5
 
 ## Acceptance Criteria
-- [ ] `GET /api/health/db` returns all green when Supabase DSN is set
-- [ ] Thesis creation succeeds (INSERT INTO theses works)
-- [ ] Paper trade creation succeeds
-- [ ] Strategy terminal writes to strategy_proposals
-- [ ] Dev bootstrap applies schema when flag is set
-- [ ] Pilot router is mounted and `/api/pilot/status` responds
+- [x] `GET /api/health/db` returns all green when Supabase DSN is set
+- [x] Thesis creation succeeds (INSERT INTO theses works)
+- [x] Paper trade creation succeeds
+- [x] Strategy terminal writes to strategy_proposals
+- [x] Dev bootstrap applies schema when flag is set
+- [x] Pilot router is mounted and `/api/pilot/status` responds

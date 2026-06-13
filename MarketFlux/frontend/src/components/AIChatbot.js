@@ -23,7 +23,7 @@ const CUSTOM_STYLES = `
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(227, 184, 95, 0); }
   }
 
-  .eq-bar { animation: eq-bounce 1.2s ease-in-out infinite; background: #E3B85F; width: 3px; border-radius: 2px; }
+  .eq-bar { animation: eq-bounce 1.2s ease-in-out infinite; background: hsl(var(--primary)); width: 3px; border-radius: 2px; }
   .eq-bar:nth-child(1) { animation-delay: 0.0s; }
   .eq-bar:nth-child(2) { animation-delay: 0.2s; }
   .eq-bar:nth-child(3) { animation-delay: 0.4s; }
@@ -46,8 +46,8 @@ const CUSTOM_STYLES = `
   }
 
   .fin-card {
-    background: var(--card-bg, rgba(255, 255, 255, 0.03));
-    border-left: 3px solid #E3B85F;
+    background: var(--card-bg, hsl(var(--muted) / 0.35));
+    border: 1px solid hsl(var(--primary) / 0.25);
     padding: 10px 14px;
     margin: 6px 0;
     border-radius: 6px;
@@ -139,7 +139,7 @@ function ComparisonChart({ tickers }) {
         <div className="flex gap-2 flex-wrap">
           {tickers.map((t, i) => (
             <span key={t} className="flex items-center gap-1 text-[10px] font-mono">
-              <span className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-[#3b82f6]' : i === 1 ? 'bg-[#f97316]' : 'bg-[#22c55e]'}`} />
+              <span className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-[#3b82f6]' : i === 1 ? 'bg-[#f97316]' : 'bg-gain'}`} />
               {t}
             </span>
           ))}
@@ -149,7 +149,7 @@ function ComparisonChart({ tickers }) {
             <button
               key={p}
               onClick={() => setPeriod(periodMap[p])}
-              className={`px-2 py-0.5 text-[10px] font-mono rounded-md transition-colors ${period === periodMap[p] ? 'bg-[#22c55e]/20 text-[#22c55e]' : 'text-[#9ca3af] hover:text-[#e5e7eb]'}`}
+              className={`px-2 py-0.5 text-[10px] font-mono rounded-md transition-colors ${period === periodMap[p] ? 'bg-gain/20 text-gain' : 'text-[#9ca3af] hover:text-[#e5e7eb]'}`}
             >
               {p}
             </button>
@@ -157,14 +157,14 @@ function ComparisonChart({ tickers }) {
         </div>
       </div>
       {loading && <div className="h-[200px] flex items-center justify-center text-[11px] text-[#9ca3af]">Loading chart...</div>}
-      {error && <div className="h-[200px] flex items-center justify-center text-[11px] text-[#ef4444]">{error}</div>}
+      {error && <div className="h-[200px] flex items-center justify-center text-[11px] text-loss">{error}</div>}
       {!loading && !error && chartData.length > 0 && (
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
             <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9ca3af' }} tickFormatter={(v) => (v || '').toString().slice(5)} />
             <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} tickFormatter={(v) => `${v}%`} domain={['auto', 'auto']} />
-            <Tooltip contentStyle={{ background: '#0f0f0f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }} formatter={(v) => [`${Number(v).toFixed(2)}%`, '']} />
+            <Tooltip contentStyle={{ background: '#0f0f0f', border: '1px solid hsl(var(--border))', borderRadius: 8 }} formatter={(v) => [`${Number(v).toFixed(2)}%`, '']} />
             <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeDasharray="2 2" />
             {tickers.map((t, i) => (
               <Line key={t} type="monotone" dataKey={`${t}_pct`} name={t} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} connectNulls />
@@ -235,9 +235,9 @@ function renderMarkdown(text) {
   // 3. Handle Typography
   return html
     .replace(/^### (.*$)/gm, '<h3 style="color: var(--color-accent, #E3B85F); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 20px; margin-bottom: 8px;">$1</h3>')
-    .replace(/^## (.*$)/gm, '<h2 style="color: #ffffff; font-size: 15px; font-weight: 700; border-left: 3px solid var(--color-accent); padding-left: 8px; margin-top: 24px; margin-bottom: 10px;">$1</h2>')
-    .replace(/^# (.*$)/gm, '<h1 style="color: #ffffff; font-size: 18px; font-weight: 800; margin-top: 28px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #ffffff; font-weight: 700;">$1</strong>')
+    .replace(/^## (.*$)/gm, '<h2 style="color: hsl(var(--foreground)); font-size: 15px; font-weight: 700; margin-top: 24px; margin-bottom: 10px;">$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1 style="color: hsl(var(--foreground)); font-size: 18px; font-weight: 800; margin-top: 28px; margin-bottom: 12px; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 6px;">$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong style="color: hsl(var(--foreground)); font-weight: 700;">$1</strong>')
     .replace(/\*(.*?)\*/g, '<em style="opacity: 0.9;">$1</em>')
     .replace(/`([^`]+)`/g, '<code class="bg-muted text-primary px-1.5 py-0.5 rounded font-mono text-[11px] border border-primary/20 mx-0.5">$1</code>')
     .replace(/^(?:-|\*)\s+(?!<div)(.*$)/gm, '<div style="color: rgba(255,255,255,0.85); margin-left: 14px; text-indent: -14px; margin-bottom: 4px;">&bull; $1</div>')
@@ -277,9 +277,9 @@ function ThinkingAccordion({ steps, isProcessing }) {
       >
         <div className="flex items-center gap-2">
           {isProcessing ? (
-            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-gain animate-pulse" />
           ) : (
-            <Check className="w-3.5 h-3.5 text-[#22c55e]" strokeWidth={3} />
+            <Check className="w-3.5 h-3.5 text-gain" strokeWidth={3} />
           )}
           <span className={`text-[11px] font-sans tracking-wide ${isProcessing ? 'text-[#e5e7eb] font-medium' : 'text-[#9ca3af]'}`}>
             {isProcessing ? 'Analyzing...' : 'Analysis Complete'}
@@ -292,7 +292,7 @@ function ThinkingAccordion({ steps, isProcessing }) {
         <div className="px-3 py-2 space-y-1.5 border-t border-[rgba(34,197,94,0.12)]">
           {steps.map((step, i) => (
             <div key={step.id || i} className="flex items-start gap-2 text-[11px] font-mono" style={{ animation: `fadeIn 150ms ease-out ${i * 80}ms both` }}>
-              <Check className={`w-3 h-3 mt-0.5 shrink-0 ${!isProcessing && i === steps.length - 1 ? 'text-[#22c55e]' : 'text-[#6b7280]'}`} strokeWidth={2} />
+              <Check className={`w-3 h-3 mt-0.5 shrink-0 ${!isProcessing && i === steps.length - 1 ? 'text-gain' : 'text-[#6b7280]'}`} strokeWidth={2} />
               <span className={!isProcessing && i === steps.length - 1 ? 'text-[#d1d5db]' : 'text-[#6b7280]'}>{step.message}</span>
             </div>
           ))}
@@ -641,7 +641,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
       {isChatOpen && (
         <div
           data-testid="chatbot-window"
-          className={`fixed z-[999] flex flex-col overflow-hidden transition-transform duration-300 ease-in-out border-[rgba(255,255,255,0.08)] ${isDesktop
+          className={`fixed z-[999] flex flex-col overflow-hidden transition-transform duration-300 ease-in-out border-border ${isDesktop
             ? 'top-0 right-0 bottom-0 h-full border-l shadow-2xl'
             : 'bottom-6 right-6 w-[380px] h-[580px] max-h-[85vh] rounded-[12px] shadow-[0_0_40px_rgba(227,184,95,0.05)] border-t border-l border-r'
             }`}
@@ -662,7 +662,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
           )}
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.08)]" style={{ backgroundColor: '#15130F' }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border" style={{ backgroundColor: '#15130F' }}>
             <div className="flex items-center gap-2">
               {showHistory && (
                 <button onClick={() => setShowHistory(false)} className="mr-1">
@@ -852,7 +852,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
 
               {/* Input */}
               <div
-                className="p-3 border-t border-[rgba(255,255,255,0.08)]"
+                className="p-3 border-t border-border"
                 style={{ backgroundColor: '#15130F' }}
               >
                 <form
@@ -879,7 +879,7 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
                         }
                       }}
                       placeholder="Ask about markets, stocks, macro..."
-                      className="flex-1 w-full dark:bg-[rgba(255,255,255,0.04)] bg-slate-100 text-foreground dark:border-[rgba(255,255,255,0.1)] border-border focus:border-primary/50 focus:ring-0 focus:shadow-[0_0_0_2px_rgba(227,184,95,0.1)] rounded-md font-mono text-xs px-3 py-2.5 min-h-[40px] resize-none terminal-scrollbar placeholder:text-muted-foreground/50 pr-8"
+                      className="flex-1 w-full dark:bg-muted/40 bg-slate-100 text-foreground dark:border-border border-border focus:border-primary/50 focus:ring-0 focus:shadow-[0_0_0_2px_rgba(227,184,95,0.1)] rounded-md font-mono text-xs px-3 py-2.5 min-h-[40px] resize-none terminal-scrollbar placeholder:text-muted-foreground/50 pr-8"
                       rows={1}
                       disabled={loading || (!aiUsage.unlimited && aiUsage.remaining <= 0)}
                     />

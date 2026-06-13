@@ -1,5 +1,12 @@
 # PRD: Backtest Lab
 
+> **Status — updated 2026-06-13 (post-PR #30):** ✅ **SHIPPED.** `pages/Backtest.js` is live with the
+> visual strategy builder, equity/drawdown charts, trade log, and an expanded metric set (Total Return,
+> CAGR, Sharpe, Sortino, Max DD, Calmar, Win Rate, Profit Factor, Expectancy, Avg Duration, Best/Worst
+> trade — see [`FRONTEND_SPEC.md`](./FRONTEND_SPEC.md) §5). The same engine is now reachable from the
+> **Copilot** via the `run_strategy_backtest` tool ([`prd-copilot-godtier.md`](prd-copilot-godtier.md)).
+> Persisting runs to the DB and backtest→proposal promotion remain on the roadmap. Acceptance below shipped.
+
 ## Problem Statement
 A complete backtesting engine exists on the backend (DSL parser, bar-by-bar simulator, walk-forward analysis, metrics) but has zero frontend. Users cannot access backtesting capabilities.
 
@@ -91,11 +98,11 @@ Backtest.js (~500 lines)
 - `sma`, `ema`, `rsi`, `atr`, `bbands_upper`, `bbands_lower`, `macd`, `macd_signal`
 
 ## Acceptance Criteria
-- [ ] `/backtest` renders the split-pane layout
-- [ ] "Load Example" populates the form with a valid strategy
-- [ ] "Run Backtest" sends strategy to backend and renders results
-- [ ] Equity curve renders as an area chart
-- [ ] Metrics grid shows CAGR, Sharpe, Sortino, Max DD
-- [ ] Trade log table is sortable
-- [ ] "Walk Forward" renders train/test window pairs
-- [ ] Validation errors shown inline
+- [x] `/backtest` renders the split-pane layout
+- [x] "Load Example" populates the form with a valid strategy
+- [x] "Run Backtest" sends strategy to backend and renders results
+- [x] Equity curve renders as an area chart
+- [x] Metrics grid shows CAGR, Sharpe, Sortino, Max DD
+- [x] Trade log table is sortable
+- [x] "Walk Forward" renders train/test window pairs
+- [x] Validation errors shown inline

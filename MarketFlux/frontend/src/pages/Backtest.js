@@ -735,7 +735,7 @@ function MonthlyHeatmap({ monthlyReturns }) {
     const absMax = Math.max(Math.abs(Math.min(...allVals)), Math.abs(Math.max(...allVals)), 0.01);
 
     const cellStyle = (val) => {
-        if (val == null) return { backgroundColor: 'rgba(255,255,255,0.02)' };
+        if (val == null) return { backgroundColor: 'hsl(var(--muted) / 0.35)' };
         const intensity = Math.min(Math.abs(val) / absMax, 1);
         if (val > 0) {
             const alpha = 0.1 + intensity * 0.55;
@@ -886,7 +886,7 @@ function EquityCurveChart({ equityCurve, startDate, endDate, capital, showBenchm
                     <YAxis tick={{ fontSize: 10, fontFamily: 'monospace', fill: 'hsl(var(--muted-foreground))' }}
                         tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={60} />
                     <RechartsTooltip
-                        contentStyle={{ background: 'hsl(var(--card))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px' }}
+                        contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px' }}
                         formatter={(v, name) => [`$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, name === 'benchmark' ? 'SPY B&H' : 'Strategy']}
                         labelFormatter={(d) => d?.slice(0, 10)}
                     />
@@ -1265,7 +1265,7 @@ function MonteCarloPanel({ trades, capital }) {
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                                     <XAxis dataKey="trade_num" tick={{ fontSize: 10, fontFamily: 'monospace', fill: 'hsl(var(--muted-foreground))' }} label={{ value: 'Trade #', position: 'insideBottom', offset: -5, fontSize: 10, fontFamily: 'monospace', fill: 'hsl(var(--muted-foreground))' }} />
                                     <YAxis tick={{ fontSize: 10, fontFamily: 'monospace', fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={60} />
-                                    <RechartsTooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px' }} />
+                                    <RechartsTooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px' }} />
                                     <Line type="monotone" dataKey="p5" stroke="#ef4444" strokeWidth={1.5} dot={false} name="5th %ile" />
                                     <Line type="monotone" dataKey="p50" stroke="#f59e0b" strokeWidth={2} dot={false} name="Median" />
                                     <Line type="monotone" dataKey="p95" stroke="#22c55e" strokeWidth={1.5} dot={false} name="95th %ile" />

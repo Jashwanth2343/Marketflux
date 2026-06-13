@@ -36,7 +36,10 @@ jobs:
             tests/test_policy_engine_unittest.py \
             tests/test_thesis_backfill_unittest.py \
             tests/test_conviction_ledger.py \
-            tests/test_sec_filings.py
+            tests/test_sec_filings.py \
+            tests/test_compliance_engine.py \
+            tests/test_intelligence_tools.py \
+            tests/test_filings_router.py
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -51,11 +54,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: yarn
-          cache-dependency-path: MarketFlux/frontend/yarn.lock
+          cache: npm
+          cache-dependency-path: MarketFlux/frontend/package-lock.json
 
       - name: Install frontend dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: Build frontend
-        run: yarn build
+        run: npm run build

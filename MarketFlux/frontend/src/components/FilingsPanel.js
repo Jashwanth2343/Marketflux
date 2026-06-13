@@ -11,7 +11,7 @@ const TABS = [
 ];
 
 const FORM_BADGE = {
-  '10-K': 'text-[#E3B85F] border-[rgba(227,184,95,0.35)] bg-[rgba(227,184,95,0.08)]',
+  '10-K': 'text-primary border-primary/20 bg-primary/10',
   '10-Q': 'text-sky-400 border-sky-400/35 bg-sky-400/10',
   '8-K': 'text-violet-400 border-violet-400/35 bg-violet-400/10',
 };
@@ -90,7 +90,7 @@ function DiffTab({ ticker }) {
     return (
       <div className="px-4 py-8 text-center">
         <button onClick={run}
-          className="rounded-lg border border-[rgba(227,184,95,0.35)] bg-[rgba(227,184,95,0.08)] px-4 py-2 font-mono text-xs text-[#E3B85F] hover:bg-[rgba(227,184,95,0.15)]">
+          className="rounded-lg border border-primary/20 bg-primary/10 px-4 py-2 font-mono text-xs text-primary hover:bg-primary/15">
           Diff the two latest 10-K Risk Factors
         </button>
         <p className="mt-2 text-[10px] text-muted-foreground">Downloads both filings from EDGAR — first run takes ~15s, then cached.</p>
@@ -108,7 +108,7 @@ function DiffTab({ ticker }) {
         <span className="text-green-500">+{data.added_count} added</span>
         <span className="text-red-500">−{data.removed_count} removed</span>
       </div>
-      <div className="font-mono text-[11px] text-[#E3B85F]">{data.read}</div>
+      <div className="font-mono text-[11px] text-primary">{data.read}</div>
       {(data.added || []).length > 0 && (
         <div className="space-y-1.5">
           <div className="font-mono text-[10px] uppercase tracking-wider text-green-500">New risk language</div>
@@ -160,7 +160,7 @@ function SearchTab({ ticker }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={`Ask the ${form} — e.g. "customer concentration", "China exposure", "litigation"`}
-          className="flex-1 rounded border border-border bg-card px-3 py-1.5 text-xs font-mono focus:border-[#E3B85F]/60 focus:outline-none"
+          className="flex-1 rounded border border-border bg-card px-3 py-1.5 text-xs font-mono focus:border-primary/60 focus:outline-none"
           data-testid="filings-search-input"
         />
         <select value={form} onChange={(e) => setForm(e.target.value)}
@@ -169,7 +169,7 @@ function SearchTab({ ticker }) {
           <option value="10-Q">10-Q</option>
         </select>
         <button type="submit" disabled={loading || q.trim().length < 2}
-          className="rounded border border-[rgba(227,184,95,0.35)] bg-[rgba(227,184,95,0.08)] px-3 py-1.5 font-mono text-xs text-[#E3B85F] hover:bg-[rgba(227,184,95,0.15)] disabled:opacity-40">
+          className="rounded border border-primary/20 bg-primary/10 px-3 py-1.5 font-mono text-xs text-primary hover:bg-primary/15 disabled:opacity-40">
           {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Search'}
         </button>
       </form>
@@ -188,7 +188,7 @@ function SearchTab({ ticker }) {
             <div key={i} className="rounded border border-border bg-card/60 p-2.5">
               <p className="text-xs text-muted-foreground leading-relaxed">{p.text}</p>
               {p.relevance != null && (
-                <div className="mt-1 font-mono text-[10px] text-[#E3B85F]">relevance {p.relevance}</div>
+                <div className="mt-1 font-mono text-[10px] text-primary">relevance {p.relevance}</div>
               )}
             </div>
           ))}
@@ -205,7 +205,7 @@ export default function FilingsPanel({ ticker }) {
     <Card className="overflow-hidden" data-testid="filings-panel">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-[#E3B85F]" />
+          <FileText className="w-4 h-4 text-primary" />
           <span className="text-sm font-semibold">SEC Filings</span>
           <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">EDGAR full text</span>
         </div>
@@ -214,7 +214,7 @@ export default function FilingsPanel({ ticker }) {
             <button key={key} onClick={() => setTab(key)}
               className={`flex items-center gap-1 rounded px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
                 tab === key
-                  ? 'bg-[rgba(227,184,95,0.1)] text-[#E3B85F] border border-[rgba(227,184,95,0.25)]'
+                  ? 'bg-primary/15 text-primary border border-primary/20'
                   : 'text-muted-foreground hover:text-foreground border border-transparent'
               }`}>
               <Icon className="w-3 h-3" /> {label}

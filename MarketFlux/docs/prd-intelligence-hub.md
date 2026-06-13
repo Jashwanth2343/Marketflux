@@ -1,5 +1,11 @@
 # PRD: Intelligence Hub
 
+> **Status — updated 2026-06-13 (post-PR #30):** ✅ **SHIPPED.** Live at `/intelligence` with all
+> five tabs, `?tab=` URL sync, and legacy redirects (see [`FRONTEND_SPEC.md`](./FRONTEND_SPEC.md) §3).
+> PR #30 added a **terminal command line** in the global search bar (inline AI reads, ask-handoff to
+> Copilot, nav commands — `SearchBar.js`, `server.py`) and remapped the hub's pages to the warm-ink
+> theme tokens (now light-mode legible). Acceptance criteria below are checked off.
+
 ## Problem Statement
 Research, news, screener, macro, and thesis features are scattered across 5+ separate nav items. Users can't find related information without navigating between pages. The nav has 11 items which is overwhelming.
 
@@ -56,9 +62,9 @@ export default function PageName({ embedded = false }) {
 ```
 
 ## Acceptance Criteria
-- [ ] `/intelligence` loads with Research tab active by default
-- [ ] All 5 tabs render their content correctly
-- [ ] `?tab=news` opens directly to News tab
-- [ ] Thesis links navigate to `/intelligence/thesis/:id`
-- [ ] Legacy redirects work: `/news` → `/intelligence?tab=news`, etc.
-- [ ] No duplicate data fetching (tabs only fetch when activated)
+- [x] `/intelligence` loads with Research tab active by default
+- [x] All 5 tabs render their content correctly
+- [x] `?tab=news` opens directly to News tab
+- [x] Thesis links navigate to `/intelligence/thesis/:id`
+- [x] Legacy redirects work: `/news` → `/intelligence?tab=news`, etc.
+- [x] No duplicate data fetching (tabs only fetch when activated)

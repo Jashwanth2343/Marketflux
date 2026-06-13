@@ -49,7 +49,7 @@ function Pct({ value, signed = true }) {
 
 function StatusBadge({ status }) {
   const map = {
-    open: { icon: CircleDot, cls: 'text-[#E3B85F] border-[rgba(227,184,95,0.3)] bg-[rgba(227,184,95,0.07)]' },
+    open: { icon: CircleDot, cls: 'text-primary border-primary/20 bg-primary/10' },
     closed: { icon: CheckCircle2, cls: 'text-zinc-300 border-zinc-500/30 bg-zinc-500/10' },
     invalidated: { icon: Ban, cls: 'text-red-400 border-red-400/30 bg-red-400/10' },
   };
@@ -110,7 +110,7 @@ function NewThesisForm({ onCreated, onCancel }) {
     }
   };
 
-  const inputCls = 'w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:border-[#E3B85F]/60';
+  const inputCls = 'w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:border-primary/60';
 
   return (
     <Card className="overflow-hidden" style={{ borderTop: '3px solid #E3B85F' }}>
@@ -157,7 +157,7 @@ function NewThesisForm({ onCreated, onCancel }) {
           <div className="flex items-center gap-2">
             <Button type="submit" size="sm" disabled={saving}
               className="gap-1 font-mono text-xs uppercase tracking-wider"
-              style={{ background: '#E3B85F', color: '#000' }}>
+              style={{ background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}>
               {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
               Log thesis
             </Button>
@@ -181,7 +181,7 @@ function ThesisRow({ t, onClose, closing }) {
   return (
     <div className="grid grid-cols-12 gap-2 items-center px-4 py-3 border-b border-border last:border-0 hover:bg-card/60 transition-colors text-sm">
       <div className="col-span-2 flex items-center gap-2 min-w-0">
-        <Link to={`/stock/${t.ticker}`} className="font-mono font-bold text-[#E3B85F] hover:underline">{t.ticker}</Link>
+        <Link to={`/stock/${t.ticker}`} className="font-mono font-bold text-primary hover:underline">{t.ticker}</Link>
         {t.direction === 'long'
           ? <TrendingUp className="w-3 h-3 text-green-500" />
           : <TrendingDown className="w-3 h-3 text-red-500" />}
@@ -268,7 +268,7 @@ export default function Ledger() {
       <header className="border-b border-border bg-card/40 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
-            <BookMarked className="w-6 h-6 text-[#E3B85F]" />
+            <BookMarked className="w-6 h-6 text-primary" />
             <div className="min-w-0">
               <h1 className="text-xl font-semibold">Conviction Ledger</h1>
               <p className="text-xs text-muted-foreground">
@@ -289,7 +289,7 @@ export default function Ledger() {
             </Button>
             <Button size="sm" onClick={() => setShowForm((v) => !v)}
               className="gap-1 font-mono text-xs uppercase tracking-wider"
-              style={{ background: '#E3B85F', color: '#000' }}
+              style={{ background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
               data-testid="ledger-new-thesis-btn">
               <Plus className="w-3 h-3" /> New thesis
             </Button>
@@ -377,7 +377,7 @@ export default function Ledger() {
                 </div>
                 {expanded === t.id ? (
                   <div className="px-6 py-3 bg-muted/20 border-b border-border text-xs text-muted-foreground whitespace-pre-wrap">
-                    <div className="font-mono uppercase tracking-wider text-[10px] mb-1 text-[#E3B85F]">Rationale</div>
+                    <div className="font-mono uppercase tracking-wider text-[10px] mb-1 text-primary">Rationale</div>
                     {t.rationale}
                     {t.benchmark_return_pct != null ? (
                       <div className="mt-2 font-mono text-[11px]">

@@ -784,6 +784,39 @@ async def _run_one_tool(name, args, db, user_id, confirm, emit, out: List[Any]):
     out.append(result)
 
 
+# Tools that must never fan out concurrently: order execution goes through the
+# compliance gate one at a time, and run_python shares a scratchpad session.
+_SEQUENTIAL_TOOLS = trading.EXECUTION_TOOLS | {"place_order", "run_python"}
+
+
+async def _run_read_tools_parallel(batch, db, user_id, confirm, emit,
+                                   results: Dict[int, Any]):
+    """Fan out a round of read-only tool calls concurrently.
+
+    ``batch`` is a list of ``(slot, name, args)``. All tool_call events are
+    emitted up front so the UI shows every tool as running; executions happen
+    concurrently; results are emitted in reverse call order because the client
+    pairs a tool_result with its newest pending tool_call of the same name —
+    reverse emission keeps that pairing correct even for duplicate names.
+    """
+    for _, name, args in batch:
+        yield emit("tool_call", name=name, label=_tool_label(name, args),
+                   args=_sanitize(args), is_trade=False)
+    settled = await asyncio.gather(
+        *(_exec_tool(name, args, db, user_id, confirm) for _, name, args in batch),
+        return_exceptions=True)
+    for (slot, name, args), result in reversed(list(zip(batch, settled))):
+        if isinstance(result, BaseException):
+            logger.error(f"parallel tool {name} failed: {result}")
+            result = {"ok": False, "error": str(result)}
+        yield emit("tool_result", name=name, ok=bool(result.get("ok", True)),
+                   summary=_result_summary(name, result))
+        insight = _insight_payload(name, result)
+        if insight:
+            yield emit("insight", **insight)
+        results[slot] = result
+
+
 # ---------------------------------------------------------------------------
 # Response-parsing helpers
 # ---------------------------------------------------------------------------
@@ -911,10 +944,8 @@ async def _finalize(db, user_id: str, session_id: str, message: str, final_text:
     if db is None:
         return
     try:
-        await db.copilot_messages.insert_one({
-            "user_id": user_id, "session_id": session_id, "message": message,
-            "response": final_text, "created_at": datetime.now(timezone.utc),
-        })
+        import copilot_store
+        await copilot_store.insert_message(db, user_id, session_id, message, final_text)
     except Exception as exc:
         logger.error(f"copilot db save failed: {exc}")
     copilot_memory.schedule_add_turn(user_id, message, final_text)
@@ -949,7 +980,10 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
         calls = _function_calls(response)
         if not calls:
             break
-        function_responses = []
+        _emit = sse_fn or _sse
+        function_responses: List[Optional[Dict[str, Any]]] = []
+        slot_names: Dict[int, str] = {}
+        pending: List[tuple] = []  # (slot, name, args)
         for fc in calls:
             if tool_calls >= MAX_TOOL_CALLS:
                 break
@@ -961,12 +995,28 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
                 continue
             called_signatures.add(signature)
             tool_calls += 1
-            _emit = sse_fn or _sse
+            function_responses.append(None)
+            slot = len(function_responses) - 1
+            slot_names[slot] = name
+            pending.append((slot, name, args))
+
+        # Read-only tools fan out concurrently; execution/code tools run
+        # sequentially through the compliance-gated path.
+        read_batch = [p for p in pending if p[1] not in _SEQUENTIAL_TOOLS]
+        seq_batch = [p for p in pending if p[1] in _SEQUENTIAL_TOOLS]
+        results: Dict[int, Any] = {}
+        if len(read_batch) > 1:
+            async for ev in _run_read_tools_parallel(read_batch, db, user_id, confirm, _emit, results):
+                yield ev
+        else:
+            seq_batch = read_batch + seq_batch
+        for slot, name, args in seq_batch:
             out: List[Any] = []
             async for ev in _run_one_tool(name, args, db, user_id, confirm, _emit, out):
                 yield ev
-            result = out[0] if out else {"ok": False, "error": "no result"}
-            function_responses.append({"function_response": {"name": name, "response": result}})
+            results[slot] = out[0] if out else {"ok": False, "error": "no result"}
+        for slot, result in results.items():
+            function_responses[slot] = {"function_response": {"name": slot_names[slot], "response": result}}
         if not function_responses:
             break
         response = await asyncio.to_thread(chat.send_message, {"role": "function", "parts": function_responses})
@@ -1032,6 +1082,8 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
         messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": [
             {"id": tc.id, "type": "function",
              "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in tcs]})
+        _emit = sse_fn or _sse
+        pending: List[tuple] = []  # (tool_call_id, name, args)
         for tc in tcs:
             name = tc.function.name
             try:
@@ -1047,12 +1099,23 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
                 continue
             called.add(signature)
             tool_calls += 1
-            _emit = sse_fn or _sse
+            pending.append((tc.id, name, args))
+
+        read_batch = [p for p in pending if p[1] not in _SEQUENTIAL_TOOLS]
+        seq_batch = [p for p in pending if p[1] in _SEQUENTIAL_TOOLS]
+        results: Dict[Any, Any] = {}
+        if len(read_batch) > 1:
+            async for ev in _run_read_tools_parallel(read_batch, db, user_id, confirm, _emit, results):
+                yield ev
+        else:
+            seq_batch = read_batch + seq_batch
+        for tc_id, name, args in seq_batch:
             out: List[Any] = []
             async for ev in _run_one_tool(name, args, db, user_id, confirm, _emit, out):
                 yield ev
-            result = out[0] if out else {"ok": False, "error": "no result"}
-            messages.append({"role": "tool", "tool_call_id": tc.id,
+            results[tc_id] = out[0] if out else {"ok": False, "error": "no result"}
+        for tc_id, result in results.items():
+            messages.append({"role": "tool", "tool_call_id": tc_id,
                              "content": json.dumps(result, default=str)[:8000]})
 
     if not holder.get("final_text"):
@@ -1066,10 +1129,7 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
 
 async def _log_trade(db, user_id: str, payload: Dict[str, Any]) -> None:
     try:
-        await db.copilot_trade_log.insert_one({
-            "user_id": user_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            **payload,
-        })
+        import copilot_store
+        await copilot_store.log_trade(db, user_id, payload)
     except Exception as exc:
         logger.warning(f"copilot trade log failed: {exc}")
