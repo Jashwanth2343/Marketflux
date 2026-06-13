@@ -40,16 +40,17 @@ def preview(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
 
 async def stage(db, user_id: str, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
     """Record a pending trade and return a 'staged' result for the agent."""
+    import copilot_store
     pid = str(uuid.uuid4())
     pv = preview(name, args)
-    await db[COLLECTION].insert_one({
+    await copilot_store.insert_pending(db, {
         "id": pid,
         "user_id": user_id,
         "tool": name,
         "args": args,
         "preview": pv,
         "status": "pending",
-        # Store as a real datetime (not ISO string) so the MongoDB TTL index fires.
+        # Real datetime: Postgres timestamptz, or the Mongo TTL index on fallback.
         "created_at": datetime.now(timezone.utc),
     })
     return {
@@ -64,9 +65,8 @@ async def stage(db, user_id: str, name: str, args: Dict[str, Any]) -> Dict[str, 
 async def list_pending(db, user_id: str) -> List[Dict[str, Any]]:
     """Staged trades still awaiting approval — lets the UI rehydrate after a
     page refresh instead of silently losing the approval queue."""
-    return await db[COLLECTION].find(
-        {"user_id": user_id, "status": "pending"}, {"_id": 0}
-    ).sort("created_at", 1).to_list(50)
+    import copilot_store
+    return await copilot_store.list_pending(db, user_id)
 
 
 async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
@@ -79,14 +79,11 @@ async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
     # Staleness guard: reject proposals older than 1 hour.
     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
 
-    doc = await db[COLLECTION].find_one_and_update(
-        {"id": pid, "user_id": user_id, "status": "pending", "created_at": {"$gte": cutoff}},
-        {"$set": {"status": "executing"}},
-        return_document=True,
-    )
+    import copilot_store
+    doc = await copilot_store.claim_pending(db, user_id, pid, cutoff)
     if not doc:
         # Distinguish expired from not-found/already-processed.
-        existing = await db[COLLECTION].find_one({"id": pid, "user_id": user_id}, {"status": 1, "created_at": 1})
+        existing = await copilot_store.get_pending_meta(db, user_id, pid)
         if not existing:
             return {"ok": False, "error": "Trade not found."}
         existing_ts = existing.get("created_at")
@@ -115,20 +112,11 @@ async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
         logger.error(f"execute_pending {pid} failed: {exc}")
         result = {"ok": False, "error": str(exc)}
 
-    await db[COLLECTION].update_one(
-        {"id": pid},
-        {"$set": {
-            "status": "executed" if result.get("ok") else "failed",
-            "result": result,
-            "executed_at": datetime.now(timezone.utc).isoformat(),
-        }},
-    )
+    await copilot_store.set_pending_result(
+        db, pid, "executed" if result.get("ok") else "failed", result)
     return result
 
 
 async def reject_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
-    res = await db[COLLECTION].update_one(
-        {"id": pid, "user_id": user_id, "status": "pending"},
-        {"$set": {"status": "rejected", "rejected_at": datetime.now(timezone.utc).isoformat()}},
-    )
-    return {"ok": res.modified_count > 0}
+    import copilot_store
+    return {"ok": await copilot_store.mark_rejected(db, user_id, pid)}

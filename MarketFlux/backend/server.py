@@ -1819,6 +1819,14 @@ async def startup():
     except Exception as exc:
         logger.warning(f"Postgres pool initialization failed: {exc}")
 
+    try:
+        # Copilot trust path (pending trades / messages / trade log) lives in
+        # Postgres now; idempotent schema apply at every boot.
+        import copilot_store
+        await copilot_store.ensure_schema()
+    except Exception as exc:
+        logger.warning(f"copilot_store schema apply failed: {exc}")
+
     asyncio.create_task(periodic_news_fetch())
     asyncio.create_task(pilot_expire_sweep())
     asyncio.create_task(pilot_nightly_reflection_loop())

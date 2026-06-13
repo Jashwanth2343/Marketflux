@@ -106,10 +106,10 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
             from datetime import datetime, timezone
             midnight = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             try:
-                turns_today = await db.copilot_messages.count_documents(
-                    {"user_id": user_id, "created_at": {"$gte": midnight}})
+                import copilot_store
+                turns_today = await copilot_store.count_turns_today(db, user_id)
             except Exception as exc:
-                logger.warning(f"copilot daily-cap check skipped, Mongo unreachable: {exc}")
+                logger.warning(f"copilot daily-cap check skipped, store unreachable: {exc}")
                 turns_today = 0
             if turns_today >= daily_cap:
                 raise HTTPException(
@@ -119,12 +119,10 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
                 )
 
         try:
-            history = await db.copilot_messages.find(
-                {"user_id": user_id, "session_id": session_id}
-            ).sort("created_at", -1).limit(8).to_list(8)
-            history.reverse()
+            import copilot_store
+            history = await copilot_store.recent_history(db, user_id, session_id, limit=8)
         except Exception as exc:
-            logger.warning(f"copilot history load skipped, Mongo unreachable: {exc}")
+            logger.warning(f"copilot history load skipped, store unreachable: {exc}")
             history = []
 
         async def _stream_with_disconnect_guard():
@@ -280,9 +278,8 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     async def copilot_trades(request: Request, limit: int = 25):
         """Recent trades the agent has executed (for the activity history)."""
         user_id = await _resolve_user_id(request)
-        rows = await db.copilot_trade_log.find(
-            {"user_id": user_id}, {"_id": 0}
-        ).sort("timestamp", -1).limit(min(limit, 100)).to_list(min(limit, 100))
+        import copilot_store
+        rows = await copilot_store.recent_trades(db, user_id, limit)
         return {"items": rows}
 
     return router

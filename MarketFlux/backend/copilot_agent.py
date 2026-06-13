@@ -944,10 +944,8 @@ async def _finalize(db, user_id: str, session_id: str, message: str, final_text:
     if db is None:
         return
     try:
-        await db.copilot_messages.insert_one({
-            "user_id": user_id, "session_id": session_id, "message": message,
-            "response": final_text, "created_at": datetime.now(timezone.utc),
-        })
+        import copilot_store
+        await copilot_store.insert_message(db, user_id, session_id, message, final_text)
     except Exception as exc:
         logger.error(f"copilot db save failed: {exc}")
     copilot_memory.schedule_add_turn(user_id, message, final_text)
@@ -1131,10 +1129,7 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
 
 async def _log_trade(db, user_id: str, payload: Dict[str, Any]) -> None:
     try:
-        await db.copilot_trade_log.insert_one({
-            "user_id": user_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            **payload,
-        })
+        import copilot_store
+        await copilot_store.log_trade(db, user_id, payload)
     except Exception as exc:
         logger.warning(f"copilot trade log failed: {exc}")
