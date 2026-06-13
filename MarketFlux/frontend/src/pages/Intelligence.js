@@ -11,6 +11,7 @@ import { FUNCTIONS, TAB_VALUES, functionByTab } from '@/components/intelligence/
 import TerminalStatusBar from '@/components/intelligence/TerminalStatusBar';
 import CommandLine from '@/components/intelligence/CommandLine';
 import ReadPanel from '@/components/intelligence/ReadPanel';
+import MonitorList from '@/components/intelligence/MonitorList';
 
 const PAGES = {
   research: ResearchCenter,
@@ -71,6 +72,9 @@ export default function Intelligence() {
   const [focused, setFocused] = useState(null);
   const [read, setRead] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [recents, setRecents] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('mf_recent_tickers') || '[]'); } catch { return []; }
+  });
 
   const selectTab = useCallback((tab) => {
     setSearchParams({ tab }, { replace: true });
@@ -87,8 +91,19 @@ export default function Intelligence() {
   }, [selectTab]);
 
   const handleRead = useCallback((ticker) => {
-    setFocused(ticker);
-    setRead(ticker);
+    const t = String(ticker).toUpperCase();
+    setFocused(t);
+    setRead(t);
+    setRecents((prev) => {
+      const next = [t, ...prev.filter((x) => x !== t)].slice(0, 8);
+      try { localStorage.setItem('mf_recent_tickers', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  const clearRecents = useCallback(() => {
+    setRecents([]);
+    try { localStorage.removeItem('mf_recent_tickers'); } catch { /* ignore */ }
   }, []);
 
   const handleScreen = useCallback((query) => {
@@ -143,6 +158,8 @@ export default function Intelligence() {
           onScreen={handleScreen}
           onFocus={setFocused}
         />
+
+        <MonitorList tickers={recents} active={focused} onPick={handleRead} onClear={clearRecents} />
 
         {read && <ReadPanel ticker={read} onClose={() => setRead(null)} />}
 
