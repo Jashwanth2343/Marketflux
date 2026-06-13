@@ -722,6 +722,72 @@ async def ticker_news(ticker: str, response: Response):
     response.headers["X-Cache"] = "MISS"
     return result
 
+@api_router.get("/intelligence/explain/{ticker}")
+async def explain_ticker_move(ticker: str, response: Response):
+    """'Why is this moving?' — live quote + recent headlines distilled into a
+    grounded two-sentence explanation, with the sources returned alongside so
+    the answer is never a black box. Cached 10 minutes per ticker."""
+    ticker = validate_ticker(ticker)
+    cache_key = f"explain:{ticker}"
+    cached = redis_cache_get(cache_key)
+    if cached:
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
+    from ai_service import _fetch_yf_info_sync, get_gemini_model, GEMINI_FLASH
+
+    info = await asyncio.to_thread(_fetch_yf_info_sync, ticker)
+    price = info.get("currentPrice") or info.get("regularMarketPrice")
+    prev = info.get("previousClose")
+    change_pct = round(((price - prev) / prev) * 100, 2) if price and prev else None
+
+    try:
+        articles = (await get_ticker_news(ticker)) or []
+    except Exception:
+        articles = []
+    headlines = [
+        {"title": a.get("title", ""),
+         "source": a.get("source") or a.get("publisher") or "",
+         "url": a.get("url") or a.get("link") or ""}
+        for a in articles[:6] if a.get("title")
+    ]
+
+    direction = "flat" if not change_pct else ("up" if change_pct > 0 else "down")
+    news_block = "\n".join(f"- {h['title']} ({h['source']})" for h in headlines) \
+        or "(no recent headlines found)"
+    prompt = (
+        f"{ticker} is {direction} {abs(change_pct or 0):.2f}% today "
+        f"(price {price}, previous close {prev}).\n"
+        f"Recent headlines:\n{news_block}\n\n"
+        "In at most two sentences, explain the most likely driver of today's move, "
+        "grounded ONLY in the headlines and data above. If the headlines don't "
+        "explain it, say the move looks like broad market/sector action rather than "
+        "company news. No investment advice, no hedging boilerplate."
+    )
+
+    explanation = ""
+    try:
+        model = get_gemini_model(GEMINI_FLASH)
+        resp = await asyncio.to_thread(model.generate_content, prompt)
+        explanation = (getattr(resp, "text", "") or "").strip()
+    except Exception as exc:
+        logger.warning(f"explain/{ticker} LLM call failed: {exc}")
+    if not explanation:
+        explanation = "No AI read available right now — the latest headlines are below."
+
+    result = {
+        "ticker": ticker,
+        "price": price,
+        "change_percent": change_pct,
+        "explanation": explanation,
+        "sources": headlines[:3],
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+    redis_cache_set(cache_key, result, ttl=600)
+    response.headers["X-Cache"] = "MISS"
+    return result
+
+
 @api_router.post("/news/refresh")
 async def refresh_news(request: Request, background_tasks: BackgroundTasks):
     # C3: Require authentication — prevents unauthenticated abuse of external API quotas

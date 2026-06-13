@@ -859,6 +859,15 @@ export default function CopilotAgent() {
         }).catch(() => { /* backend offline — keep the landing */ });
     }, []);
 
+    // Pick up a raw question handed off from the command line (⌘K "ask …").
+    useEffect(() => {
+        const ask = sessionStorage.getItem('copilot_ask');
+        if (ask) {
+            setInput(ask);
+            sessionStorage.removeItem('copilot_ask');
+        }
+    }, []);
+
     // Pick up a strategy handed off from the Strategy Studio.
     useEffect(() => {
         const handoff = sessionStorage.getItem('copilot_handoff');
