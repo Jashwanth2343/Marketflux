@@ -12,6 +12,7 @@ import TerminalStatusBar from '@/components/intelligence/TerminalStatusBar';
 import CommandLine from '@/components/intelligence/CommandLine';
 import ReadPanel from '@/components/intelligence/ReadPanel';
 import MonitorList from '@/components/intelligence/MonitorList';
+import SecurityHeader from '@/components/intelligence/SecurityHeader';
 
 const PAGES = {
   research: ResearchCenter,
@@ -160,6 +161,8 @@ export default function Intelligence() {
         />
 
         <MonitorList tickers={recents} active={focused} onPick={handleRead} onClear={clearRecents} />
+
+        {focused && <SecurityHeader ticker={focused} />}
 
         {read && <ReadPanel ticker={read} onClose={() => setRead(null)} />}
 
