@@ -58,12 +58,13 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         """Resolve the user id for write endpoints (chat/stream, trade approve,
         agents CRUD).
 
-        In PRODUCTION this requires a verified user — anonymous callers must not
-        share the 'local-copilot' namespace and approve each other's staged
-        trades. In local/dev (NODE_ENV != 'production') we fall back to the shared
-        anon id so a missing/expired session never fully bricks the copilot;
-        anonymous turns are forced into safe confirm-before-trade mode by the
-        chat endpoint regardless.
+        Requires a verified user by DEFAULT — anonymous callers must not share
+        the 'local-copilot' namespace and approve each other's staged trades.
+        The shared anon fallback is opt-in: only when NODE_ENV is explicitly
+        'development'/'dev', so a missing/unset NODE_ENV in any deployed env
+        fails closed (401) rather than silently opening the namespace. In that
+        local-dev mode anonymous turns are still forced into safe
+        confirm-before-trade mode by the chat endpoint.
         """
         user = await get_current_user(request)
         if user:
