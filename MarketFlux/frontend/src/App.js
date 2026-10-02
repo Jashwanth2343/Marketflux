@@ -8,20 +8,31 @@ import TopNav from "@/components/TopNav";
 const AIChatbot = lazy(() => import("@/components/AIChatbot"));
 import ScanlineOverlay from "@/components/ScanlineOverlay";
 import AuthCallback from "@/components/AuthCallback";
-import Dashboard from "@/pages/Dashboard";
-import Intelligence from "@/pages/Intelligence";
-import Copilot from "@/pages/Copilot";
-import PortfolioRisk from "@/pages/PortfolioRisk";
-import Backtest from "@/pages/Backtest";
-import StockDetail from "@/pages/StockDetail";
-import ThesisNew from "@/pages/ThesisNew";
-import ThesisWorkspace from "@/pages/ThesisWorkspace";
-import ThesisTradeLab from "@/pages/ThesisTradeLab";
-import Auth from "@/pages/Auth";
-import PilotLeaderboard from "@/pages/PilotLeaderboard";
-import PilotPublicProfile from "@/pages/PilotPublicProfile";
-import Ledger from "@/pages/Ledger";
+// Route-level code splitting: heavy pages load on demand, keeping the
+// initial bundle lean. Each is rendered inside the Suspense below.
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Intelligence = lazy(() => import("@/pages/Intelligence"));
+const Copilot = lazy(() => import("@/pages/Copilot"));
+const PortfolioRisk = lazy(() => import("@/pages/PortfolioRisk"));
+const Backtest = lazy(() => import("@/pages/Backtest"));
+const StockDetail = lazy(() => import("@/pages/StockDetail"));
+const ThesisNew = lazy(() => import("@/pages/ThesisNew"));
+const ThesisWorkspace = lazy(() => import("@/pages/ThesisWorkspace"));
+const ThesisTradeLab = lazy(() => import("@/pages/ThesisTradeLab"));
+const Auth = lazy(() => import("@/pages/Auth"));
+const PilotLeaderboard = lazy(() => import("@/pages/PilotLeaderboard"));
+const PilotPublicProfile = lazy(() => import("@/pages/PilotPublicProfile"));
+const Ledger = lazy(() => import("@/pages/Ledger"));
 import { Toaster } from "@/components/ui/sonner";
+import { Sparkles } from "lucide-react";
+
+function RouteFallback() {
+  return (
+    <div className="flex h-64 items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-b-primary" />
+    </div>
+  );
+}
 
 function ThesisRedirect() {
   const { thesisId } = useParams();
@@ -72,11 +83,47 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+class ChatErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch() {
+    this.props.onError?.();
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="fixed bottom-6 right-6 z-[999] flex items-center gap-2 px-5 py-3.5 rounded-full shadow-lg font-semibold text-sm"
+          style={{ background: 'var(--mf-accent)', color: 'var(--mf-accent-fg)' }}
+          title="Flux AI failed to load — click to reload"
+        >
+          <Sparkles className="w-5 h-5" />
+          <span className="hidden sm:inline">Reload Flux AI</span>
+        </button>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function AppRouter() {
   const location = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatWidth, setChatWidth] = useState(380);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  const [chatFailed, setChatFailed] = useState(false);
+
+  const openFluxChat = () => {
+    setChatFailed(false);
+    window.dispatchEvent(new Event("marketflux:open-terminal"));
+  };
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
@@ -110,6 +157,7 @@ function AppRouter() {
         >
           <TopNav />
           <main className="flex-1 overflow-y-auto flex flex-col relative w-full">
+            <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Core pages */}
               <Route path="/" element={<Dashboard />} />
@@ -143,17 +191,43 @@ function AppRouter() {
               <Route path="/pilot/leaderboard" element={<Navigate to="/leaderboard" replace />} />
               <Route path="/pilot/p/:slug" element={<PilotProfileRedirect />} />
             </Routes>
+            </Suspense>
           </main>
         </div>
         <Suspense fallback={null}>
-        <AIChatbot
-          isChatOpen={isChatOpen}
-          setIsChatOpen={setIsChatOpen}
-          chatWidth={chatWidth}
-          setChatWidth={setChatWidth}
-          isDesktop={isDesktop}
-        />
+          <ChatErrorBoundary onError={() => setChatFailed(true)}>
+            {!chatFailed && (
+              <AIChatbot
+                isChatOpen={isChatOpen}
+                setIsChatOpen={setIsChatOpen}
+                chatWidth={chatWidth}
+                setChatWidth={setChatWidth}
+                isDesktop={isDesktop}
+              />
+            )}
+          </ChatErrorBoundary>
         </Suspense>
+        {/* Global Flux AI floating action button — lives outside the lazy
+            chatbot chunk so it always renders, even if the chunk fails to
+            load (stale deploy). Dispatches the same window event the drawer
+            listens for. */}
+        {!isChatOpen && (
+          <button
+            type="button"
+            onClick={openFluxChat}
+            data-testid="fluxai-fab"
+            className="fixed bottom-6 right-6 z-[999] flex items-center justify-center gap-2 px-5 py-3.5 rounded-full shadow-lg hover:shadow-primary/30 hover:scale-105 transition-all duration-300 font-semibold"
+            style={{
+              background: 'var(--mf-accent, #E3B85F)',
+              color: 'var(--mf-accent-fg, #1a1409)',
+              boxShadow: '0 0 0 1px var(--mf-accent-border, rgba(227,184,95,0.35))',
+            }}
+            title="Ask Flux AI"
+          >
+            <Sparkles className="w-5 h-5" />
+            <span className="text-sm hidden sm:inline">Flux AI</span>
+          </button>
+        )}
         <ScanlineOverlay />
         <Toaster position="top-right" />
       </div>

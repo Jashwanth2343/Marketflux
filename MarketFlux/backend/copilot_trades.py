@@ -68,6 +68,10 @@ async def execute_pending(db, user_id: str, pid: str) -> Dict[str, Any]:
     "executing" as a mutex, preventing double-execution on rapid double-clicks
     or concurrent tab approvals.
     """
+    from trading_halt import HALT_MESSAGE, is_trading_halted
+    if is_trading_halted():
+        return {"ok": False, "error": HALT_MESSAGE}
+
     # Staleness guard: reject proposals older than 1 hour.
     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
 

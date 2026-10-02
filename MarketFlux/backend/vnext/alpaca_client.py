@@ -634,6 +634,48 @@ def broker_close_position(account_id: str, symbol: str, qty: Optional[float] = N
         return None
 
 
+def broker_get_order(account_id: str, order_id: str) -> Optional[Dict[str, Any]]:
+    """Get a single order for a sub-account (broker mode). Scoped to the
+    sub-account so users can never see another user's orders."""
+    client = _get_broker_client()
+    if not client:
+        return None
+    try:
+        order = client.get_order_for_account_by_id(account_id=account_id, order_id=order_id)
+        return _serialize_order(order)
+    except Exception as exc:
+        logger.error(f"Broker get_order failed for {account_id}: {exc}")
+        return None
+
+
+def broker_cancel_all_orders(account_id: str) -> List[Dict[str, Any]]:
+    """Cancel all open orders for a sub-account (broker mode). Scoped to the
+    sub-account — never touches other users' orders."""
+    client = _get_broker_client()
+    if not client:
+        return []
+    try:
+        responses = client.cancel_orders_for_account(account_id=account_id)
+        return [{"id": str(r.id), "status": str(r.status)} for r in (responses or [])]
+    except Exception as exc:
+        logger.error(f"Broker cancel_all_orders failed for {account_id}: {exc}")
+        return []
+
+
+def broker_close_all_positions(account_id: str) -> List[Dict[str, Any]]:
+    """Liquidate all positions for a sub-account (broker mode). Scoped to the
+    sub-account — never touches other users' positions."""
+    client = _get_broker_client()
+    if not client:
+        return []
+    try:
+        orders = client.close_all_positions_for_account(account_id=account_id, cancel_orders=True)
+        return [_serialize_order(o) for o in (orders or [])]
+    except Exception as exc:
+        logger.error(f"Broker close_all_positions failed for {account_id}: {exc}")
+        return []
+
+
 def broker_get_portfolio_history(
     account_id: str,
     period: str = "1M",

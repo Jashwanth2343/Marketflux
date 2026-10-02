@@ -95,10 +95,20 @@ async def delete_agent(db, user_id: str, agent_id: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Execution
 # ---------------------------------------------------------------------------
-async def _run_instruction(db, user_id: str, name: str, instruction: str,
+async def _run_instruction(db, user_id: str, agent_id: str, name: str, instruction: str,
                            model: Optional[str]) -> Dict[str, Any]:
     """Invoke the conversational agent autonomously and collect its outcome."""
-    from copilot_agent import run_copilot_agent
+    from copilot_agent import all_tool_names, run_copilot_agent
+
+    # Per-run session id: isolates each run's history so concurrent/overlapping
+    # runs never share (or leak into) each other's conversation state.
+    run_uuid = uuid.uuid4().hex[:12]
+    session_id = f"standing:{agent_id}:{run_uuid}"
+
+    # Autonomous runs get a restricted toolset: no arbitrary-code sandbox.
+    # (place_order etc. still pass through the mandatory compliance chokepoint
+    # and the global kill switch inside copilot_trading_tools.)
+    tools = [n for n in all_tool_names() if n != "run_python"]
 
     framed = (
         f"You are running as the scheduled autonomous agent \"{name}\". Execute this "
@@ -109,7 +119,7 @@ async def _run_instruction(db, user_id: str, name: str, instruction: str,
     try:
         async for chunk in run_copilot_agent(
             message=framed, history=[], db=db, user_id=user_id,
-            session_id=f"standing:{name}", model=model, confirm=False,
+            session_id=session_id, model=model, confirm=False, tools=tools,
         ):
             line = chunk.strip()
             if not line.startswith("data: "):
@@ -132,7 +142,7 @@ async def _run_instruction(db, user_id: str, name: str, instruction: str,
 async def run_agent(db, agent: Dict[str, Any]) -> Dict[str, Any]:
     """Run one standing agent now and record the outcome."""
     result = await _run_instruction(
-        db, agent["user_id"], agent.get("name", "agent"),
+        db, agent["user_id"], agent["id"], agent.get("name", "agent"),
         agent.get("instruction", ""), agent.get("model"),
     )
     now = _now()

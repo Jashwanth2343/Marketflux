@@ -1,10 +1,41 @@
 # MarketFlux - local/production compose
-# Supabase is the primary external data/auth layer. Optional legacy Mongo
-# fallback code may still exist in the backend, but compose does not start it.
-
-version: "3.9"
+#
+# `docker compose up --build` starts the full stack:
+#   backend  -> FastAPI on :8000
+#   frontend -> React on :3000
+#   mongo    -> required primary data layer (auth sessions, trades, portfolios,
+#               copilot/pilot state). The backend fails fast with a clear error
+#               if MONGO_URL is unset.
+#   redis    -> shared cache + rate-limiter backend (optional but recommended;
+#               the app degrades gracefully without it).
+#
+# Copy backend/.env.example to backend/.env and fill in API keys before the
+# first run. Compose provides the infrastructure URLs below; your .env only
+# needs the secrets (GEMINI_API_KEY, APCA_*, SUPABASE_*, ...).
 
 services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   backend:
     build:
       context: ./backend
@@ -16,6 +47,17 @@ services:
     environment:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost}
       - PORT=${PORT:-8000}
+      # Infrastructure wiring (override in .env only if you run these externally)
+      - MONGO_URL=mongodb://mongo:27017
+      - DB_NAME=${DB_NAME:-marketflux}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -30,8 +72,5 @@ services:
       - backend
     restart: unless-stopped
 
-# Optional: use local Redis if REDIS_HOST not set to external
-#  redis:
-#    image: redis:7-alpine
-#    ports:
-#      - "6379:6379"
+volumes:
+  mongo_data:

@@ -790,6 +790,40 @@ export default function CopilotAgent() {
         }).catch(() => { /* keep default */ });
     }, []);
 
+    // Hydrate staged (pending-approval) trades on mount so approvals survive
+    // a page refresh. Backend contract: GET /api/copilot/trades/pending ->
+    // { trades: [...] } staged trades for the current user.
+    useEffect(() => {
+        let cancelled = false;
+        api.get('/copilot/trades/pending').then(({ data }) => {
+            if (cancelled) return;
+            const staged = Array.isArray(data?.trades) ? data.trades : [];
+            if (staged.length === 0) return;
+            setMessages((prev) => {
+                const known = new Set();
+                prev.forEach((m) => (m.activity || []).forEach((a) => {
+                    if (a?.kind === 'trade' && a.proposal_id) known.add(a.proposal_id);
+                }));
+                const fresh = staged.filter((t) => t?.proposal_id && !known.has(t.proposal_id));
+                if (fresh.length === 0) return prev;
+                return [
+                    ...prev,
+                    {
+                        id: nextId(),
+                        role: 'assistant',
+                        content: '',
+                        activity: fresh.map((t) => ({ kind: 'trade', pending: true, ...t })),
+                        restored: true,
+                    },
+                ];
+            });
+            toast('Restored pending trade approvals', {
+                description: `${staged.length} staged trade${staged.length === 1 ? '' : 's'} waiting for your decision`,
+            });
+        }).catch(() => { /* endpoint may not exist yet — non-fatal */ });
+        return () => { cancelled = true; };
+    }, []);
+
     const onModelChange = useCallback((key) => {
         setModel(key);
         localStorage.setItem('copilot_model', key);
@@ -1002,7 +1036,7 @@ export default function CopilotAgent() {
                 }`}
             >
                 {confirm ? <ShieldCheck className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
-                {confirm ? 'Confirm trades' : 'Auto-execute'}
+                {confirm ? 'Confirm before trade' : 'Execute automatically'}
             </button>
             <div className="flex items-center gap-1.5 rounded-full border border-border bg-card py-1 pl-2.5 pr-1.5" title="Model">
                 <Cpu className="h-3.5 w-3.5 text-primary" />

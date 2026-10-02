@@ -6,10 +6,17 @@ Provides endpoints for orders, positions, portfolio history, and asset lookup.
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
+import uuid
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+
+from trading_halt import HALT_MESSAGE, is_trading_halted
+
+logger = logging.getLogger(__name__)
 
 from .alpaca_client import (
     cancel_all_orders,
@@ -28,10 +35,13 @@ from .alpaca_client import (
     submit_limit_order,
     submit_market_order,
     # Broker mode functions
+    broker_cancel_all_orders,
     broker_cancel_order,
+    broker_close_all_positions,
     broker_close_position,
     broker_create_trading_account,
     broker_get_account,
+    broker_get_order,
     broker_get_portfolio_history,
     broker_get_positions,
     broker_list_orders,
@@ -77,37 +87,94 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             raise HTTPException(503, "Alpaca Trading API is not configured. Set APCA_API_KEY_ID and APCA_API_SECRET_KEY.")
 
     async def _get_or_create_broker_account(user: dict) -> str:
-        """Broker mode only: get or create a per-user sub-account."""
+        """Broker mode only: get or create a per-user sub-account.
+
+        Creation is guarded by an atomic ``find_one_and_update`` claim so two
+        concurrent requests for the same user cannot create duplicate
+        sub-accounts (the old find-one -> create -> upsert had a TOCTOU race).
+        A claim left stale for >120s (e.g. a crashed request) may be stolen.
+        """
+        from pymongo import ReturnDocument
+
         user_id = user["user_id"]
-        user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-        account_id = (user_doc or {}).get("alpaca_account_id")
+
+        async def _current_account_id() -> Optional[str]:
+            doc = await db.users.find_one({"user_id": user_id}, {"_id": 0, "alpaca_account_id": 1})
+            return (doc or {}).get("alpaca_account_id")
+
+        account_id = await _current_account_id()
         if account_id:
             return account_id
 
-        given_name = user.get("name", "Paper").split()[0] if user.get("name") else "Paper"
-        family_name = (
-            user.get("name", "Trader").split()[-1]
-            if user.get("name") and len(user.get("name", "").split()) > 1
-            else "Trader"
-        )
-        email = user.get("email", f"{user_id}@marketflux.paper")
-
-        result = await asyncio.to_thread(
-            broker_create_trading_account,
-            given_name=given_name,
-            family_name=family_name,
-            email=email,
-        )
-        if not result:
-            raise HTTPException(503, "Failed to create Alpaca sub-account. Check Broker API credentials.")
-
-        account_id = result["account_id"]
+        # Ensure the user doc exists (atomic upsert on the unique user_id).
         await db.users.update_one(
-            {"user_id": user_id},
-            {"$set": {"alpaca_account_id": account_id}},
-            upsert=True,
+            {"user_id": user_id}, {"$setOnInsert": {"user_id": user_id}}, upsert=True
         )
-        return account_id
+
+        # Atomically claim the creation slot: exactly one concurrent requester
+        # wins; losers wait for the winner to finish.
+        claim_token = uuid.uuid4().hex
+        now = time.time()
+        claimed = await db.users.find_one_and_update(
+            {
+                "user_id": user_id,
+                "alpaca_account_id": {"$exists": False},
+                "$or": [
+                    {"alpaca_account_creating": {"$exists": False}},
+                    {"alpaca_account_creating_at": {"$lt": now - 120}},
+                ],
+            },
+            {"$set": {"alpaca_account_creating": claim_token, "alpaca_account_creating_at": now}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if claimed is None or claimed.get("alpaca_account_creating") != claim_token:
+            # Lost the race — poll for the winner's result instead of
+            # creating a second sub-account.
+            for _ in range(20):
+                await asyncio.sleep(0.5)
+                account_id = await _current_account_id()
+                if account_id:
+                    return account_id
+            raise HTTPException(503, "Sub-account creation in progress by another request; retry shortly.")
+
+        try:
+            given_name = user.get("name", "Paper").split()[0] if user.get("name") else "Paper"
+            family_name = (
+                user.get("name", "Trader").split()[-1]
+                if user.get("name") and len(user.get("name", "").split()) > 1
+                else "Trader"
+            )
+            email = user.get("email", f"{user_id}@marketflux.paper")
+
+            result = await asyncio.to_thread(
+                broker_create_trading_account,
+                given_name=given_name,
+                family_name=family_name,
+                email=email,
+            )
+            if not result:
+                raise HTTPException(503, "Failed to create Alpaca sub-account. Check Broker API credentials.")
+
+            account_id = result["account_id"]
+            await db.users.update_one(
+                {"user_id": user_id, "alpaca_account_creating": claim_token},
+                {
+                    "$set": {"alpaca_account_id": account_id},
+                    "$unset": {"alpaca_account_creating": "", "alpaca_account_creating_at": ""},
+                },
+            )
+            return account_id
+        finally:
+            # Release the claim if we failed before recording the account id,
+            # so a retry isn't stuck behind our own stale claim.
+            await db.users.update_one(
+                {
+                    "user_id": user_id,
+                    "alpaca_account_creating": claim_token,
+                    "alpaca_account_id": {"$exists": False},
+                },
+                {"$unset": {"alpaca_account_creating": "", "alpaca_account_creating_at": ""}},
+            )
 
     # ------------------------------------------------------------------
     # Health / config check
@@ -147,6 +214,8 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.post("/orders")
     async def alpaca_submit_order(request: Request, payload: AlpacaOrderRequest):
         _require_configured()
+        if is_trading_halted():
+            raise HTTPException(403, HALT_MESSAGE)
         user = await require_user(request)
 
         if is_broker_mode():
@@ -211,8 +280,14 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.get("/orders/{order_id}")
     async def alpaca_get_order(order_id: str, request: Request):
         _require_configured()
-        await require_user(request)
-        order = await asyncio.to_thread(get_order, order_id)
+        user = await require_user(request)
+        if is_broker_mode():
+            # Scoped to the caller's sub-account: users can never see
+            # another user's orders (previously used the shared account).
+            account_id = await _get_or_create_broker_account(user)
+            order = await asyncio.to_thread(broker_get_order, account_id, order_id)
+        else:
+            order = await asyncio.to_thread(get_order, order_id)
         if not order:
             raise HTTPException(404, "Order not found.")
         return {"item": order}
@@ -220,6 +295,8 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.delete("/orders/{order_id}")
     async def alpaca_cancel_order(order_id: str, request: Request):
         _require_configured()
+        if is_trading_halted():
+            raise HTTPException(403, HALT_MESSAGE)
         user = await require_user(request)
         if is_broker_mode():
             account_id = await _get_or_create_broker_account(user)
@@ -233,8 +310,16 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.delete("/orders")
     async def alpaca_cancel_all_orders(request: Request):
         _require_configured()
-        await require_user(request)
-        results = await asyncio.to_thread(cancel_all_orders)
+        if is_trading_halted():
+            raise HTTPException(403, HALT_MESSAGE)
+        user = await require_user(request)
+        if is_broker_mode():
+            # Scoped to the caller's sub-account (previously cancelled ALL
+            # users' orders via the shared account).
+            account_id = await _get_or_create_broker_account(user)
+            results = await asyncio.to_thread(broker_cancel_all_orders, account_id)
+        else:
+            results = await asyncio.to_thread(cancel_all_orders)
         return {"cancelled": results, "total": len(results)}
 
     # ------------------------------------------------------------------
@@ -255,6 +340,8 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.post("/positions/close")
     async def alpaca_close_position(request: Request, payload: AlpacaClosePositionRequest):
         _require_configured()
+        if is_trading_halted():
+            raise HTTPException(403, HALT_MESSAGE)
         user = await require_user(request)
         if is_broker_mode():
             account_id = await _get_or_create_broker_account(user)
@@ -268,8 +355,16 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.post("/positions/liquidate")
     async def alpaca_liquidate_all(request: Request):
         _require_configured()
-        await require_user(request)
-        results = await asyncio.to_thread(close_all_positions)
+        if is_trading_halted():
+            raise HTTPException(403, HALT_MESSAGE)
+        user = await require_user(request)
+        if is_broker_mode():
+            # Scoped to the caller's sub-account (previously liquidated the
+            # shared account, closing every user's positions).
+            account_id = await _get_or_create_broker_account(user)
+            results = await asyncio.to_thread(broker_close_all_positions, account_id)
+        else:
+            results = await asyncio.to_thread(close_all_positions)
         return {"closed": results, "total": len(results)}
 
     # ------------------------------------------------------------------

@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Optional
 
+import compliance_engine
+from trading_halt import HALT_MESSAGE, is_trading_halted
 from vnext import alpaca_client
 
 logger = logging.getLogger(__name__)
@@ -142,6 +145,75 @@ def get_portfolio_history(period: str = "1M", timeframe: str = "1D") -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Mandatory pre-trade compliance chokepoint (fail-closed)
+# ---------------------------------------------------------------------------
+
+def _mandatory_compliance_gate(
+    symbol: str,
+    side: str,
+    quantity: float,
+    order_type: str,
+    limit_price: float,
+    est_price: float,
+) -> Optional[dict]:
+    """Hard compliance gate for order execution.
+
+    Runs ``compliance_engine.pre_trade_check`` with fresh account/position data
+    on EVERY execution path — the agent loop, staged-trade approvals, and
+    standing agents — not just when the model chooses the advisory
+    ``compliance_precheck`` tool.
+
+    Returns None when the order may proceed, otherwise an error dict.
+    FAIL-CLOSED: if the check itself throws, the order is blocked rather than
+    waved through.
+    """
+    if is_trading_halted():
+        return _err(HALT_MESSAGE)
+    try:
+        acct = alpaca_client.get_account() or {}
+        raw_positions = alpaca_client.get_positions() or []
+        account = {
+            "equity": acct.get("equity"),
+            "cash": acct.get("cash"),
+            "buying_power": acct.get("buying_power"),
+        }
+        positions = [
+            {
+                "symbol": p.get("symbol"),
+                "qty": p.get("qty"),
+                "market_value": p.get("market_value"),
+                "unrealized_pl": p.get("unrealized_pl"),
+                "avg_entry_price": p.get("avg_entry_price"),
+            }
+            for p in raw_positions
+        ]
+        report = compliance_engine.pre_trade_check(
+            symbol=symbol,
+            side=side,
+            quantity=quantity,
+            est_price=est_price,
+            order_type=order_type,
+            limit_price=limit_price or 0.0,
+            account=account,
+            positions=positions,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("compliance chokepoint failed (fail-closed): %s", exc)
+        return _err(
+            f"Compliance check failed ({exc}); order blocked as a safety precaution.",
+            blocked_by_compliance=True,
+        )
+    if report.get("decision") == compliance_engine.BLOCK:
+        return _err(
+            f"Blocked by compliance: {report.get('summary')}",
+            blocked_by_compliance=True,
+            decision="BLOCK",
+            checks=report.get("checks"),
+        )
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Write tools (these actually execute)
 # ---------------------------------------------------------------------------
 
@@ -188,9 +260,13 @@ def place_order(
     if order_type not in ("market", "limit"):
         return _err("order_type must be 'market' or 'limit'.")
 
+    if is_trading_halted():
+        return _err(HALT_MESSAGE)
+
     if not alpaca_client.is_alpaca_configured():
         return _err("Alpaca is not configured; cannot place orders.")
 
+    gate_price: float
     if order_type == "limit":
         try:
             limit_price = float(limit_price)
@@ -206,10 +282,7 @@ def place_order(
                 notional=round(notional, 2),
                 cap=MAX_ORDER_NOTIONAL,
             )
-        order = alpaca_client.submit_limit_order(
-            symbol=symbol, qty=quantity, side=side,
-            limit_price=limit_price, time_in_force=time_in_force,
-        )
+        gate_price = limit_price
     else:
         current_price = _estimate_price(symbol)
         if current_price > 0:
@@ -221,6 +294,28 @@ def place_order(
                     notional=round(est_notional, 2),
                     cap=MAX_ORDER_NOTIONAL,
                 )
+        gate_price = current_price
+
+    # Mandatory compliance chokepoint (fail-closed). This is the hard gate:
+    # a BLOCK verdict stops the order here on every execution path, including
+    # staged-trade approvals and standing-agent runs.
+    gate_err = _mandatory_compliance_gate(
+        symbol=symbol,
+        side=side,
+        quantity=quantity,
+        order_type=order_type,
+        limit_price=limit_price if order_type == "limit" else 0.0,
+        est_price=gate_price,
+    )
+    if gate_err:
+        return gate_err
+
+    if order_type == "limit":
+        order = alpaca_client.submit_limit_order(
+            symbol=symbol, qty=quantity, side=side,
+            limit_price=limit_price, time_in_force=time_in_force,
+        )
+    else:
         order = alpaca_client.submit_market_order(
             symbol=symbol, qty=quantity, side=side, time_in_force=time_in_force,
         )
