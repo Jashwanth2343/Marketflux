@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import DOMPurify from 'dompurify';
-import { MessageSquare, X, Send, Zap, Lock, Loader2, Plus, History, ChevronLeft, ChevronDown, ChevronRight, Paperclip, TerminalSquare, Check } from 'lucide-react';
+import { MessageSquare, X, Send, Zap, Lock, Loader2, Plus, History, ChevronLeft, ChevronDown, ChevronRight, Paperclip, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import api, { API_BASE } from '@/lib/api';
@@ -625,17 +625,8 @@ export default function AIChatbot({ isChatOpen, setIsChatOpen, chatWidth, setCha
     <>
       <style>{CUSTOM_STYLES}</style>
 
-      {/* Floating button */}
-      {!isChatOpen && (
-        <button
-          data-testid="chatbot-toggle"
-          onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-6 right-6 z-[999] group flex items-center justify-center gap-2 px-5 py-3.5 bg-gradient-to-tr from-primary to-[#F4D078] text-primary-foreground font-semibold rounded-full shadow-lg hover:shadow-primary/30 hover:scale-105 transition-all duration-300"
-        >
-          <TerminalSquare className="w-5 h-5 fill-black/10" />
-          <span className="text-sm hidden sm:inline">Flux AI</span>
-        </button>
-      )}
+      {/* Floating open button lives in App.js (outside the lazy chunk) so it
+          always renders. See `fluxai-fab`. */}
 
       {/* Chat window */}
       {isChatOpen && (

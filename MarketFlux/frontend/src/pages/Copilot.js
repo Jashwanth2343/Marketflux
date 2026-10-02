@@ -15,7 +15,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 const CopilotAgent = lazy(() => import('@/components/copilot/CopilotAgent'));
 const StrategyTerminal = lazy(() => import('@/components/StrategyTerminal'));
 const StandingAgents = lazy(() => import('@/components/copilot/StandingAgents'));
+const PilotAutopilot = lazy(() => import('@/components/pilot/PilotAutopilot'));
 const AccountSummary = lazy(() => import('@/components/copilot/AccountSummary'));
+const OrderTicket = lazy(() => import('@/components/copilot/OrderTicket'));
 
 const tabs = [
   {
@@ -153,18 +155,27 @@ export default function Copilot() {
 
           <TabsContent value="proposals" className="mt-0">
             <Suspense fallback={<LoadingSpinner />}>
-              <StandingAgents />
+              <div className="space-y-10">
+                <PilotAutopilot />
+                <div>
+                  <div className="mb-3 text-sm font-semibold text-foreground">Standing agents</div>
+                  <StandingAgents />
+                </div>
+              </div>
             </Suspense>
           </TabsContent>
 
           <TabsContent value="portfolio" className="mt-0">
             <Suspense fallback={<LoadingSpinner />}>
-              <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 shadow-xl shadow-black/25 backdrop-blur">
-                <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <BriefcaseBusiness className="h-4 w-4 text-primary" />
-                  Paper Account
+              <div className="space-y-4">
+                <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/[0.025] p-5 shadow-xl shadow-black/25 backdrop-blur">
+                  <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <BriefcaseBusiness className="h-4 w-4 text-primary" />
+                    Paper Account
+                  </div>
+                  <AccountSummary source="copilot" />
                 </div>
-                <AccountSummary source="copilot" />
+                <OrderTicket />
               </div>
             </Suspense>
           </TabsContent>

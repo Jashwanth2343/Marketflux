@@ -86,7 +86,13 @@ def build_ledger_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
     @router.get("/stats")
     async def ledger_stats(request: Request):
         user_id = await _resolve_user_id(request)
-        return await ledger.get_stats(db, user_id)
+        try:
+            return await ledger.get_stats(db, user_id)
+        except Exception as exc:
+            # DB unreachable (or any backend failure): 503 with a clear
+            # message instead of a raw 500.
+            logger.error("ledger stats failed: %s", exc)
+            raise HTTPException(503, "Ledger database unavailable. Retry shortly.")
 
     @router.get("/audit/{thesis_id}")
     async def thesis_audit(thesis_id: str, request: Request):

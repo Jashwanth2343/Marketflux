@@ -237,44 +237,183 @@ function decodeStrategyUrl(encoded) {
     } catch { return null; }
 }
 
+// ─── DSL → backtrader Python compiler ─────────────────────────────────────────
+// Compiles the strategy JSON (indicators + entry/exit condition DSL) into a
+// runnable backtrader script. Operands may be indicator names, "close",
+// "volume", or numeric literals.
+function dslOperandPy(operand, generated, lineFor) {
+    if (typeof operand === 'number') return { expr: String(operand), ok: true };
+    if (operand === 'close') return { expr: 'self.data.close[0]', ok: true };
+    if (operand === 'volume') return { expr: 'self.data.volume[0]', ok: true };
+    if (typeof operand === 'string' && lineFor && lineFor[operand]) return { expr: `${lineFor[operand]}[0]`, ok: true };
+    if (typeof operand === 'string' && generated.has(operand)) return { expr: `self.${operand}[0]`, ok: true };
+    return { expr: 'None', ok: false, note: `operand "${operand}" has no generated indicator` };
+}
+
+function dslOperandPrevPy(operand, generated, lineFor) {
+    // previous-bar value, for crosses_* operators
+    const cur = dslOperandPy(operand, generated, lineFor);
+    if (!cur.ok) return cur;
+    if (typeof operand === 'number') return { expr: String(operand), ok: true };
+    if (operand === 'close') return { expr: 'self.data.close[-1]', ok: true };
+    if (operand === 'volume') return { expr: 'self.data.volume[-1]', ok: true };
+    if (typeof operand === 'string' && lineFor && lineFor[operand]) return { expr: `${lineFor[operand]}[-1]`, ok: true };
+    return { expr: `self.${operand}[-1]`, ok: true };
+}
+
+function dslCondPy(cond, generated, lineFor) {
+    // Returns { expr } or { skip, note } for unsupported shapes.
+    const op = Object.keys(cond || {})[0];
+    const args = cond?.[op];
+    const bin = (pyOp) => {
+        if (!Array.isArray(args) || args.length !== 2) return { skip: true, note: `malformed ${op}` };
+        const a = dslOperandPy(args[0], generated, lineFor);
+        const b = dslOperandPy(args[1], generated, lineFor);
+        if (!a.ok) return { skip: true, note: a.note };
+        if (!b.ok) return { skip: true, note: b.note };
+        return { expr: `${a.expr} ${pyOp} ${b.expr}` };
+    };
+    const cross = (above) => {
+        if (!Array.isArray(args) || args.length !== 2) return { skip: true, note: `malformed ${op}` };
+        const a0 = dslOperandPy(args[0], generated, lineFor);
+        const b0 = dslOperandPy(args[1], generated, lineFor);
+        const a1 = dslOperandPrevPy(args[0], generated, lineFor);
+        const b1 = dslOperandPrevPy(args[1], generated, lineFor);
+        if (!a0.ok) return { skip: true, note: a0.note };
+        if (!b0.ok) return { skip: true, note: b0.note };
+        if (!a1.ok) return { skip: true, note: a1.note };
+        if (!b1.ok) return { skip: true, note: b1.note };
+        const cmp = above ? '>' : '<';
+        const cmpPrev = above ? '<=' : '>=';
+        return { expr: `(${a0.expr} ${cmp} ${b0.expr} and ${a1.expr} ${cmpPrev} ${b1.expr})` };
+    };
+    switch (op) {
+        case 'lt': return bin('<');
+        case 'lte': return bin('<=');
+        case 'gt': return bin('>');
+        case 'gte': return bin('>=');
+        case 'eq': return bin('==');
+        case 'crosses_above': return cross(true);
+        case 'crosses_below': return cross(false);
+        case 'hold_days_gte': {
+            const n = Number(args);
+            if (!Number.isFinite(n)) return { skip: true, note: 'malformed hold_days_gte' };
+            return { expr: `(len(self) - self._entry_bar >= ${Math.round(n)})` };
+        }
+        default: return { skip: true, note: `unsupported operator "${op}"` };
+    }
+}
+
+function dslBlockPy(block, joiner, generated, lineFor, allowHoldDays) {
+    // block: { all: [...] } or { any: [...] }; joiner 'and'/'or'
+    const conds = block?.all || block?.any || [];
+    const parts = [];
+    const notes = [];
+    for (const c of conds) {
+        if (c && typeof c === 'object' && 'hold_days_gte' in c && !allowHoldDays) {
+            notes.push('# NOTE: hold_days_gte only applies to exits — skipped in entry');
+            continue;
+        }
+        const r = dslCondPy(c, generated, lineFor);
+        if (r.expr) parts.push(r.expr);
+        else notes.push(`# NOTE: skipped condition ${JSON.stringify(c)} — ${r.note}`);
+    }
+    return { expr: parts.join(` ${joiner} `), notes };
+}
+
+function pyDateArgs(iso) {
+    // "2024-01-09" -> "2024, 1, 9" (no leading zeros — invalid Python)
+    return iso.split('-').map((x) => String(Number(x))).join(', ');
+}
+
 function generatePythonCode(strategy, startDate, endDate, capital) {
-    const tickers = strategy.universe?.join("', '") || 'AAPL';
+    const firstTicker = (strategy.universe && strategy.universe[0]) || 'AAPL';
+    const multiTickerNote = (strategy.universe && strategy.universe.length > 1)
+        ? `# NOTE: this strategy's universe has ${strategy.universe.length} tickers, but the\n# Python export covers the first ticker only ('${firstTicker}'). Per-data\n# indicator logic for multi-ticker backtests is not generated — add feeds\n# manually if you need the full universe.\n`
+        : '';
+    // Safe Python class name: strip non-alphanumerics, never start with a digit.
+    const rawName = (strategy.name || 'MyStrategy').replace(/[^a-zA-Z0-9]/g, '') || 'MyStrategy';
+    const safeClassName = /^[0-9]/.test(rawName) ? `_${rawName}` : rawName;
+    const generated = new Set();
+    const lineFor = {}; // indicator name -> python accessor base (for shared-line indicators)
     const indLines = Object.entries(strategy.indicators || {}).map(([name, spec]) => {
-        if (spec.type === 'sma') return `        self.${name} = bt.indicators.SMA(self.data.close, period=${spec.period || 20})`;
-        if (spec.type === 'ema') return `        self.${name} = bt.indicators.EMA(self.data.close, period=${spec.period || 20})`;
-        if (spec.type === 'rsi') return `        self.${name} = bt.indicators.RSI(self.data.close, period=${spec.period || 14})`;
-        if (spec.type === 'macd') return `        self.${name} = bt.indicators.MACD(self.data.close, period_me1=${spec.fast || 12}, period_me2=${spec.slow || 26})`;
-        if (spec.type === 'atr') return `        self.${name} = bt.indicators.ATR(self.data, period=${spec.period || 14})`;
-        if (spec.type === 'bollinger_upper' || spec.type === 'bollinger_lower') return `        self.bb = bt.indicators.BollingerBands(self.data.close, period=${spec.period || 20}, devfactor=${spec.num_std || 2})`;
+        const add = (line) => { generated.add(name); return `        ${line}`; };
+        if (spec.type === 'sma') return add(`self.${name} = bt.indicators.SMA(self.data.close, period=${spec.period || 20})`);
+        if (spec.type === 'ema') return add(`self.${name} = bt.indicators.EMA(self.data.close, period=${spec.period || 20})`);
+        if (spec.type === 'rsi') return add(`self.${name} = bt.indicators.RSI(self.data.close, period=${spec.period || 14})`);
+        if (spec.type === 'macd') return add(`self.${name} = bt.indicators.MACD(self.data.close, period_me1=${spec.fast || 12}, period_me2=${spec.slow || 26})`);
+        if (spec.type === 'macd_signal') return add(`self.${name} = bt.indicators.MACD(self.data.close, period_me1=${spec.fast || 12}, period_me2=${spec.slow || 26}, period_signal=${spec.signal || 9}).signal`);
+        if (spec.type === 'atr') return add(`self.${name} = bt.indicators.ATR(self.data, period=${spec.period || 14})`);
+        if (spec.type === 'bollinger_upper' || spec.type === 'bollinger_lower') {
+            generated.add(name);
+            lineFor[name] = spec.type === 'bollinger_upper' ? 'self.bb.lines.top' : 'self.bb.lines.bot';
+            if (!generated.has('__bb__')) {
+                generated.add('__bb__');
+                return add(`self.bb = bt.indicators.BollingerBands(self.data.close, period=${spec.period || 20}, devfactor=${spec.num_std || 2})`);
+            }
+            return `        # ${name} shares the BollingerBands instance above`;
+        }
         return `        # self.${name} = ... (${spec.type} — implement manually)`;
     });
+
+    const entry = dslBlockPy(strategy.entry, 'and', generated, lineFor, false);
+    const exit = dslBlockPy(strategy.exit, 'or', generated, lineFor, true);
+
+    const stopPct = Number(strategy.stop_loss_pct);
+    const tpPct = Number(strategy.take_profit_pct);
+    const riskLines = [];
+    if (Number.isFinite(stopPct) && stopPct > 0) {
+        riskLines.push(`            pnl_pct = (self.data.close[0] - self.position.price) / self.position.price if self.position.price else 0`);
+        riskLines.push(`            if pnl_pct <= -${stopPct}:`);
+        riskLines.push(`                self.close()  # stop-loss`);
+        riskLines.push(`                return`);
+    }
+    if (Number.isFinite(tpPct) && tpPct > 0) {
+        if (riskLines.length === 0) {
+            riskLines.push(`            pnl_pct = (self.data.close[0] - self.position.price) / self.position.price if self.position.price else 0`);
+        }
+        riskLines.push(`            if pnl_pct >= ${tpPct}:`);
+        riskLines.push(`                self.close()  # take-profit`);
+        riskLines.push(`                return`);
+    }
+
+    const entryBody = entry.expr
+        ? [`            if ${entry.expr}:`, `                self.buy()`, `                self._entry_bar = len(self)`]
+        : [`            # no entry conditions defined — add conditions in the builder`, `            pass`];
+    const exitConds = exit.expr ? [`            if ${exit.expr}:`, `                self.close()`] : [];
+    const exitBody = [...riskLines, ...exitConds];
+    if (exitBody.length === 0) exitBody.push(`            pass  # no exit conditions defined`);
+
+    const notes = [...entry.notes, ...exit.notes].map((n) => `        ${n}`).join('\n');
+
     return `import backtrader as bt
 import datetime
 
-class ${(strategy.name || 'MyStrategy').replace(/[^a-zA-Z0-9]/g, '')}(bt.Strategy):
-    \"\"\"Auto-generated from MarketFlux Backtest Lab\"\"\"
+class ${safeClassName}(bt.Strategy):
+    """Auto-generated from MarketFlux Backtest Lab
+    Entry: all of the DSL entry conditions must hold.
+    Exit: any of the DSL exit conditions (or stop/take-profit) closes the position.
+"""
 
     def __init__(self):
 ${indLines.join('\n') || '        pass'}
+        self._entry_bar = 0
 
     def next(self):
-        # Entry / exit logic — adapt conditions from your DSL
-        if not self.position:
-            # TODO: implement entry conditions
-            pass
+${notes ? notes + '\n' : ''}        if not self.position:
+${entryBody.join('\n')}
         else:
-            # TODO: implement exit conditions
-            pass
+${exitBody.join('\n')}
 
 if __name__ == '__main__':
     cerebro = bt.Cerebro()
-    cerebro.addstrategy(${(strategy.name || 'MyStrategy').replace(/[^a-zA-Z0-9]/g, '')})
+    cerebro.addstrategy(${safeClassName})
 
-    for ticker in ['${tickers}']:
+${multiTickerNote}    for ticker in ['${firstTicker}']:
         data = bt.feeds.YahooFinanceData(
             dataname=ticker,
-            fromdate=datetime.datetime(${startDate.split('-').join(', ')}),
-            todate=datetime.datetime(${endDate.split('-').join(', ')}),
+            fromdate=datetime.datetime(${pyDateArgs(startDate)}),
+            todate=datetime.datetime(${pyDateArgs(endDate)}),
         )
         cerebro.adddata(data, name=ticker)
 
@@ -1568,6 +1707,18 @@ export default function Backtest() {
             <div className="min-h-screen bg-background p-4 md:p-6">
                 {/* Market Context Ribbon */}
                 <MarketContextRibbon />
+
+                {/* Honesty disclaimers — backtests are not promises */}
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        <span className="font-semibold text-foreground">Backtests are hypothetical.</span>
+                        {' '}Results use yfinance data (survivorship bias: delisted stocks are missing),
+                        assume fills at historical closes with no slippage modeling, and may suffer
+                        look-ahead bias if indicators peek at future bars. Treat strategies with fewer
+                        than 30 trades as statistically weak. Past performance does not predict future returns.
+                    </p>
+                </div>
 
                 {/* Page Header */}
                 <div className="mb-6 flex items-start justify-between">

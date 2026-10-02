@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, BackgroundTasks, UploadFile, File, Header
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -38,13 +38,23 @@ load_dotenv(ROOT_DIR / '.env')
 
 import certifi
 
-# MongoDB
-mongo_url = os.environ['MONGO_URL']
+# MongoDB — required: auth sessions, trades, portfolios, watchlists, and all
+# copilot/pilot state live here. Fail with an actionable message (not a bare
+# KeyError) when it is missing so deploy-from-docs doesn't crash cryptically.
+mongo_url = os.environ.get("MONGO_URL", "")
+db_name = os.environ.get("DB_NAME", "marketflux")
+if not mongo_url:
+    raise RuntimeError(
+        "MONGO_URL environment variable is not set. The MarketFlux backend requires "
+        "MongoDB for auth sessions, trades, portfolios, watchlists, and copilot state. "
+        "Set MONGO_URL (e.g. mongodb://127.0.0.1:27017) and optionally DB_NAME in "
+        "backend/.env — see backend/.env.example for the full list."
+    )
 if "mongodb+srv" in mongo_url:
     client = AsyncIOMotorClient(mongo_url, tls=True, tlsCAFile=certifi.where(), serverSelectionTimeoutMS=5000)
 else:
     client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
-db = client[os.environ['DB_NAME']]
+db = client[db_name]
 
 # JWT — required unless Supabase Auth is configured as primary
 _raw_jwt_secret = os.environ.get('JWT_SECRET') or os.environ.get('JWT_SECRET_KEY')
@@ -464,6 +474,7 @@ def is_market_open() -> bool:
 @api_router.get("/market/overview")
 async def market_overview(response: Response):
     cache_key = "market_overview"
+    stale_key = "market_overview:stale"
     cached = redis_cache_get(cache_key)
     if cached:
         response.headers["X-Cache"] = "HIT"
@@ -473,14 +484,26 @@ async def market_overview(response: Response):
             cached["as_of"] = datetime.now(timezone.utc).isoformat()
         return cached
     try:
-        data = await get_market_overview()
+        # Hard timeout: yfinance can hang for 20s+ on a dead network. Never
+        # block the request on a cold fetch; serve stale data instead.
+        data = await asyncio.wait_for(get_market_overview(), timeout=12.0)
         result = {"indices": data, "is_market_open": is_market_open(), "as_of": datetime.now(timezone.utc).isoformat()}
         redis_cache_set(cache_key, result, ttl=30)
+        redis_cache_set(stale_key, result, ttl=3600)  # 1h stale fallback
         response.headers["X-Cache"] = "MISS"
         return result
+    except asyncio.TimeoutError:
+        logger.warning("market/overview fetch timed out after 12s — serving stale/fallback")
     except Exception as e:
         logger.error(f"Market overview error: {e}")
-        return {"indices": {}, "is_market_open": is_market_open(), "as_of": datetime.now(timezone.utc).isoformat()}
+    stale = redis_cache_get(stale_key)
+    if stale:
+        response.headers["X-Cache"] = "STALE"
+        stale["is_market_open"] = is_market_open()
+        if "as_of" not in stale:
+            stale["as_of"] = datetime.now(timezone.utc).isoformat()
+        return stale
+    return {"indices": {}, "is_market_open": is_market_open(), "as_of": datetime.now(timezone.utc).isoformat(), "stale": True}
 
 @api_router.get("/market/movers")
 async def market_movers():
@@ -1730,34 +1753,83 @@ async def shutdown():
 
 @app.get("/api/health/db")
 async def health_db():
+    """DB connectivity probe. Pings run concurrently with short timeouts so a
+    dead backend never stalls the endpoint (previously ~5.5s sequential)."""
     result = {"postgres": {"connected": False}, "mongo": {"connected": False}, "redis": {"connected": False}}
-    try:
-        result["mongo"]["connected"] = await db.command("ping") is not None
-    except Exception:
-        pass
-    try:
-        from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
-        if is_pg_configured():
-            pool = await get_pg_pool()
+
+    async def _ping_mongo():
+        try:
+            ok = await asyncio.wait_for(db.command("ping"), timeout=2.0)
+            result["mongo"]["connected"] = ok is not None
+        except Exception:
+            pass
+
+    async def _ping_postgres():
+        try:
+            from vnext.fundos_pg_client import get_pg_pool, is_pg_configured
+            if not is_pg_configured():
+                return
+            pool = await asyncio.wait_for(get_pg_pool(), timeout=2.0)
             async with pool.acquire() as conn:
                 result["postgres"]["connected"] = True
-                tables = await conn.fetch(
+                tables = await asyncio.wait_for(conn.fetch(
                     "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('theses','strategy_proposals','paper_trades')"
-                )
+                ), timeout=2.0)
                 result["postgres"]["tables_ok"] = len(tables) == 3
-                vec = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')")
+                vec = await asyncio.wait_for(conn.fetchval(
+                    "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')"), timeout=2.0)
                 result["postgres"]["vector_ext"] = bool(vec)
-    except Exception:
-        pass
-    try:
-        from cache import _get_redis
-        client = _get_redis()
-        if client is not None:
-            client.ping()
-            result["redis"]["connected"] = True
-    except Exception:
-        pass
+        except Exception:
+            pass
+
+    async def _ping_redis():
+        try:
+            from cache import _get_redis
+            client = await asyncio.to_thread(_get_redis)
+            if client is not None:
+                await asyncio.to_thread(client.ping)
+                result["redis"]["connected"] = True
+        except Exception:
+            pass
+
+    await asyncio.gather(_ping_mongo(), _ping_postgres(), _ping_redis())
     return result
+
+
+class TradingHaltRequest(BaseModel):
+    halted: bool = Field(description="True to halt all trading, False to release the halt.")
+
+
+@api_router.post("/admin/trading-halt")
+async def admin_trading_halt(payload: TradingHaltRequest, x_admin_token: Optional[str] = Header(default=None)):
+    """Global trading kill switch (runtime toggle).
+
+    Gated by the X-Admin-Token shared secret, following the LEDGER_GRADE_TOKEN
+    pattern. Fail-closed: the endpoint is disabled (503) unless ADMIN_TOKEN is
+    set, and the header must match when it is. There is no unauthenticated
+    dev-mode carve-out — set a dummy ADMIN_TOKEN in your local .env instead.
+    TRADING_HALTED=1 env var also halts trading independently of this toggle.
+    """
+    from trading_halt import halt_status, set_trading_halted
+    expected = os.environ.get("ADMIN_TOKEN", "")
+    if not expected:
+        raise HTTPException(503, "ADMIN_TOKEN is not configured.")
+    if x_admin_token != expected:
+        raise HTTPException(401, "bad admin token")
+    halted = set_trading_halted(payload.halted)
+    return {"ok": True, **halt_status(), "requested": payload.halted, "effective_halted": halted}
+
+
+@api_router.get("/admin/trading-halt")
+async def admin_trading_halt_status(x_admin_token: Optional[str] = Header(default=None)):
+    """Read the current kill-switch state (same auth as the toggle)."""
+    from trading_halt import halt_status
+    expected = os.environ.get("ADMIN_TOKEN", "")
+    if not expected:
+        raise HTTPException(503, "ADMIN_TOKEN is not configured.")
+    if x_admin_token != expected:
+        raise HTTPException(401, "bad admin token")
+    return halt_status()
 
 app.include_router(api_router)
 

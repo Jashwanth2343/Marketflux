@@ -659,6 +659,10 @@ def build_pilot_router(db, get_current_user: Callable[[Request], Any]) -> APIRou
 async def _safe_execute(db, proposal_id: str, user_id: str) -> None:
     """Background task wrapper that swallows + logs exceptions."""
     try:
+        from trading_halt import is_trading_halted
+        if is_trading_halted():
+            logger.warning("pilot execute skipped for proposal %s: trading halted by kill switch", proposal_id)
+            return
         await execute_approved(db, proposal_id, user_id)
     except Exception as exc:
         logger.exception(f"pilot background execute failed for proposal {proposal_id}: {exc}")

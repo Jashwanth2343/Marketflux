@@ -15,6 +15,14 @@ Deploy MarketFlux as a React frontend plus FastAPI backend.
 ```env
 ALLOWED_ORIGINS=https://your-frontend.example.com,http://localhost:3000
 
+# Required: the server hard-fails at startup without these (see server.py).
+# NOTE: this contradicts the "Mongo is legacy/optional" framing elsewhere in
+# these docs — on this branch Mongo is the required primary data layer.
+# Reconciling the Supabase-vs-Mongo story is tracked as open work in
+# docs/HANDOVER-god-tier-hardening.md.
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=marketflux
+
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_KEY=your-service-role-key
@@ -33,6 +41,17 @@ NVIDIA_NIM_API_KEY=your-nvidia-key
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ```
+
+## Trading-safety controls (god-tier-hardening branch)
+
+| Variable | Purpose |
+|---|---|
+| `TRADING_HALTED=1` | Global kill switch: rejects every order path with 403. Also toggleable at runtime via `POST /api/admin/trading-halt`. |
+| `ADMIN_TOKEN` | Shared secret for the trading-halt admin endpoint (`X-Admin-Token` header). |
+| `COPILOT_CHAT_PER_MINUTE` | Per-minute rate limit on copilot chat (default 20; 429 + `Retry-After`). Redis-backed when `REDIS_URL` is set. |
+
+Compliance (`compliance_engine.pre_trade_check`) is a mandatory, fail-closed
+chokepoint inside every order execution path — not advisory.
 
 ## Required Frontend Environment
 

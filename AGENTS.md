@@ -23,6 +23,8 @@ Open the app at `http://localhost:3000`.
 
 ## Known Gotchas
 
+0. **Mongo is required at startup on this branch.** `server.py` raises `RuntimeError` at import if `MONGO_URL`/`DB_NAME` are unset — despite the "legacy/optional" framing above. See `docs/HANDOVER-god-tier-hardening.md` §2 for the open Supabase-vs-Mongo reconciliation work. Do not "fix" this unilaterally.
+
 1. **Use backend port 8000**: The frontend `.env` and `src/lib/api.js` default to `http://localhost:8000`. Do not start the backend on another port unless you also intentionally change the frontend env.
 
 2. **Use `MarketFlux/backend/venv`, not `.venv`**: The `venv` environment has the current backend dependencies such as `asyncpg`. The `.venv` directory is stale/incomplete and can fail during startup.

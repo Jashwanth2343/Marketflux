@@ -10,8 +10,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 import uuid
-from typing import Any, Callable, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -22,6 +24,84 @@ from copilot_agent import run_copilot_agent
 logger = logging.getLogger(__name__)
 
 _ANON_ID = "local-copilot"
+
+
+# ---------------------------------------------------------------------------
+# Per-minute rate limiter for copilot chat turns.
+#
+# Redis-backed sliding window when REDIS_URL is set (shared across replicas /
+# processes), otherwise an in-memory per-process token bucket. This sits in
+# front of the /chat/stream endpoint so one client can't burn the Gemini key
+# with bursts; the coarser daily-turn budget inside the endpoint is unchanged.
+# ---------------------------------------------------------------------------
+_rl_redis_client = None
+_rl_redis_failed = False
+_chat_buckets: Dict[str, List[float]] = {}
+
+
+def _get_rl_redis():
+    """Redis client for the rate limiter, or None when REDIS_URL is unset or
+    unreachable (falls back to in-memory buckets)."""
+    global _rl_redis_client, _rl_redis_failed
+    url = os.environ.get("REDIS_URL", "").strip()
+    if not url or _rl_redis_failed:
+        return None
+    if _rl_redis_client is None:
+        try:
+            import redis
+            client = redis.Redis.from_url(
+                url, socket_connect_timeout=1, socket_timeout=1, decode_responses=True
+            )
+            client.ping()
+            _rl_redis_client = client
+        except Exception as exc:
+            logger.warning("copilot rate limiter: Redis unavailable, using in-memory buckets: %s", exc)
+            _rl_redis_failed = True
+            return None
+    return _rl_redis_client
+
+
+def check_copilot_chat_rate_limit(user_id: str) -> None:
+    """Enforce COPILOT_CHAT_PER_MINUTE (default 20) sliding-window limit.
+
+    Raises HTTPException(429) with a Retry-After header when exceeded.
+    """
+    try:
+        limit = int(os.environ.get("COPILOT_CHAT_PER_MINUTE", "20") or 20)
+    except ValueError:
+        limit = 20
+    if limit <= 0:
+        return
+    window = 60.0
+    now = time.monotonic()
+    detail = f"Copilot chat rate limit exceeded ({limit}/min). Slow down and retry."
+
+    client = _get_rl_redis()
+    if client is not None:
+        key = f"mf:rl:copilot_chat:{user_id}"
+        try:
+            pipe = client.pipeline()
+            pipe.zremrangebyscore(key, 0, now - window)
+            pipe.zadd(key, {repr(now): now})
+            pipe.zcard(key)
+            pipe.expire(key, 65)
+            _, _, count, _ = pipe.execute()
+            if count > limit:
+                raise HTTPException(429, detail, headers={"Retry-After": "60"})
+            return
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("copilot rate limiter: Redis error, falling back to memory: %s", exc)
+
+    bucket = _chat_buckets.setdefault(user_id, [])
+    cutoff = now - window
+    while bucket and bucket[0] <= cutoff:
+        bucket.pop(0)
+    if len(bucket) >= limit:
+        retry_after = max(1, int(bucket[0] + window - now) + 1)
+        raise HTTPException(429, detail, headers={"Retry-After": str(retry_after)})
+    bucket.append(now)
 
 
 class CopilotChatRequest(BaseModel):
@@ -87,6 +167,8 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     async def copilot_chat_stream(payload: CopilotChatRequest, request: Request):
         message = "".join(c for c in payload.message if c.isprintable() or c in "\n\t\r")
         user_id = await _resolve_user_id_required(request)
+        # Per-minute burst guard (Redis-backed when REDIS_URL is set).
+        check_copilot_chat_rate_limit(user_id)
         # Enforce confirm mode for safety — autonomous mode is an opt-in
         # that requires an authenticated user whose identity can be audited.
         if not user_id or user_id == _ANON_ID:
@@ -253,6 +335,23 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         import copilot_standing
         user_id = await _resolve_user_id_required(request)
         return await copilot_standing.run_now(db, user_id, agent_id)
+
+    @router.get("/trades/pending")
+    async def copilot_pending_trades_list(request: Request):
+        """Staged (unapproved, unexpired) trade proposals for the current user.
+
+        Contract: {"trades": [...]} — each item is the staged proposal doc
+        (id, tool, args, preview, status, created_at). Proposals expire 1h
+        after creation; expired ones are omitted here.
+        """
+        import copilot_trades
+        user_id = await _resolve_user_id_required(request)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+        rows = await db[copilot_trades.COLLECTION].find(
+            {"user_id": user_id, "status": "pending", "created_at": {"$gte": cutoff}},
+            {"_id": 0},
+        ).sort("created_at", -1).to_list(100)
+        return {"trades": rows}
 
     @router.get("/trades")
     async def copilot_trades(request: Request, limit: int = 25):

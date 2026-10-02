@@ -259,6 +259,11 @@ _RESEARCH_MODE_TOOLS = [t for t in _ALL_TOOLS if t.__name__ not in trading.EXECU
 def _tools_for_mode(mode: str):
     return _RESEARCH_MODE_TOOLS if mode == "research" else _ALL_TOOLS
 
+
+def all_tool_names() -> List[str]:
+    """Public list of every registered copilot tool name (for allowlisting)."""
+    return [t.__name__ for t in _ALL_TOOLS]
+
 # name -> callable
 _TOOL_MAP: Dict[str, Any] = {fn.__name__: fn for fn in _ALL_TOOLS}
 # alias used by Gemini for the overview tool
@@ -822,6 +827,7 @@ async def run_copilot_agent(
     model: Optional[str] = None,
     confirm: bool = True,
     mode: str = "trade",
+    tools: Optional[List[str]] = None,
 ) -> AsyncGenerator[str, None]:
     """Run one turn of the trading copilot, streaming SSE events.
 
@@ -832,6 +838,10 @@ async def run_copilot_agent(
 
     Every SSE event includes an ``id:`` field (monotonically increasing per
     turn) so clients can use ``Last-Event-ID`` to detect dropped events.
+
+    tools: optional allowlist of tool ``__name__``s. When given, only those
+        tools are exposed to the model — used to restrict autonomous standing
+        agents (e.g. excluding the run_python sandbox).
     """
     seq: List[int] = [0]  # mutable counter shared with sub-generators
     # Insight/trade events from this turn, inspected at finalize by the
@@ -881,10 +891,14 @@ async def run_copilot_agent(
 
     holder: Dict[str, Any] = {"final_text": ""}
     try:
+        # Optional tool allowlist (e.g. standing agents exclude run_python).
+        # Applied at the schema level for both providers so the model can only
+        # ever request an allowed tool.
+        allowed = set(tools) if tools is not None else None
         if resolved.provider == "gemini":
-            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse, mode=mode)
+            sub = _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse, mode=mode, allowed_tools=allowed)
         else:
-            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse, mode=mode)
+            sub = _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm, sse_fn=sse, mode=mode, allowed_tools=allowed)
         async for ev in sub:
             yield ev
 
@@ -927,9 +941,12 @@ async def _finalize(db, user_id: str, session_id: str, message: str, final_text:
         logger.warning(f"conviction ledger auto-log failed: {exc}")
 
 
-async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None, mode="trade"):
+async def _run_gemini(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None, mode="trade", allowed_tools=None):
     """Native Gemini function-calling loop."""
-    model = _build_model(system_prompt, model_name=resolved.model_id, tools=_tools_for_mode(mode))
+    _tools = _tools_for_mode(mode)
+    if allowed_tools is not None:
+        _tools = [t for t in _tools if t.__name__ in allowed_tools]
+    model = _build_model(system_prompt, model_name=resolved.model_id, tools=_tools)
     gemini_history: List[Dict[str, Any]] = []
     for h in (history or [])[-8:]:
         msg, resp = h.get("message", ""), h.get("response", "")
@@ -988,7 +1005,7 @@ async def _run_gemini(resolved, system_prompt, history, context, message, db, us
     holder["final_text"] = final_text
 
 
-async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None, mode="trade"):
+async def _run_openai(resolved, system_prompt, history, context, message, db, user_id, holder, confirm=False, sse_fn=None, mode="trade", allowed_tools=None):
     """OpenAI-compatible tool-calling loop (OpenRouter / NVIDIA NIM)."""
     from openai import AsyncOpenAI
 
@@ -997,6 +1014,8 @@ async def _run_openai(resolved, system_prompt, history, context, message, db, us
     client = AsyncOpenAI(api_key=resolved.api_key, base_url=resolved.base_url,
                          default_headers=headers, timeout=120.0)
     tools = _openai_tool_schemas(mode)
+    if allowed_tools is not None:
+        tools = [s for s in tools if s["function"]["name"] in allowed_tools]
 
     messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     for h in (history or [])[-8:]:
