@@ -1805,19 +1805,17 @@ async def admin_trading_halt(payload: TradingHaltRequest, x_admin_token: Optiona
     """Global trading kill switch (runtime toggle).
 
     Gated by the X-Admin-Token shared secret, following the LEDGER_GRADE_TOKEN
-    pattern: if ADMIN_TOKEN is set the header must match; in production a
-    missing ADMIN_TOKEN disables the endpoint outright. Local/dev without the
-    env var allows manual use. TRADING_HALTED=1 env var also halts trading
-    independently of this toggle.
+    pattern. Fail-closed: the endpoint is disabled (503) unless ADMIN_TOKEN is
+    set, and the header must match when it is. There is no unauthenticated
+    dev-mode carve-out — set a dummy ADMIN_TOKEN in your local .env instead.
+    TRADING_HALTED=1 env var also halts trading independently of this toggle.
     """
     from trading_halt import halt_status, set_trading_halted
     expected = os.environ.get("ADMIN_TOKEN", "")
-    prod = os.environ.get("NODE_ENV", "").lower() == "production"
-    if expected:
-        if x_admin_token != expected:
-            raise HTTPException(401, "bad admin token")
-    elif prod:
+    if not expected:
         raise HTTPException(503, "ADMIN_TOKEN is not configured.")
+    if x_admin_token != expected:
+        raise HTTPException(401, "bad admin token")
     halted = set_trading_halted(payload.halted)
     return {"ok": True, **halt_status(), "requested": payload.halted, "effective_halted": halted}
 
@@ -1827,12 +1825,10 @@ async def admin_trading_halt_status(x_admin_token: Optional[str] = Header(defaul
     """Read the current kill-switch state (same auth as the toggle)."""
     from trading_halt import halt_status
     expected = os.environ.get("ADMIN_TOKEN", "")
-    prod = os.environ.get("NODE_ENV", "").lower() == "production"
-    if expected:
-        if x_admin_token != expected:
-            raise HTTPException(401, "bad admin token")
-    elif prod:
+    if not expected:
         raise HTTPException(503, "ADMIN_TOKEN is not configured.")
+    if x_admin_token != expected:
+        raise HTTPException(401, "bad admin token")
     return halt_status()
 
 app.include_router(api_router)

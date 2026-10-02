@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 
 from trading_halt import HALT_MESSAGE, is_trading_halted
 
+from copilot_trading_tools import _mandatory_compliance_gate
+
 logger = logging.getLogger(__name__)
 
 from .alpaca_client import (
@@ -218,8 +220,46 @@ def build_alpaca_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
             raise HTTPException(403, HALT_MESSAGE)
         user = await require_user(request)
 
+        # Mandatory compliance chokepoint (fail-closed): the manual order
+        # ticket goes through the same pre-trade checks as the copilot tool.
+        # In broker mode the checks run against the caller's sub-account.
+        gate_account = None
+        gate_positions = None
+        broker_account_id = None
         if is_broker_mode():
-            account_id = await _get_or_create_broker_account(user)
+            broker_account_id = await _get_or_create_broker_account(user)
+            raw_acct = await asyncio.to_thread(broker_get_account, broker_account_id) or {}
+            raw_pos = await asyncio.to_thread(broker_get_positions, broker_account_id) or []
+            gate_account = {
+                "equity": raw_acct.get("equity"),
+                "cash": raw_acct.get("cash"),
+                "buying_power": raw_acct.get("buying_power"),
+            }
+            gate_positions = [
+                {
+                    "symbol": p.get("symbol"),
+                    "qty": p.get("qty"),
+                    "market_value": p.get("market_value"),
+                    "unrealized_pl": p.get("unrealized_pl"),
+                    "avg_entry_price": p.get("avg_entry_price"),
+                }
+                for p in raw_pos
+            ]
+        gate_err = _mandatory_compliance_gate(
+            symbol=payload.symbol,
+            side=payload.side,
+            quantity=payload.qty,
+            order_type=payload.order_type,
+            limit_price=payload.limit_price or 0.0,
+            est_price=payload.limit_price or 0.0,
+            account=gate_account,
+            positions=gate_positions,
+        )
+        if gate_err:
+            raise HTTPException(403, gate_err.get("error", "Blocked by compliance."))
+
+        if is_broker_mode():
+            account_id = broker_account_id
             if payload.order_type == "limit":
                 if payload.limit_price is None or payload.limit_price <= 0:
                     raise HTTPException(422, "limit_price is required for limit orders.")

@@ -155,13 +155,19 @@ def _mandatory_compliance_gate(
     order_type: str,
     limit_price: float,
     est_price: float,
+    account: Optional[dict] = None,
+    positions: Optional[list] = None,
 ) -> Optional[dict]:
     """Hard compliance gate for order execution.
 
     Runs ``compliance_engine.pre_trade_check`` with fresh account/position data
-    on EVERY execution path — the agent loop, staged-trade approvals, and
-    standing agents — not just when the model chooses the advisory
-    ``compliance_precheck`` tool.
+    on EVERY execution path — the agent loop, staged-trade approvals, standing
+    agents, and the manual Alpaca REST order endpoints — not just when the
+    model chooses the advisory ``compliance_precheck`` tool.
+
+    ``account``/``positions`` may be supplied by callers that already hold
+    scoped data (e.g. broker-mode sub-accounts); when omitted they are fetched
+    for the default account.
 
     Returns None when the order may proceed, otherwise an error dict.
     FAIL-CLOSED: if the check itself throws, the order is blocked rather than
@@ -170,23 +176,24 @@ def _mandatory_compliance_gate(
     if is_trading_halted():
         return _err(HALT_MESSAGE)
     try:
-        acct = alpaca_client.get_account() or {}
-        raw_positions = alpaca_client.get_positions() or []
-        account = {
-            "equity": acct.get("equity"),
-            "cash": acct.get("cash"),
-            "buying_power": acct.get("buying_power"),
-        }
-        positions = [
-            {
-                "symbol": p.get("symbol"),
-                "qty": p.get("qty"),
-                "market_value": p.get("market_value"),
-                "unrealized_pl": p.get("unrealized_pl"),
-                "avg_entry_price": p.get("avg_entry_price"),
+        if account is None or positions is None:
+            acct = alpaca_client.get_account() or {}
+            raw_positions = alpaca_client.get_positions() or []
+            account = {
+                "equity": acct.get("equity"),
+                "cash": acct.get("cash"),
+                "buying_power": acct.get("buying_power"),
             }
-            for p in raw_positions
-        ]
+            positions = [
+                {
+                    "symbol": p.get("symbol"),
+                    "qty": p.get("qty"),
+                    "market_value": p.get("market_value"),
+                    "unrealized_pl": p.get("unrealized_pl"),
+                    "avg_entry_price": p.get("avg_entry_price"),
+                }
+                for p in raw_positions
+            ]
         report = compliance_engine.pre_trade_check(
             symbol=symbol,
             side=side,

@@ -327,7 +327,13 @@ function pyDateArgs(iso) {
 }
 
 function generatePythonCode(strategy, startDate, endDate, capital) {
-    const tickers = strategy.universe?.join("', '") || 'AAPL';
+    const firstTicker = (strategy.universe && strategy.universe[0]) || 'AAPL';
+    const multiTickerNote = (strategy.universe && strategy.universe.length > 1)
+        ? `# NOTE: this strategy's universe has ${strategy.universe.length} tickers, but the\n# Python export covers the first ticker only ('${firstTicker}'). Per-data\n# indicator logic for multi-ticker backtests is not generated — add feeds\n# manually if you need the full universe.\n`
+        : '';
+    // Safe Python class name: strip non-alphanumerics, never start with a digit.
+    const rawName = (strategy.name || 'MyStrategy').replace(/[^a-zA-Z0-9]/g, '') || 'MyStrategy';
+    const safeClassName = /^[0-9]/.test(rawName) ? `_${rawName}` : rawName;
     const generated = new Set();
     const lineFor = {}; // indicator name -> python accessor base (for shared-line indicators)
     const indLines = Object.entries(strategy.indicators || {}).map(([name, spec]) => {
@@ -383,7 +389,7 @@ function generatePythonCode(strategy, startDate, endDate, capital) {
     return `import backtrader as bt
 import datetime
 
-class ${(strategy.name || 'MyStrategy').replace(/[^a-zA-Z0-9]/g, '')}(bt.Strategy):
+class ${safeClassName}(bt.Strategy):
     """Auto-generated from MarketFlux Backtest Lab
     Entry: all of the DSL entry conditions must hold.
     Exit: any of the DSL exit conditions (or stop/take-profit) closes the position.
@@ -401,9 +407,9 @@ ${exitBody.join('\n')}
 
 if __name__ == '__main__':
     cerebro = bt.Cerebro()
-    cerebro.addstrategy(${(strategy.name || 'MyStrategy').replace(/[^a-zA-Z0-9]/g, '')})
+    cerebro.addstrategy(${safeClassName})
 
-    for ticker in ['${tickers}']:
+${multiTickerNote}    for ticker in ['${firstTicker}']:
         data = bt.feeds.YahooFinanceData(
             dataname=ticker,
             fromdate=datetime.datetime(${pyDateArgs(startDate)}),

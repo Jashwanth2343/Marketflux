@@ -147,3 +147,95 @@ class TestRateLimiter:
         router = self._fresh(monkeypatch, "0")
         for _ in range(10):
             router.check_copilot_chat_rate_limit("u1")  # no raise
+
+
+class TestAdminHaltAuth:
+    """The kill-switch admin endpoints must fail closed without ADMIN_TOKEN."""
+
+    def _server(self, monkeypatch):
+        # server.py hard-requires MONGO_URL/DB_NAME at import.
+        monkeypatch.setenv("MONGO_URL", "mongodb://127.0.0.1:27017")
+        monkeypatch.setenv("DB_NAME", "test")
+        import server
+
+        return server
+
+    def test_toggle_503_without_admin_token(self, monkeypatch):
+        server = self._server(monkeypatch)
+        monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        import asyncio
+
+        with pytest.raises(HTTPException) as excinfo:
+            asyncio.run(
+                server.admin_trading_halt(
+                    server.TradingHaltRequest(halted=True), x_admin_token=None
+                )
+            )
+        assert excinfo.value.status_code == 503
+
+    def test_status_503_without_admin_token(self, monkeypatch):
+        server = self._server(monkeypatch)
+        monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+        monkeypatch.delenv("NODE_ENV", raising=False)
+        import asyncio
+
+        with pytest.raises(HTTPException) as excinfo:
+            asyncio.run(server.admin_trading_halt_status(x_admin_token=None))
+        assert excinfo.value.status_code == 503
+
+    def test_toggle_401_with_wrong_token(self, monkeypatch):
+        server = self._server(monkeypatch)
+        monkeypatch.setenv("ADMIN_TOKEN", "correct-secret")
+        import asyncio
+
+        with pytest.raises(HTTPException) as excinfo:
+            asyncio.run(
+                server.admin_trading_halt(
+                    server.TradingHaltRequest(halted=True), x_admin_token="wrong"
+                )
+            )
+        assert excinfo.value.status_code == 401
+
+
+class TestComplianceGateScopedData:
+    """The gate must accept caller-supplied (broker-mode) account/positions
+    and use them instead of fetching the default account."""
+
+    def _no_fetch(self, monkeypatch):
+        def _must_not_fetch(*a, **k):
+            raise AssertionError("must not fetch default account when scoped data is given")
+
+        monkeypatch.setattr(alpaca_client, "get_account", _must_not_fetch)
+        monkeypatch.setattr(alpaca_client, "get_positions", _must_not_fetch)
+
+    def test_gate_passes_on_scoped_account(self, monkeypatch):
+        self._no_fetch(monkeypatch)
+        err = trading._mandatory_compliance_gate(
+            symbol="AAPL",
+            side="buy",
+            quantity=1,
+            order_type="market",
+            limit_price=0.0,
+            est_price=150.0,
+            account={"equity": "100000", "cash": "50000", "buying_power": "100000"},
+            positions=[],
+        )
+        assert err is None
+
+    def test_gate_blocks_on_scoped_account(self, monkeypatch):
+        # $15,000 notional vs $100 buying power -> buying_power BLOCK,
+        # evaluated against the SUPPLIED account, not the default one.
+        self._no_fetch(monkeypatch)
+        err = trading._mandatory_compliance_gate(
+            symbol="AAPL",
+            side="buy",
+            quantity=100,
+            order_type="market",
+            limit_price=0.0,
+            est_price=150.0,
+            account={"equity": "100000", "cash": "50000", "buying_power": "100"},
+            positions=[],
+        )
+        assert err is not None
+        assert err.get("blocked_by_compliance") is True
