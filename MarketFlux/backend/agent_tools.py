@@ -13,18 +13,12 @@ import logging
 import httpx
 import numpy as np
 from typing import Dict, List, Optional
-import diskcache
 from provider_router import ProviderRouter
+from ttl_cache import TTLCache
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Caching
-# Store in app-local .cache directory (not world-readable /tmp/) — M5
-# ---------------------------------------------------------------------------
-_CACHE_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache")
-os.makedirs(_CACHE_BASE, mode=0o700, exist_ok=True)
-_tool_cache = diskcache.Cache(os.path.join(_CACHE_BASE, "tool_cache"))
+_tool_cache = TTLCache()
 
 
 def _cache_get(key: str):

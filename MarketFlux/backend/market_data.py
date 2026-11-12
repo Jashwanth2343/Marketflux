@@ -2,18 +2,15 @@ import yfinance as yf
 import asyncio
 import logging
 import time
-from pathlib import Path
 from fastapi import HTTPException
-import diskcache
 from typing import Dict, List
+from ttl_cache import TTLCache
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-# Persistent disk cache — project-local .cache directory
-_CACHE_DIR = Path(__file__).parent / '.cache' / 'market_cache'
-_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-cache = diskcache.Cache(str(_CACHE_DIR))
+# Process-local TTL cache. Render's disk does not survive a restart.
+cache = TTLCache()
 CACHE_TTL = 180  # 3 minutes — keeps top gainers/losers fresh
 
 async def cache_get_async(key):

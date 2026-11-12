@@ -5,21 +5,16 @@ import logging
 import asyncio
 from typing import Dict, Optional, AsyncGenerator
 from datetime import datetime, timezone, timedelta
-import diskcache
 import yfinance as yf
+from ttl_cache import TTLCache
 
 import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Disk cache — valid ticker lookups are cached for 1 hour
-# Store in app-local .cache directory (not world-readable /tmp/) — M5
-# ---------------------------------------------------------------------------
-_CACHE_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache")
-os.makedirs(_CACHE_BASE, mode=0o700, exist_ok=True)
-_ticker_cache = diskcache.Cache(os.path.join(_CACHE_BASE, "ticker_cache"))
-_usage_cache = diskcache.Cache(os.path.join(_CACHE_BASE, "usage_cache"))
+# Process-local TTL caches. diskcache pickles to disk and has no patched release.
+_ticker_cache = TTLCache()
+_usage_cache = TTLCache()
 
 
 # We defer genai configuration to lazily use the env var

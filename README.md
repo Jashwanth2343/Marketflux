@@ -77,7 +77,7 @@ The copilot is a hand-rolled tool loop in `MarketFlux/backend/copilot_agent.py`.
 
 ## Tests
 
-`pytest` collects **141** tests. **112** pass without a running server. **29** integration tests skip unless `REACT_APP_BACKEND_URL` points at a live API. CI runs the full suite, Ruff, frontend ESLint, an import smoke test, and `yarn build`.
+`pytest` collects **142** tests. **113** pass without a running server. **29** integration tests skip unless `REACT_APP_BACKEND_URL` points at a live API. CI runs the full suite, Ruff, frontend ESLint, an import smoke test, and `yarn build`.
 
 ## Quick start
 
