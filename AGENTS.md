@@ -31,9 +31,9 @@ Open the app at `http://localhost:3000`.
 
 4. **Supabase is the primary auth/data layer**: Frontend auth uses `REACT_APP_SUPABASE_URL` and `REACT_APP_SUPABASE_ANON_KEY`. Backend vNext/FundOS data uses the DSN chain `SUPABASE_DB_URL` > `MARKETFLUX_VNEXT_DATABASE_URL` > `FUNDOS_DATABASE_URL`.
 
-5. **Legacy Mongo code still exists**: Do not reintroduce Mongo-first setup instructions. If Mongo fallback code is touched, keep it optional and non-blocking unless the feature explicitly still depends on it.
+5. **MongoDB is still required at startup**: Supabase is the primary auth and Postgres store, but copilot history, news, and other collections still use Mongo. `MONGO_URL` and `DB_NAME` must be set or the process raises a clear `RuntimeError`. Do not treat Mongo as optional.
 
-6. **HuggingFace models**: `sentence-transformers` may download/load models on first backend startup. The server should degrade gracefully if embeddings are unavailable.
+6. **Embeddings**: `sentence-transformers` is not in the default image (it pulls PyTorch). Install `requirements-ml.txt` for local embeddings. Otherwise the API uses Gemini embeddings when `GEMINI_API_KEY` is set, and semantic ranking turns off if neither is available.
 
 7. **NaN in market data**: `yfinance` can return NaN values that crash JSON serialization. Use the existing `sanitize_for_json` helper when adding market-data responses.
 
@@ -60,9 +60,9 @@ Without AI/broker keys, non-AI market pages can still render with degraded funct
 cd MarketFlux/frontend
 CI=true npx craco test --watchAll=false --passWithNoTests
 
-# Backend unit tests
+# Backend unit tests (full suite; 29 live-API tests skip without REACT_APP_BACKEND_URL)
 cd MarketFlux/backend
-./venv/bin/python -m pytest tests/test_pilot_smoke.py tests/test_thesis_router_unittest.py tests/test_thesis_backfill_unittest.py tests/test_policy_engine_unittest.py -v
+./venv/bin/python -m pytest -q
 
 # Frontend production-style compile with the dev CRACO config
 cd MarketFlux/frontend
@@ -71,4 +71,6 @@ CI=true npx craco build --config craco.config.dev.js
 
 ## Frontend Environment Variable
 
-Set `REACT_APP_BACKEND_URL=http://localhost:8000` when starting the frontend locally.
+Set `REACT_APP_BACKEND_URL=http://localhost:8000` when starting the frontend locally. Production builds fail if that variable is missing.
+
+Local copilot anonymous access requires `MARKETFLUX_ENV=development` (or `test`). Unset is treated as production. Public demos set `DEMO_MODE=true`.

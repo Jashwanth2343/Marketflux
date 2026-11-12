@@ -1,93 +1,77 @@
-# MarketFlux Deployment Guide
+# Deploy MarketFlux
 
-Deploy MarketFlux as a React frontend plus FastAPI backend.
+Public demo shape: React on Vercel, FastAPI on Render (free web service, `MarketFlux/backend/Dockerfile`), Supabase for auth and Postgres, MongoDB Atlas M0 for the collections that still use Mongo. Redis is optional.
 
-## Current Runtime
+The API process is production-safe when `MARKETFLUX_ENV` is unset: copilot routes require a logged-in user, localhost is not added to CORS, and `run_python` stays off. `render.yaml` sets `MARKETFLUX_ENV=production` and `DEMO_MODE=true` explicitly.
 
-- Frontend: React CRA build, served on `3000` locally
-- Backend: FastAPI, `8000` locally
-- Primary auth/data: Supabase Auth + Supabase Postgres / pgvector
-- Optional services: Redis cache, Alpaca paper trading, model provider APIs
-- Legacy compatibility: Mongo fallback/mirror code still exists in a few backend paths, but it is not the default deployment foundation.
+## Render (backend)
 
-## Required Backend Environment
+`render.yaml` at the repo root defines one Docker web service:
 
-```env
-ALLOWED_ORIGINS=https://your-frontend.example.com,http://localhost:3000
+- Dockerfile: `MarketFlux/backend/Dockerfile` (Python 3.12)
+- Health check: `GET /api/health`
+- Bind: `0.0.0.0:$PORT` (Render sets `PORT`)
 
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-role-key
-SUPABASE_DB_URL=postgresql://...
+In the Render dashboard, set the secrets marked `sync: false`. `DEMO_MODE`, `ENABLE_CODE_SANDBOX=false`, `DB_NAME`, and the copilot limits are already in the blueprint.
 
-GEMINI_API_KEY=your-gemini-key
+Required:
 
-APCA_API_KEY_ID=your-alpaca-paper-key
-APCA_API_SECRET_KEY=your-alpaca-paper-secret
+| Variable | Why |
+| --- | --- |
+| `MONGO_URL` | Copilot history, news, and other Mongo collections. The process exits with a clear error if this is missing. |
+| `DB_NAME` | Mongo database name. The blueprint defaults it to `marketflux`. |
+| `JWT_SECRET` | 32+ characters. Required if Supabase auth is not configured. |
+| `ALLOWED_ORIGINS` | The Vercel origin, for example `https://your-app.vercel.app`. No localhost default in production. |
+| `SUPABASE_URL` | Same project as the frontend. |
+| `SUPABASE_ANON_KEY` | Verifies user JWTs. |
+| `SUPABASE_SERVICE_KEY` | Server writes. Never ship this to the browser. |
+| `GEMINI_API_KEY` | Copilot, digests, screener. |
 
-# Optional model providers
-OPENROUTER_API_KEY=your-openrouter-key
-NVIDIA_NIM_API_KEY=your-nvidia-key
+Needed for trading and memory:
 
-# Optional cache
-REDIS_HOST=localhost
-REDIS_PORT=6379
-```
+| Variable | Why |
+| --- | --- |
+| `SUPABASE_DB_URL` | Postgres connection for pgvector memory and vNext tables. |
+| `APCA_API_KEY_ID` | Alpaca **paper** key. The client is constructed with `paper=True`. |
+| `APCA_API_SECRET_KEY` | Paired paper secret. |
+| `REDIS_URL` | Optional. Use `rediss://` for TLS. `REDIS_HOST` / `REDIS_PORT` are only a fallback when `REDIS_URL` is unset. |
 
-## Required Frontend Environment
+Optional: `OPENROUTER_API_KEY`, `NVIDIA_NIM_API_KEY`, `FINNHUB_KEY`, `FRED_API_KEY`, `ALPHA_VANTAGE_KEY`, `TAVILY_API_KEY`, `LEDGER_GRADE_TOKEN`, `COPILOT_DAILY_TURNS`, `COPILOT_RATE_LIMIT`.
 
-```env
-REACT_APP_BACKEND_URL=https://your-backend.example.com
-REACT_APP_SUPABASE_URL=https://your-project.supabase.co
-REACT_APP_SUPABASE_ANON_KEY=your-anon-key
-```
+Do not set `ENABLE_CODE_SANDBOX=true` on this service. Demo mode forces the Python tool off even if you do.
 
-For local frontend development, use:
+## Vercel (frontend)
 
-```env
-REACT_APP_BACKEND_URL=http://localhost:8000
-```
+Root `vercel.json` installs and builds `MarketFlux/frontend` and rewrites every path to `index.html`. Security headers match `MarketFlux/frontend/nginx.conf`, with Google Fonts and TradingView allowed so the ticker tape and charts still load.
 
-## Docker Compose
+Set these before the first production build. `yarn build` fails if `REACT_APP_BACKEND_URL` is empty. `frontend/.env.production` sets `GENERATE_SOURCEMAP=false`.
 
-```bash
-cd MarketFlux
-cp .env.example .env
-cp backend/.env.example backend/.env
-docker compose up --build
-```
+| Variable | Why |
+| --- | --- |
+| `REACT_APP_BACKEND_URL` | Render URL, no trailing slash. Example: `https://marketflux-api.onrender.com` |
+| `REACT_APP_SUPABASE_URL` | Same project as the backend. |
+| `REACT_APP_SUPABASE_ANON_KEY` | Public anon key. RLS is what keeps table data private. |
+| `REACT_APP_DEMO_MODE` | `true` shows the paper-trading banner immediately. The API `demo_mode` flag also turns the banner on. |
 
-Local URLs:
+If you would rather set the Vercel root directory to `MarketFlux/frontend`, the same env vars apply and the output directory is `build`. The repo-root `vercel.json` is the path that works without changing the project root.
 
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:8000`
+## Supabase
 
-## Render Backend
+Apply every file in `supabase/migrations/` in filename order (SQL editor or `supabase db push`). That creates the vNext tables, pilot tables, ledger tables, and row level security.
 
-1. Create a Render Web Service.
-2. Root directory: `MarketFlux/backend`.
-3. Build command: `pip install -r requirements.txt`.
-4. Start command: `uvicorn server:app --host 0.0.0.0 --port $PORT`.
-5. Set the backend environment variables above.
+The anon key can authenticate users. It cannot read another user's rows, and it cannot read service-only tables (checkpoints, filings corpus, daily closes). The API uses the service role for those writes.
 
-## Vercel / Static Frontend
+Google sign-in is `supabase.auth.signInWithOAuth({ provider: 'google' })`. Enable the Google provider in the Supabase dashboard if you want that button. There is no Emergent login proxy.
 
-1. Root directory: `MarketFlux/frontend`.
-2. Framework: Create React App.
-3. Build command: `npm ci && npm run build` or `yarn install && yarn build`.
-4. Output directory: `build`.
-5. Set `REACT_APP_BACKEND_URL`, `REACT_APP_SUPABASE_URL`, and `REACT_APP_SUPABASE_ANON_KEY`.
+## MongoDB Atlas
 
-## Local Smoke Checks
+Create an M0 cluster, allow the Render egress IPs (or `0.0.0.0/0` for a demo, knowing what that means), and set `MONGO_URL` to the SRV string. `DB_NAME` must match the database you want the API to use.
 
-```bash
-cd MarketFlux/backend
-./venv/bin/python -m uvicorn server:app --reload --host 127.0.0.1 --port 8000
-```
+## Local Docker
 
-```bash
-cd MarketFlux/frontend
-BROWSER=none HOST=127.0.0.1 PORT=3000 REACT_APP_BACKEND_URL=http://localhost:8000 npx craco start --config craco.config.dev.js
-```
+`MarketFlux/docker-compose.yml` builds the API and the nginx frontend. Put the variables from `backend/.env.example` in `backend/.env`. Compose defaults `MARKETFLUX_ENV` to `development` so localhost CORS works. It does not start Mongo; point `MONGO_URL` at Atlas or a Mongo you run yourself.
 
-Then open `http://localhost:3000`.
+## Health
+
+- `GET /api/health` returns 200 when the process is up. Render uses this path. It does not ping Mongo.
+- `GET /api/health/db` reports Mongo, Postgres, and Redis connectivity for debugging.
