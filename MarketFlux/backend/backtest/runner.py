@@ -6,12 +6,12 @@ result serialization so callers (HTTP layer, scripts, agents) can stay light.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Dict, List, Mapping, Optional
 
 import pandas as pd
 
-from .costs import CostModel, cost_model_from_dict, DEFAULT_COSTS
+from .costs import cost_model_from_dict, DEFAULT_COSTS
 from .data import load_universe
 from .dsl import Strategy
 from .engine import BacktestResult, run_engine
@@ -157,7 +157,6 @@ def run_walk_forward(
         oos_fold_trades = [t for t in test_result_extended.trades if pd.Timestamp(t.exit_date) >= test_start_ts]
 
         train_result = run_engine(strat, data=train_data, initial_capital=initial_capital, costs=cost_model)
-        test_result = test_result_extended
 
         train_metrics = compute_metrics(train_result.equity_curve, [t.as_dict() for t in train_result.trades])
         test_metrics = compute_metrics(oos_equity, [t.as_dict() for t in oos_fold_trades])

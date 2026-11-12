@@ -15,6 +15,14 @@ jobs:
     defaults:
       run:
         working-directory: MarketFlux/backend
+    env:
+      MONGO_URL: mongodb://127.0.0.1:27017
+      DB_NAME: marketflux_test
+      JWT_SECRET: ci-jwt-secret-must-be-at-least-32-characters
+      MARKETFLUX_ENV: test
+      ALLOWED_ORIGINS: http://localhost:3000
+      ENABLE_CODE_SANDBOX: "false"
+      DEMO_MODE: "false"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,22 +35,28 @@ jobs:
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest
+          pip install -r requirements.txt pytest ruff
 
-      - name: Run backend unit tests
-        run: |
-          python -m pytest -q \
-            tests/test_thesis_router_unittest.py \
-            tests/test_policy_engine_unittest.py \
-            tests/test_thesis_backfill_unittest.py \
-            tests/test_conviction_ledger.py \
-            tests/test_sec_filings.py
+      - name: Ruff
+        run: ruff check .
+
+      - name: Backend unit tests
+        run: python -m pytest -q
+
+      - name: Import server with dummy env
+        run: python -c "import server; assert any(getattr(r, 'path', None) == '/api/health' for r in server.app.routes)"
 
   frontend-build:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: MarketFlux/frontend
+    env:
+      CI: "true"
+      REACT_APP_BACKEND_URL: https://marketflux-api.example.com
+      REACT_APP_SUPABASE_URL: https://example.supabase.co
+      REACT_APP_SUPABASE_ANON_KEY: public-anon-placeholder
+      GENERATE_SOURCEMAP: "false"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +70,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: yarn install --frozen-lockfile
+
+      - name: ESLint
+        run: yarn lint
 
       - name: Build frontend
         run: yarn build

@@ -16,9 +16,8 @@ The Director synthesises their outputs into a final structured memo.
 import asyncio
 import json
 import logging
-import re
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import AsyncGenerator, Dict
 
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold

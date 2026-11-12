@@ -216,8 +216,6 @@ def _get_ticker_data(symbol: str) -> Dict:
 
 
 def _get_chart_data(symbol: str, period: str = "1mo", interval: str = "1d") -> List[Dict]:
-    cache_key = f"chart_{symbol}_{period}_{interval}"
-
     try:
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period=period, interval=interval)
@@ -538,7 +536,6 @@ async def get_ticker_news(symbol: str) -> List[Dict]:
         return cached
 
     try:
-        loop = asyncio.get_running_loop()
         news_items = await _async_yf_call(lambda symbol: getattr(yf.Ticker(symbol), "news", []), symbol)
 
         articles = []
@@ -914,7 +911,7 @@ def _filter_universe(filters: Dict) -> List[Dict]:
             change_str = str(row.get("Change", "0")).replace("%", "")
             try:
                 change_pct = float(change_str)
-            except:
+            except (TypeError, ValueError):
                 change_pct = 0
                 
             price_str = str(row.get("Price", "0")).replace(',', '')

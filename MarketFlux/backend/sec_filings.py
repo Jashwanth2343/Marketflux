@@ -17,7 +17,7 @@ import difflib
 import html as html_lib
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import httpx
 

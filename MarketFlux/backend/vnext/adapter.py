@@ -4,7 +4,6 @@ from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, Request
 
-from fastapi import APIRouter, HTTPException, Request
 from market_data import get_market_overview, get_rich_stock_data
 from vnext.adapter_helpers import build_adapter_envelope, collect_regime_inputs
 from vnext.engines import (

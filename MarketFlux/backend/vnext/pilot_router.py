@@ -20,7 +20,6 @@ from .pilot import (
     Personality,
     PersonalityRiskPolicy,
     ProposalStatus,
-    SEED_PERSONALITIES,
     apply_user_override,
     delete_personality,
     expire_overdue_proposals,
@@ -36,7 +35,6 @@ from .pilot.pilot_engine import (
     propose_trades,
 )
 from .pilot.personality import (
-    PERSONALITY_COLLECTION,
     SYSTEM_USER_ID,
     clone_seed_for_user,
     ensure_seed_personalities,
@@ -44,7 +42,6 @@ from .pilot.personality import (
     set_visibility,
 )
 from .pilot.trade_proposals import (
-    AUDIT_COLLECTION,
     get_proposal,
     list_audit_events_for_proposal,
     list_proposals,

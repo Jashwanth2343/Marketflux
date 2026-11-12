@@ -252,7 +252,7 @@ function generatePythonCode(strategy, startDate, endDate, capital) {
 import datetime
 
 class ${(strategy.name || 'MyStrategy').replace(/[^a-zA-Z0-9]/g, '')}(bt.Strategy):
-    \"\"\"Auto-generated from MarketFlux Backtest Lab\"\"\"
+    """Auto-generated from MarketFlux Backtest Lab"""
 
     def __init__(self):
 ${indLines.join('\n') || '        pass'}

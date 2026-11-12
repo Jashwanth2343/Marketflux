@@ -14,7 +14,7 @@ Results are cached in MongoDB for instant retrieval during the day.
 import asyncio
 import logging
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -181,7 +181,6 @@ async def analyze_sector_rotation() -> Dict:
                         continue
 
                     closes = hist["Close"]
-                    cur = float(closes.iloc[-1])
                     ret_1m = float((closes.iloc[-1] - closes.iloc[-22]) / closes.iloc[-22] * 100) if len(closes) >= 22 else 0
                     ret_3m = float((closes.iloc[-1] - closes.iloc[0]) / closes.iloc[0] * 100)
 

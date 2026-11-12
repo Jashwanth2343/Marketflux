@@ -9,7 +9,6 @@ from .fundos_service import (
     build_fundos_overview,
     build_paper_portfolio,
     build_strategy_queue,
-    fundos_store_configured,
     search_fundos,
 )
 
@@ -143,7 +142,6 @@ def build_fundos_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
                 if item is None:
                     break
                 # Server sent events mapping
-                import json
                 yield f"data: {json.dumps(item)}\n\n"
                 
         from fastapi.responses import StreamingResponse

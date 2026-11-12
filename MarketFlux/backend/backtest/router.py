@@ -277,7 +277,6 @@ def build_backtest_router(get_current_user: Callable[[Request], Any]) -> APIRout
             returns = np.array(
                 [float(t.get("return_pct", 0.0)) for t in payload.trades]
             )
-            n_trades = len(returns)
             n_sims = max(1, min(payload.num_simulations, 10_000))
             capital = float(payload.initial_capital)
 
