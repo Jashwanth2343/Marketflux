@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import uuid
 from typing import Any, Callable, Optional
 
@@ -18,6 +17,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from copilot_agent import run_copilot_agent
+from rate_limit import copilot_rate_limit, limiter
+from runtime_config import copilot_daily_turn_cap, demo_mode, is_development
 
 logger = logging.getLogger(__name__)
 
@@ -52,25 +53,27 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
 
     async def _resolve_user_id(request: Request) -> str:
         user = await get_current_user(request)
-        return user["user_id"] if user else _ANON_ID
-
-    async def _resolve_user_id_required(request: Request) -> str:
-        """Resolve the user id for write endpoints (chat/stream, trade approve,
-        agents CRUD).
-
-        In PRODUCTION this requires a verified user — anonymous callers must not
-        share the 'local-copilot' namespace and approve each other's staged
-        trades. In local/dev (NODE_ENV != 'production') we fall back to the shared
-        anon id so a missing/expired session never fully bricks the copilot;
-        anonymous turns are forced into safe confirm-before-trade mode by the
-        chat endpoint regardless.
-        """
-        user = await get_current_user(request)
         if user:
             return user["user_id"]
-        if os.environ.get("NODE_ENV", "").lower() == "production":
-            raise HTTPException(401, "Authentication required for this endpoint.")
-        return _ANON_ID
+        if is_development():
+            return _ANON_ID
+        raise HTTPException(401, "Authentication required for this endpoint.")
+
+    async def _resolve_user_id_required(request: Request) -> str:
+        """Resolve the user id for write endpoints.
+
+        Anonymous fallback exists only when MARKETFLUX_ENV is development or
+        test. An unset environment (the Render default) requires a real user so
+        visitors cannot share the local-copilot namespace.
+        """
+        return await _resolve_user_id(request)
+
+    def _reject_demo_agents() -> None:
+        if demo_mode():
+            raise HTTPException(
+                403,
+                "Standing agents are disabled in demo mode. Trades stay confirm-before-execute on the shared paper account.",
+            )
 
     @router.get("/status")
     async def copilot_status():
@@ -79,23 +82,26 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
             "ok": True,
             "service": "trading-copilot",
             "paper_only": True,
+            "demo_mode": demo_mode(),
+            "confirm_required": demo_mode(),
+            "standing_agents": not demo_mode(),
             "alpaca_configured": is_alpaca_configured(),
             "disclaimer": "Paper trading only. Educational simulation, not investment advice.",
         }
 
     @router.post("/chat/stream")
+    @limiter.limit(copilot_rate_limit())
     async def copilot_chat_stream(payload: CopilotChatRequest, request: Request):
         message = "".join(c for c in payload.message if c.isprintable() or c in "\n\t\r")
         user_id = await _resolve_user_id_required(request)
-        # Enforce confirm mode for safety — autonomous mode is an opt-in
-        # that requires an authenticated user whose identity can be audited.
-        if not user_id or user_id == _ANON_ID:
+        # Demo mode and anonymous local use cannot turn on auto-execute.
+        if demo_mode() or user_id == _ANON_ID:
             payload = payload.model_copy(update={"confirm": True})
         session_id = payload.session_id or str(uuid.uuid4())
 
         # Per-user daily LLM budget (lean-v1 cost guardrail). One copilot turn
         # fans out to many model calls, so the cap is on turns, not tokens.
-        daily_cap = int(os.environ.get("COPILOT_DAILY_TURNS", "50") or 50)
+        daily_cap = copilot_daily_turn_cap()
         if daily_cap > 0:
             from datetime import datetime, timezone
             midnight = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -174,6 +180,7 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
         return await copilot_enrich.enrich_positions()
 
     @router.post("/trades/{pid}/approve")
+    @limiter.limit(copilot_rate_limit())
     async def copilot_trade_approve(pid: str, request: Request):
         """Execute a staged trade after explicit user approval (confirm mode)."""
         import copilot_trades
@@ -220,6 +227,7 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
     # ------------------------------------------------------------------
     @router.get("/agents")
     async def standing_list(request: Request):
+        _reject_demo_agents()
         import copilot_standing
         user_id = await _resolve_user_id(request)
         return {"items": await copilot_standing.list_agents(db, user_id),
@@ -227,6 +235,7 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
 
     @router.post("/agents")
     async def standing_create(payload: StandingAgentCreate, request: Request):
+        _reject_demo_agents()
         import copilot_standing
         user_id = await _resolve_user_id_required(request)
         res = await copilot_standing.create_agent(
@@ -238,18 +247,22 @@ def build_copilot_router(db, get_current_user: Callable[[Request], Any]) -> APIR
 
     @router.put("/agents/{agent_id}")
     async def standing_update(agent_id: str, payload: StandingAgentUpdate, request: Request):
+        _reject_demo_agents()
         import copilot_standing
         user_id = await _resolve_user_id_required(request)
         return await copilot_standing.update_agent(db, user_id, agent_id, payload.model_dump(exclude_none=True))
 
     @router.delete("/agents/{agent_id}")
     async def standing_delete(agent_id: str, request: Request):
+        _reject_demo_agents()
         import copilot_standing
         user_id = await _resolve_user_id_required(request)
         return await copilot_standing.delete_agent(db, user_id, agent_id)
 
     @router.post("/agents/{agent_id}/run")
+    @limiter.limit(copilot_rate_limit())
     async def standing_run_now(agent_id: str, request: Request):
+        _reject_demo_agents()
         import copilot_standing
         user_id = await _resolve_user_id_required(request)
         return await copilot_standing.run_now(db, user_id, agent_id)

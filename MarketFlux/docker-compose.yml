@@ -14,6 +14,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      - MARKETFLUX_ENV=${MARKETFLUX_ENV:-development}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost}
       - PORT=${PORT:-8000}
     restart: unless-stopped
@@ -30,7 +31,7 @@ services:
       - backend
     restart: unless-stopped
 
-# Optional: use local Redis if REDIS_HOST not set to external
+# Optional: set REDIS_URL (rediss:// for TLS) to enable the cache.
 #  redis:
 #    image: redis:7-alpine
 #    ports:

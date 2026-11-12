@@ -47,7 +47,17 @@ BLOCKED_NAMES = {
 # can reach without an explicit import statement.
 BLOCKED_ATTRS = {
     "os", "sys", "subprocess", "nt", "posix", "distutils",
-    "system", "popen", "fork", "spawn",
+    "system", "popen", "fork", "spawn", "io", "npyio", "ctypeslib",
+    # pandas / numpy file I/O. These are methods, not imports, so an import
+    # allowlist does not stop pd.read_csv or np.save from reading the disk.
+    "read_csv", "read_excel", "read_json", "read_parquet", "read_pickle",
+    "read_html", "read_sql", "read_sql_query", "read_sql_table", "read_table",
+    "read_fwf", "read_clipboard", "read_feather", "read_hdf", "read_xml",
+    "read_orc", "read_sas", "read_spss", "read_stata",
+    "to_csv", "to_pickle", "to_json", "to_excel", "to_parquet", "to_sql",
+    "to_html", "to_feather", "to_hdf",
+    "load", "save", "savez", "savez_compressed", "loadtxt", "savetxt",
+    "genfromtxt", "fromfile", "tofile", "memmap", "DataSource",
 }
 
 TIMEOUT_SECONDS = 12
@@ -126,6 +136,18 @@ def run_python(code: str) -> dict:
     Args:
         code: Python source to execute. Print what you want returned.
     """
+    from runtime_config import code_sandbox_enabled
+
+    if not code_sandbox_enabled():
+        return {
+            "ok": False,
+            "error": (
+                "Python execution is disabled. It can read server files through "
+                "pandas and numpy, so it stays off unless ENABLE_CODE_SANDBOX=true "
+                "on a private host. DEMO_MODE forces it off."
+            ),
+        }
+
     if not code or not code.strip():
         return {"ok": False, "error": "No code provided."}
 

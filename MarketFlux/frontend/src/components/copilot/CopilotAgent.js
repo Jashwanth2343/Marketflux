@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/api';
+import { useDemoMode } from '@/lib/demoMode';
 import api from '@/lib/api';
 import CopilotMemory from '@/components/copilot/CopilotMemory';
 import RichMarkdown from '@/components/RichMarkdown';
@@ -772,6 +773,7 @@ export default function CopilotAgent() {
     const [showMemory, setShowMemory] = useState(false);
     const [models, setModels] = useState([]);
     const [model, setModel] = useState(() => localStorage.getItem('copilot_model') || 'gemini-2.5-flash');
+    const demoMode = useDemoMode();
     const [confirm, setConfirm] = useState(() => localStorage.getItem('copilot_confirm') !== 'false');
     const [mode, setMode] = useState(() => localStorage.getItem('copilot_mode') === 'research' ? 'research' : 'trade');
     const sessionId = useRef(`copilot_${Date.now()}`);
@@ -795,11 +797,17 @@ export default function CopilotAgent() {
         localStorage.setItem('copilot_model', key);
     }, []);
 
+    useEffect(() => {
+        if (demoMode) setConfirm(true);
+    }, [demoMode]);
+
     const toggleConfirm = useCallback(() => {
+        if (demoMode) return;
         setConfirm((c) => { localStorage.setItem('copilot_confirm', String(!c)); return !c; });
+    }, [demoMode]);
+
     const toggleMode = () =>
         setMode((m) => { const n = m === 'trade' ? 'research' : 'trade'; localStorage.setItem('copilot_mode', n); return n; });
-    }, []);
 
     const patchTradeByProposal = useCallback((pid, updates) => {
         setMessages((prev) => prev.map((m) => {
@@ -875,7 +883,7 @@ export default function CopilotAgent() {
                 method: 'POST',
                 headers: authHeaders,
                 credentials: 'include',
-                body: JSON.stringify({ message: msg, session_id: sessionId.current, model, confirm, mode }),
+                body: JSON.stringify({ message: msg, session_id: sessionId.current, model, confirm: demoMode || confirm, mode }),
                 signal: controller.signal,
             });
             if (!res.ok || !res.body) throw new Error(`Request failed (${res.status})`);
@@ -970,7 +978,7 @@ export default function CopilotAgent() {
             setLoading(false);
             abortRef.current = null;
         }
-    }, [input, loading, model, confirm, mode, patchLastAssistant, session?.access_token]);
+    }, [input, loading, model, confirm, demoMode, mode, patchLastAssistant, session?.access_token]);
 
     const stop = () => { abortRef.current?.abort(); abortRef.current = null; setLoading(false); patchLastAssistant((m) => ({ ...m, streaming: false })); };
 
@@ -995,7 +1003,12 @@ export default function CopilotAgent() {
             </button>
             <button
                 onClick={toggleConfirm}
-                title={confirm ? 'Confirm before trade: every trade is staged for your one-click approval before it hits the broker.' : 'Execute automatically: the agent places paper trades without asking.'}
+                disabled={demoMode}
+                title={demoMode
+                    ? 'Demo mode keeps confirm-before-trade on. Automatic execution is disabled.'
+                    : confirm
+                        ? 'Confirm before trade: every trade is staged for your one-click approval before it hits the broker.'
+                        : 'Execute automatically: the agent places paper trades without asking.'}
                 className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
                     confirm ? 'border-primary/30 bg-primary/10 text-primary'
                         : 'border-amber-500/40 bg-amber-500/10 text-amber-500'
@@ -1069,8 +1082,11 @@ export default function CopilotAgent() {
                             confirm ? 'border-primary/25 bg-primary/[0.06] text-primary' : 'border-amber-500/35 bg-amber-500/[0.06] text-amber-500'
                         }`}>
                             {confirm ? <ShieldCheck className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
-                            {confirm ? 'Confirm-before-trade is on — nothing executes without your approval.'
-                                : 'Auto-execute is on — paper trades place without asking.'}
+                            {demoMode
+                                ? 'Paper trading, not investment advice. Confirm-before-trade stays on in this demo.'
+                                : confirm
+                                    ? 'Confirm-before-trade is on — nothing executes without your approval.'
+                                    : 'Auto-execute is on — paper trades place without asking.'}
                         </div>
                     </div>
 

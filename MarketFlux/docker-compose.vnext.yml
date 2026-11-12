@@ -12,7 +12,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/sql/vnext_pgvector_schema.sql:/docker-entrypoint-initdb.d/01-vnext-schema.sql:ro
+      - ./supabase/migrations/20260515000001_vnext_core.sql:/docker-entrypoint-initdb.d/01-vnext-schema.sql:ro
 
   redis:
     image: redis:7-alpine
