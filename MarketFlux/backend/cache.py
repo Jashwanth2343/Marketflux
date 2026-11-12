@@ -4,8 +4,9 @@ Wraps all Redis calls in try/except — if Redis is down, the app works normally
 """
 import redis
 import json
-import os
 import logging
+
+from redis_settings import build_redis_url, redis_client_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -21,15 +22,7 @@ def _get_redis():
         
     if _redis_client is None:
         try:
-            client = redis.Redis(
-                host=os.getenv("REDIS_HOST", "localhost"),
-                port=int(os.getenv("REDIS_PORT", 6379)),
-                password=os.getenv("REDIS_PASSWORD") or None,
-                db=0,
-                decode_responses=True,
-                socket_connect_timeout=1,
-                socket_timeout=1,
-            )
+            client = redis.Redis.from_url(build_redis_url("0"), **redis_client_kwargs())
             # Test connection
             client.ping()
             _redis_client = client

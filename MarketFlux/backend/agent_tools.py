@@ -7,8 +7,6 @@ market_data functions without rewriting the underlying logic.
 """
 
 import os
-# Disable HuggingFace Hub network calls when loading models
-os.environ["HF_HUB_OFFLINE"] = "1"
 
 import asyncio
 import logging
@@ -97,17 +95,59 @@ _news_store: Dict[str, dict] = {}  # key=url -> {title, summary, source, publish
 _NEWS_STORE_MAX = 2000  # L5: Cap to avoid unbounded memory growth
 
 
+class _GeminiEmbedder:
+    """Gemini embeddings used when sentence-transformers is not installed.
+
+    Avoids pulling PyTorch into the default image. Vectors stay in-process and
+    are only compared with other vectors from this same embedder.
+    """
+
+    def encode(self, texts, normalize_embeddings=True, show_progress_bar=False):
+        del show_progress_bar
+        from google import genai
+
+        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        response = client.models.embed_content(
+            model="gemini-embedding-001",
+            contents=list(texts),
+        )
+        vectors = []
+        for item in response.embeddings:
+            values = getattr(item, "values", None) or item["values"]
+            vectors.append(list(values))
+        arr = np.array(vectors, dtype=float)
+        if normalize_embeddings:
+            norms = np.linalg.norm(arr, axis=1, keepdims=True)
+            arr = arr / np.clip(norms, 1e-9, None)
+        return arr
+
+
 def _get_embedding_model():
-    """Lazy-load the sentence-transformer model."""
+    """Lazy-load local embeddings, then Gemini, then give up.
+
+    sentence-transformers is optional (requirements-ml.txt) because it installs
+    PyTorch. A missing model disables semantic ranking; news still returns.
+    """
     global _embedding_model
-    if _embedding_model is None:
-        try:
-            from sentence_transformers import SentenceTransformer
-            _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-            logger.info("Loaded sentence-transformers all-MiniLM-L6-v2 for semantic search")
-        except Exception as e:
-            logger.error(f"Failed to load sentence-transformer model: {e}")
-    return _embedding_model
+    if _embedding_model is False:
+        return None
+    if _embedding_model is not None:
+        return _embedding_model
+    try:
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        from sentence_transformers import SentenceTransformer
+        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        logger.info("Loaded sentence-transformers all-MiniLM-L6-v2 for semantic search")
+        return _embedding_model
+    except Exception as exc:
+        logger.info("sentence-transformers unavailable (%s); trying Gemini embeddings", exc)
+    if os.getenv("GEMINI_API_KEY"):
+        _embedding_model = _GeminiEmbedder()
+        logger.info("Using Gemini embeddings for semantic news search")
+        return _embedding_model
+    logger.info("No embedding backend available; semantic news ranking is off")
+    _embedding_model = False
+    return None
 
 
 def embed_and_store_news(symbol: str, articles: List[dict]):
@@ -829,11 +869,11 @@ async def get_market_overview_tool() -> dict:
                 "name": g.get("name"),
                 "change_percent": g.get("change_percent"),
             })
-        for l in (movers.get("losers") or [])[:5]:
+        for loser in (movers.get("losers") or [])[:5]:
             result["top_losers"].append({
-                "symbol": l.get("symbol"),
-                "name": l.get("name"),
-                "change_percent": l.get("change_percent"),
+                "symbol": loser.get("symbol"),
+                "name": loser.get("name"),
+                "change_percent": loser.get("change_percent"),
             })
 
         # Try to get fear & greed

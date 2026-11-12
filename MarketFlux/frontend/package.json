@@ -63,7 +63,8 @@
   },
   "scripts": {
     "start": "craco start",
-    "build": "craco build",
+    "build": "node scripts/require-backend-url.js && GENERATE_SOURCEMAP=false craco build",
+    "lint": "eslint src",
     "test": "craco test"
   },
   "browserslist": {

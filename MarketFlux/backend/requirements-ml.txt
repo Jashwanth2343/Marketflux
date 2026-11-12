@@ -1,0 +1,4 @@
+# Optional local embeddings. Not installed by the Dockerfile or CI.
+# sentence-transformers pulls PyTorch (about 2GB). The API uses Gemini
+# embeddings when GEMINI_API_KEY is set and this package is absent.
+sentence-transformers>=3.3.0

@@ -1,0 +1,49 @@
+# Render Blueprint for the MarketFlux API.
+# Frontend is deployed separately on Vercel (see vercel.json).
+# Secrets use sync: false so the dashboard prompts for them. Do not commit values.
+services:
+  - type: web
+    name: marketflux-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./MarketFlux/backend/Dockerfile
+    dockerContext: ./MarketFlux/backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: MARKETFLUX_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: ENABLE_CODE_SANDBOX
+        value: "false"
+      - key: DB_NAME
+        value: marketflux
+      - key: COPILOT_DAILY_TURNS
+        value: "20"
+      - key: COPILOT_RATE_LIMIT
+        value: "10/minute"
+      - key: MONGO_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: APCA_API_KEY_ID
+        sync: false
+      - key: APCA_API_SECRET_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: LEDGER_GRADE_TOKEN
+        sync: false

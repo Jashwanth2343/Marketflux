@@ -3,13 +3,12 @@ import re
 import json
 import logging
 import asyncio
-from typing import Dict, List, Optional, AsyncGenerator
+from typing import Dict, Optional, AsyncGenerator
 from datetime import datetime, timezone, timedelta
 import diskcache
 import yfinance as yf
 
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 logger = logging.getLogger(__name__)
 
@@ -72,19 +71,13 @@ def select_model_id(message: str, intent: Optional[str] = None, user_id: Optiona
     return selected_model
 
 def get_gemini_model(model_id: str = GEMINI_FLASH, system_instruction: Optional[str] = None):
-    configure_gemini()
-    
-    # Safety settings to avoid blocking financial analysis
-    safety_settings = {
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
-    
-    if system_instruction:
-        return genai.GenerativeModel(model_id, system_instruction=system_instruction, safety_settings=safety_settings)
-    return genai.GenerativeModel(model_id, safety_settings=safety_settings)
+    """Chat and one-shot calls use google-genai.
+
+    Tool-calling agents still call configure_gemini() and build a
+    google.generativeai.GenerativeModel themselves.
+    """
+    from gemini_client import GeminiChatModel
+    return GeminiChatModel(model_id, system_instruction)
 
 
 async def generate_summary(title: str, content: str) -> str:
