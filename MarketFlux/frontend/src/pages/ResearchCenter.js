@@ -68,7 +68,7 @@ function renderMarkdown(text) {
     .replace(/^### (.*$)/gm, '<h3 style="font-size:0.85rem;font-weight:700;margin:0.75rem 0 0.35rem;color:#E3B85F;font-family:monospace;">$1</h3>')
     .replace(/^## (.*$)/gm, '<h2 style="font-size:0.95rem;font-weight:800;margin:1rem 0 0.5rem;color:#9298A6;font-family:monospace;">$1</h2>')
     .replace(/^# (.*$)/gm, '<h1 style="font-size:1.1rem;font-weight:800;margin:1rem 0 0.5rem;color:#E3B85F;font-family:monospace;">$1</h1>')
-    .replace(/^\- (.*$)/gm, '<li style="margin-left:1rem;margin-bottom:0.15rem;">$1</li>')
+    .replace(/^- (.*$)/gm, '<li style="margin-left:1rem;margin-bottom:0.15rem;">$1</li>')
     .replace(/`([^`]+)`/g, '<code style="background:#1a1a1a;padding:0.1rem 0.25rem;font-family:monospace;font-size:0.8rem;">$1</code>')
     .replace(/\|(.+)\|/g, (match) => {
       const cells = match.split('|').filter(Boolean).map(c => c.trim());

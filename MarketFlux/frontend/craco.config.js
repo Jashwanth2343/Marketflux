@@ -2,14 +2,10 @@
 const path = require("path");
 require("dotenv").config();
 
-// Check if we're in development/preview mode (not production build)
-// Craco sets NODE_ENV=development for start, NODE_ENV=production for build
-const isDevServer = process.env.NODE_ENV !== "production";
-
-// Environment variable overrides
+// Visual-edit tooling from the old app builder is not loaded.
 const config = {
   enableHealthCheck: process.env.ENABLE_HEALTH_CHECK === "true",
-  enableVisualEdits: isDevServer && process.env.DISABLE_VISUAL_EDITS !== "true", // set DISABLE_VISUAL_EDITS=true to skip the babel-metadata-plugin
+  enableVisualEdits: false,
 };
 
 // Conditionally load visual edits modules only in dev mode

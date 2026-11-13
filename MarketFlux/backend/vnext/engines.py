@@ -774,7 +774,7 @@ def _build_strategy_lab(
             "strategy_id": "dispersion-catalyst-pairs",
             "name": "Dispersion Catalyst Pairs",
             "archetype": "event-driven relative value",
-            "summary": f"Pair upside leaders with downside laggards to isolate catalyst-driven dispersion instead of raw market beta.",
+            "summary": "Pair upside leaders with downside laggards to isolate catalyst-driven dispersion instead of raw market beta.",
             "edge": f"Current tape highlights {lead_ticker} versus {hedge_ticker} style dispersion that can be debated by separate agents.",
             "confidence": max(57, _score_from_severity(lead_signal.get('severity', 'medium'))),
             "invalidation": "Stand down if the mover spread compresses and headline catalysts fail to explain the move.",

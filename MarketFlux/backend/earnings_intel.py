@@ -11,8 +11,8 @@ Provides:
 import asyncio
 import logging
 import json
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Dict, List
 
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold

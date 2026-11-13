@@ -3,14 +3,11 @@ import httpx
 import logging
 import asyncio
 import yfinance as yf
-import diskcache
+from ttl_cache import TTLCache
 
 logger = logging.getLogger(__name__)
 
-# Caching setup
-_CACHE_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache")
-os.makedirs(_CACHE_BASE, mode=0o700, exist_ok=True)
-_react_cache = diskcache.Cache(os.path.join(_CACHE_BASE, "react_cache"))
+_react_cache = TTLCache()
 
 def _cache_get(key: str):
     try:

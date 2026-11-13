@@ -15,6 +15,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import conviction_ledger as ledger
+from runtime_config import is_development
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +41,14 @@ def build_ledger_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
 
     async def _resolve_user_id(request: Request) -> str:
         user = await get_current_user(request)
-        return user["user_id"] if user else _ANON_ID
-
-    async def _resolve_user_id_required(request: Request) -> str:
-        user = await get_current_user(request)
         if user:
             return user["user_id"]
-        if os.environ.get("NODE_ENV", "").lower() == "production":
-            raise HTTPException(401, "Authentication required for this endpoint.")
-        return _ANON_ID
+        if is_development():
+            return _ANON_ID
+        raise HTTPException(401, "Authentication required for this endpoint.")
+
+    async def _resolve_user_id_required(request: Request) -> str:
+        return await _resolve_user_id(request)
 
     @router.get("/theses")
     async def theses_list(request: Request, status: Optional[str] = None,
@@ -107,11 +107,11 @@ def build_ledger_router(db, get_current_user: Callable[[Request], Any]) -> APIRo
         than open. Local/dev without the env var allows manual runs.
         """
         expected = os.environ.get("LEDGER_GRADE_TOKEN", "")
-        prod = os.environ.get("NODE_ENV", "").lower() == "production"
         if expected:
-            if x_grade_token != expected:
+            import hmac
+            if not hmac.compare_digest(x_grade_token or "", expected):
                 raise HTTPException(401, "bad grade token")
-        elif prod:
+        elif not is_development():
             raise HTTPException(503, "LEDGER_GRADE_TOKEN is not configured.")
         return await ledger.grade_all(db)
 

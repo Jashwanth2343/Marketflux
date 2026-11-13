@@ -11,6 +11,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useDemoMode } from '@/lib/demoMode';
 
 const CopilotAgent = lazy(() => import('@/components/copilot/CopilotAgent'));
 const StrategyTerminal = lazy(() => import('@/components/StrategyTerminal'));
@@ -66,8 +67,11 @@ function TrustBadge({ icon: Icon, label }) {
 }
 
 export default function Copilot() {
+  const demoMode = useDemoMode();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'copilot';
+  const visibleTabs = demoMode ? tabs.filter((tab) => tab.value !== 'proposals') : tabs;
+  const requested = searchParams.get('tab') || 'copilot';
+  const activeTab = visibleTabs.some((tab) => tab.value === requested) ? requested : 'copilot';
   const activeMeta = tabs.find((tab) => tab.value === activeTab) || tabs[0];
   const ActiveIcon = activeMeta.icon;
 
@@ -99,13 +103,15 @@ export default function Copilot() {
                 Trading Copilot
               </h1>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Open a conversation, inspect every action, and keep the older autonomous proposal workflow nearby when you need it.
+                {demoMode
+                  ? 'Research a name, size the risk, and stage a paper trade. Nothing is sent until you approve it.'
+                  : 'Open a conversation, inspect every action, and keep standing agents nearby when you need them.'}
               </p>
             </div>
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full xl:w-auto">
               <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-white/[0.035] p-1 shadow-lg shadow-black/20 backdrop-blur xl:flex xl:w-auto">
-                {tabs.map(({ value, label, longLabel, icon: Icon }) => (
+                {visibleTabs.map(({ value, label, longLabel, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
                     value={value}
@@ -151,11 +157,13 @@ export default function Copilot() {
             </Suspense>
           </TabsContent>
 
+          {!demoMode && (
           <TabsContent value="proposals" className="mt-0">
             <Suspense fallback={<LoadingSpinner />}>
               <StandingAgents />
             </Suspense>
           </TabsContent>
+          )}
 
           <TabsContent value="portfolio" className="mt-0">
             <Suspense fallback={<LoadingSpinner />}>

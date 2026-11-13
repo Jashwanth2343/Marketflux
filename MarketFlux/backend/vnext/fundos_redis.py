@@ -32,7 +32,8 @@ class FundOSRedisClient:
         db: Optional[int] = None,
         namespace: str = "fundos",
     ) -> None:
-        self.url = (url or os.getenv("FUNDOS_REDIS_URL") or os.getenv("REDIS_URL") or "").strip()
+        from redis_settings import build_redis_url
+        self.url = (url or os.getenv("FUNDOS_REDIS_URL") or build_redis_url("0")).strip()
         self.host = host or os.getenv("FUNDOS_REDIS_HOST") or os.getenv("REDIS_HOST", "localhost")
         self.port = int(port or os.getenv("FUNDOS_REDIS_PORT", 6379))
         self.password = password if password is not None else (os.getenv("FUNDOS_REDIS_PASSWORD") or None)

@@ -25,7 +25,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import statistics
-import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -261,9 +260,9 @@ async def _llm_journal(
         f"Mandate: {mandate}\n"
         f"Date (UTC): {date}\n\n"
         f"Today's executed paper trades:\n- " + "\n- ".join(executed_lines) + "\n\n"
-        f"Today's rejected candidates:\n- " + "\n- ".join(rejected_lines) + "\n\n"
-        f"Today's expired (timed out without approval):\n- " + "\n- ".join(expired_lines) + "\n\n"
-        f"Per-category attribution (sum of category scores on executed BUYs minus SELLs):\n"
+        "Today's rejected candidates:\n- " + "\n- ".join(rejected_lines) + "\n\n"
+        "Today's expired (timed out without approval):\n- " + "\n- ".join(expired_lines) + "\n\n"
+        "Per-category attribution (sum of category scores on executed BUYs minus SELLs):\n"
         + ("\n".join(attr_lines) if attr_lines else "  (no fills today)") + "\n\n"
         "Output format (use these exact labels, one per line):\n"
         "SUMMARY: <two short paragraphs of self-reflection>\n"
@@ -500,7 +499,6 @@ async def compute_leaderboard(
             "executed_at": {"$gte": cutoff},
         }).sort("executed_at", 1)
 
-        buys: List[Dict[str, Any]] = []
         realized: float = 0.0
         trade_returns: List[float] = []
         latest_quotes: Dict[str, float] = {}

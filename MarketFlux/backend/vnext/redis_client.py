@@ -1,12 +1,12 @@
-import os
 import redis.asyncio as redis
 from typing import Optional, Any
 import json
 
+from redis_settings import build_redis_url, redis_client_kwargs
+
 class FundOSRedisClient:
     def __init__(self):
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/1")
-        self.r = redis.from_url(redis_url, decode_responses=True)
+        self.r = redis.from_url(build_redis_url("0"), **redis_client_kwargs())
 
     def _namespace(self, user_id: str, session_id: str, key: str) -> str:
         return f"fundos:{user_id}:{session_id}:{key}"
@@ -17,7 +17,7 @@ class FundOSRedisClient:
         if val:
             try:
                 return json.loads(val)
-            except:
+            except (TypeError, ValueError):
                 return val
         return None
 

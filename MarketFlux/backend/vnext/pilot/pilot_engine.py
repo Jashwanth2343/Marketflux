@@ -114,14 +114,12 @@ from .checkpoints import get_checkpoint_store
 from .memory import (
     record_debate_insight,
     record_trade_outcome,
-    retrieve_context,
     retrieve_for_ticker,
     retrieve_lessons,
     get_current_regime,
 )
 from .personality import Personality, get_personality, set_paused
 from .trade_proposals import (
-    PROPOSAL_COLLECTION,
     ProposalStatus,
     TradeProposal,
     create_proposal,
@@ -766,8 +764,8 @@ async def _run_swarm_safe(
             memory_section += f"- {m.get('content', '')}\n"
     if lessons:
         memory_section += "\n## Permanent Lessons & Rules\n"
-        for l in lessons[:5]:
-            memory_section += f"- {l.get('content', '')}\n"
+        for lesson in lessons[:5]:
+            memory_section += f"- {lesson.get('content', '')}\n"
 
     prompt = (
         f"You are advising portfolio manager '{personality.name}'.\n"

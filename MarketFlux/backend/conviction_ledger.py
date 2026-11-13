@@ -22,7 +22,7 @@ Design rules (from the approved design doc):
 
 Storage: MongoDB (the app's primary store) via the same motor handle the rest
 of the backend uses. A Supabase Postgres migration is shipped in
-docs/migrations/ledger.sql for when the ledger graduates to Postgres; this
+supabase/migrations/20261112000002_ledger.sql for the Postgres tables; this
 module's public API is storage-agnostic so the swap doesn't touch callers.
 """
 from __future__ import annotations

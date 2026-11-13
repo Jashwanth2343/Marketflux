@@ -1,5 +1,9 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, BackgroundTasks, UploadFile, File
 from dotenv import load_dotenv
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
@@ -18,6 +22,16 @@ import httpx
 from fastapi.responses import StreamingResponse
 from database import initialize_indexes
 from cache import cache_get as redis_cache_get, cache_set as redis_cache_set
+from rate_limit import limiter
+from runtime_config import (
+    allowed_origins,
+    code_sandbox_enabled,
+    demo_mode,
+    is_development,
+    localhost_origin_regex,
+    require_db_name,
+    require_mongo_url,
+)
 
 from news_scraper import fetch_all_feeds, store_articles
 from market_data import (
@@ -38,13 +52,14 @@ load_dotenv(ROOT_DIR / '.env')
 
 import certifi
 
-# MongoDB
-mongo_url = os.environ['MONGO_URL']
+# MongoDB is still required. Supabase is the primary auth and Postgres store,
+# but copilot history, news, and several other collections have not moved yet.
+mongo_url = require_mongo_url()
 if "mongodb+srv" in mongo_url:
     client = AsyncIOMotorClient(mongo_url, tls=True, tlsCAFile=certifi.where(), serverSelectionTimeoutMS=5000)
 else:
     client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
-db = client[os.environ['DB_NAME']]
+db = client[require_db_name()]
 
 # JWT — required unless Supabase Auth is configured as primary
 _raw_jwt_secret = os.environ.get('JWT_SECRET') or os.environ.get('JWT_SECRET_KEY')
@@ -101,32 +116,39 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(LimitRequestSizeMiddleware)
-# Treat an empty/whitespace ALLOWED_ORIGINS the same as unset — otherwise the
-# split produces [''] and CORS silently blocks the local frontend (a "Failed to
-# fetch" footgun). Always include the localhost dev origins as a baseline.
-_DEFAULT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
-_origins_env = os.environ.get('ALLOWED_ORIGINS', '').strip()
-_allowed_origins = [o.strip() for o in _origins_env.split(',') if o.strip()] or _DEFAULT_ORIGINS
-for _o in _DEFAULT_ORIGINS:
-    if _o not in _allowed_origins:
-        _allowed_origins.append(_o)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed_origins,
-    # Accept the dev frontend on ANY localhost/127.0.0.1 port so a port mismatch
-    # never silently breaks the app with a CORS "Failed to fetch".
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Localhost is included only in an explicit development environment. Production
+# must set ALLOWED_ORIGINS to the real frontend origin.
+_cors_kwargs = {
+    "allow_origins": allowed_origins(),
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+_origin_regex = localhost_origin_regex()
+if _origin_regex:
+    _cors_kwargs["allow_origin_regex"] = _origin_regex
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 @app.get("/")
 def read_root():
+    payload = {"status": "ok", "service": "marketflux-api"}
+    if is_development():
+        payload["message"] = "Backend is active. Open the frontend at http://localhost:3000."
+    return payload
+
+@app.get("/api/health")
+def health():
+    """Liveness check for Render. Does not depend on Mongo, Postgres, or Redis."""
     return {
-        "status": "MarketFlux API is running", 
-        "message": "Backend is active. Please use the frontend application at http://localhost:3000 to interact with MarketFlux."
+        "status": "ok",
+        "service": "marketflux-api",
+        "demo_mode": demo_mode(),
+        "paper_only": True,
+        "code_sandbox": code_sandbox_enabled(),
+        "environment": "development" if is_development() else "production",
     }
 
 api_router = APIRouter(prefix="/api")
@@ -387,51 +409,6 @@ async def login(data: UserLogin, response: Response, request: Request):
     token = create_jwt_token(user["user_id"])
     response.set_cookie("session_token", token, httponly=True, secure=True, samesite="none", path="/", max_age=7*24*3600)
     return {"token": token, "user": {"user_id": user["user_id"], "email": user["email"], "name": user["name"], "picture": user.get("picture", "")}}
-
-@api_router.post("/auth/google-session")
-async def google_session(request: Request, response: Response):
-    body = await request.json()
-    session_id = body.get("session_id")
-    if not session_id:
-        raise HTTPException(400, "session_id required")
-
-    # REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    async with httpx.AsyncClient() as http_client:
-        resp = await http_client.get(
-            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-            headers={"X-Session-ID": session_id}
-        )
-        if resp.status_code != 200:
-            raise HTTPException(401, "Invalid session")
-        google_data = resp.json()
-
-    email = google_data["email"]
-    user = await db.users.find_one({"email": email}, {"_id": 0})
-
-    if not user:
-        user_id = f"user_{uuid.uuid4().hex}"  # Full 128-bit UUID
-        user = {
-            "user_id": user_id,
-            "email": email,
-            "name": google_data.get("name", ""),
-            "picture": google_data.get("picture", ""),
-            "auth_type": "google",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.users.insert_one(user)
-    else:
-        user_id = user["user_id"]
-
-    session_token = google_data.get("session_token", str(uuid.uuid4()))
-    await db.user_sessions.insert_one({
-        "user_id": user_id,
-        "session_token": session_token,
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-
-    response.set_cookie("session_token", session_token, httponly=True, secure=True, samesite="none", path="/", max_age=7*24*3600)
-    return {"user": {"user_id": user_id, "email": email, "name": user.get("name", ""), "picture": user.get("picture", "")}, "token": session_token}
 
 @api_router.get("/auth/me")
 async def get_me(request: Request):
@@ -1656,12 +1633,10 @@ async def pilot_nightly_reflection_loop():
         await asyncio.sleep(1800)
 
 
-@app.on_event("startup")
 async def startup():
     # JWT_SECRET is already validated at module load time (C1).
-    # Additional production environment checks:
-    if os.environ.get('NODE_ENV') == 'production' and "localhost" in os.environ.get('MONGO_URL', ''):
-        logger.warning("WARNING: App is running in production with a localhost MongoDB URL!")
+    if not is_development() and "localhost" in os.environ.get('MONGO_URL', ''):
+        logger.warning("MONGO_URL points at localhost while the process is not in development.")
 
     await initialize_indexes(db)
 
@@ -1693,16 +1668,16 @@ async def startup():
         if is_pg_configured():
             pool = await get_pg_pool()
             logger.info("Shared vNext Postgres pool initialized")
-            if os.getenv("MARKETFLUX_AUTO_APPLY_SCHEMA") == "true" and os.getenv("NODE_ENV") != "production":
+            if os.getenv("MARKETFLUX_AUTO_APPLY_SCHEMA") == "true" and is_development():
                 async with pool.acquire() as conn:
                     exists = await conn.fetchval(
                         "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='theses')"
                     )
                     if not exists:
-                        schema_path = Path(__file__).parent / "sql" / "vnext_pgvector_schema.sql"
+                        schema_path = Path(__file__).resolve().parents[1] / "supabase" / "migrations" / "20260515000001_vnext_core.sql"
                         if schema_path.exists():
                             await conn.execute(schema_path.read_text())
-                            logger.info("Dev auto-applied vnext_pgvector_schema.sql")
+                            logger.info("Dev auto-applied supabase/migrations/20260515000001_vnext_core.sql")
         else:
             logger.info("Shared vNext Postgres pool skipped: SUPABASE_DB_URL/MARKETFLUX_VNEXT_DATABASE_URL/FUNDOS_DATABASE_URL not configured")
     except Exception as exc:
@@ -1711,14 +1686,16 @@ async def startup():
     asyncio.create_task(periodic_news_fetch())
     asyncio.create_task(pilot_expire_sweep())
     asyncio.create_task(pilot_nightly_reflection_loop())
-    try:
-        import copilot_standing
-        asyncio.create_task(copilot_standing.scheduler_loop(db))
-    except Exception as exc:
-        logger.warning(f"copilot standing-agent scheduler not started: {exc}")
+    if demo_mode():
+        logger.info("DEMO_MODE: standing-agent scheduler is disabled")
+    else:
+        try:
+            import copilot_standing
+            asyncio.create_task(copilot_standing.scheduler_loop(db))
+        except Exception as exc:
+            logger.warning(f"copilot standing-agent scheduler not started: {exc}")
     logger.info("MarketFlux backend started")
 
-@app.on_event("shutdown")
 async def shutdown():
     try:
         from vnext.fundos_pg_client import close_pg_pool
@@ -1727,6 +1704,16 @@ async def shutdown():
     except Exception as exc:
         logger.warning(f"Failed to close shared vNext Postgres pool cleanly: {exc}")
     client.close()
+
+@asynccontextmanager
+async def _app_lifespan(_app: FastAPI):
+    await startup()
+    try:
+        yield
+    finally:
+        await shutdown()
+
+app.router.lifespan_context = _app_lifespan
 
 @app.get("/api/health/db")
 async def health_db():

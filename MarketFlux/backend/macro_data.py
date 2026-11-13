@@ -12,9 +12,8 @@ Provides:
 
 import asyncio
 import logging
-import os
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import httpx
 
@@ -98,13 +97,6 @@ async def get_yield_curve() -> Dict:
     Fetch US Treasury yield curve from yfinance.
     Returns current yields across maturities + 2s10s spread.
     """
-    maturities = {
-        "3M": "^IRX",
-        "5Y": "^FVX",
-        "10Y": "^TNX",
-        "30Y": "^TYX",
-    }
-
     # Use yfinance tickers for Treasury rates
     treasury_tickers = {
         "3M": "^IRX",

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
@@ -48,10 +47,8 @@ def _get_redis():
 
     try:
         import redis
-        host = os.getenv("REDIS_HOST", "localhost")
-        port = int(os.getenv("REDIS_PORT", "6379"))
-        password = os.getenv("REDIS_PASSWORD") or None
-        _redis_client = redis.Redis(host=host, port=port, password=password, decode_responses=True)
+        from redis_settings import build_redis_url, redis_client_kwargs
+        _redis_client = redis.Redis.from_url(build_redis_url("0"), **redis_client_kwargs())
         _redis_client.ping()
         return _redis_client
     except Exception as exc:
@@ -659,7 +656,6 @@ async def _retrieve_mongo_fallback(
     limit: int = 20,
 ) -> List[Dict[str, Any]]:
     """MongoDB fallback retrieval (transition period)."""
-    import math
 
     now = datetime.now(timezone.utc)
     query: Dict[str, Any] = {"personality_id": personality_id, "user_id": user_id}

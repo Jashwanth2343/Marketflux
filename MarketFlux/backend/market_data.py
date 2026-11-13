@@ -2,18 +2,15 @@ import yfinance as yf
 import asyncio
 import logging
 import time
-from pathlib import Path
 from fastapi import HTTPException
-import diskcache
 from typing import Dict, List
+from ttl_cache import TTLCache
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-# Persistent disk cache — project-local .cache directory
-_CACHE_DIR = Path(__file__).parent / '.cache' / 'market_cache'
-_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-cache = diskcache.Cache(str(_CACHE_DIR))
+# Process-local TTL cache. Render's disk does not survive a restart.
+cache = TTLCache()
 CACHE_TTL = 180  # 3 minutes — keeps top gainers/losers fresh
 
 async def cache_get_async(key):
@@ -216,8 +213,6 @@ def _get_ticker_data(symbol: str) -> Dict:
 
 
 def _get_chart_data(symbol: str, period: str = "1mo", interval: str = "1d") -> List[Dict]:
-    cache_key = f"chart_{symbol}_{period}_{interval}"
-
     try:
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period=period, interval=interval)
@@ -538,7 +533,6 @@ async def get_ticker_news(symbol: str) -> List[Dict]:
         return cached
 
     try:
-        loop = asyncio.get_running_loop()
         news_items = await _async_yf_call(lambda symbol: getattr(yf.Ticker(symbol), "news", []), symbol)
 
         articles = []
@@ -914,7 +908,7 @@ def _filter_universe(filters: Dict) -> List[Dict]:
             change_str = str(row.get("Change", "0")).replace("%", "")
             try:
                 change_pct = float(change_str)
-            except:
+            except (TypeError, ValueError):
                 change_pct = 0
                 
             price_str = str(row.get("Price", "0")).replace(',', '')

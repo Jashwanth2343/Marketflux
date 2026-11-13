@@ -74,7 +74,7 @@ const CAPABILITIES = [
     to: '/copilot',
     label: 'AI Trading Copilot',
     icon: Plane,
-    desc: 'Chat with an AI agent that can research stocks, analyze your portfolio, and execute paper trades autonomously.',
+    desc: 'Chat with an AI agent that researches stocks, sizes risk, and stages paper trades for you to approve.',
     tag: 'Most Popular',
   },
   {
@@ -180,7 +180,7 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">
                 {user
                   ? 'Your portfolio, market intelligence, and AI copilot — all in one place. Here\'s what\'s happening in the markets today.'
-                  : 'MarketFlux combines real-time market data, AI-powered analysis, and autonomous paper trading into one platform. Research stocks, backtest strategies, and let AI manage a paper portfolio — all without risking real money.'
+                  : 'MarketFlux combines real-time market data, AI-powered analysis, and paper trading into one platform. Research stocks, backtest strategies, and approve a paper trade before it is sent.'
                 }
               </p>
               {!user && (
@@ -227,7 +227,7 @@ export default function Dashboard() {
               <div className="flex flex-col gap-2.5 lg:min-w-[220px]">
                 {[
                   { icon: Zap, text: 'Real-time market data & AI analysis' },
-                  { icon: Bot, text: 'Autonomous paper trading agent' },
+                  { icon: Bot, text: 'Paper trades wait for your approval' },
                   { icon: Shield, text: 'Paper-only — zero financial risk' },
                 ].map(({ icon: Icon, text }) => (
                   <div key={text} className="flex items-center gap-2.5 text-xs text-muted-foreground">

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import TopNav from "@/components/TopNav";
+import DemoBanner from "@/components/DemoBanner";
 
 const AIChatbot = lazy(() => import("@/components/AIChatbot"));
 import ScanlineOverlay from "@/components/ScanlineOverlay";
-import AuthCallback from "@/components/AuthCallback";
 import Dashboard from "@/pages/Dashboard";
 import Intelligence from "@/pages/Intelligence";
 import Copilot from "@/pages/Copilot";
@@ -73,7 +73,6 @@ class ErrorBoundary extends React.Component {
 }
 
 function AppRouter() {
-  const location = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatWidth, setChatWidth] = useState(380);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
@@ -95,10 +94,6 @@ function AppRouter() {
     };
   }, []);
 
-  if (location.hash?.includes('session_id=')) {
-    return <AuthCallback />;
-  }
-
   const mainMarginRight = isDesktop && isChatOpen ? chatWidth : 0;
 
   return (
@@ -109,6 +104,7 @@ function AppRouter() {
           style={{ marginRight: mainMarginRight }}
         >
           <TopNav />
+          <DemoBanner />
           <main className="flex-1 overflow-y-auto flex flex-col relative w-full">
             <Routes>
               {/* Core pages */}

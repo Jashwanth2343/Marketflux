@@ -513,8 +513,8 @@ def _format_tool_context(tool_results: Dict) -> str:
                         lines.append(f"  {g.get('symbol', '')} ({g.get('name', '')}): {g.get('change_percent', 0):+.2f}%")
                 if data.get("top_losers"):
                     lines.append("\nTop Losers:")
-                    for l in data["top_losers"]:
-                        lines.append(f"  {l.get('symbol', '')} ({l.get('name', '')}): {l.get('change_percent', 0):+.2f}%")
+                    for loser in data["top_losers"]:
+                        lines.append(f"  {loser.get('symbol', '')} ({loser.get('name', '')}): {loser.get('change_percent', 0):+.2f}%")
                 if data.get("fear_greed_index"):
                     fng = data["fear_greed_index"]
                     lines.append(f"\nFear & Greed Index: {fng.get('value', 50)} ({fng.get('classification', 'Neutral')})")
@@ -629,7 +629,7 @@ def _build_fallback_from_tools(
             fundamentals[sym] = v
     if symbols and snapshots:
         cols = symbols[:5]
-        rows = [f"| Metric | " + " | ".join(cols) + " |", "|--------|" + "|".join("----------" for _ in cols) + "|"]
+        rows = ["| Metric | " + " | ".join(cols) + " |", "|--------|" + "|".join("----------" for _ in cols) + "|"]
         for key, label in [
             ("price", "Price"), ("change_percent", "Change %"), ("market_cap", "Market Cap"), ("pe_ratio", "P/E"),
         ]:
@@ -1201,7 +1201,6 @@ async def run_agent_pipeline(
         chat = model.start_chat(history=gemini_history)
 
         # Attempt 1: Stream (original behavior)
-        stream_ok = False
         try:
             response_stream = await asyncio.to_thread(
                 chat.send_message, final_user_text, stream=True
@@ -1213,7 +1212,6 @@ async def run_agent_pipeline(
                         yield _token_event(text)
                         full_response += text
                         await asyncio.sleep(0.01)
-                        stream_ok = True
                 except Exception:
                     pass
         except Exception as e:

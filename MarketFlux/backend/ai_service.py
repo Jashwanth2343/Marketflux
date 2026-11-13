@@ -3,24 +3,18 @@ import re
 import json
 import logging
 import asyncio
-from typing import Dict, List, Optional, AsyncGenerator
+from typing import Dict, Optional, AsyncGenerator
 from datetime import datetime, timezone, timedelta
-import diskcache
 import yfinance as yf
+from ttl_cache import TTLCache
 
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Disk cache — valid ticker lookups are cached for 1 hour
-# Store in app-local .cache directory (not world-readable /tmp/) — M5
-# ---------------------------------------------------------------------------
-_CACHE_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache")
-os.makedirs(_CACHE_BASE, mode=0o700, exist_ok=True)
-_ticker_cache = diskcache.Cache(os.path.join(_CACHE_BASE, "ticker_cache"))
-_usage_cache = diskcache.Cache(os.path.join(_CACHE_BASE, "usage_cache"))
+# Process-local TTL caches. diskcache pickles to disk and has no patched release.
+_ticker_cache = TTLCache()
+_usage_cache = TTLCache()
 
 
 # We defer genai configuration to lazily use the env var
@@ -72,19 +66,13 @@ def select_model_id(message: str, intent: Optional[str] = None, user_id: Optiona
     return selected_model
 
 def get_gemini_model(model_id: str = GEMINI_FLASH, system_instruction: Optional[str] = None):
-    configure_gemini()
-    
-    # Safety settings to avoid blocking financial analysis
-    safety_settings = {
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
-    
-    if system_instruction:
-        return genai.GenerativeModel(model_id, system_instruction=system_instruction, safety_settings=safety_settings)
-    return genai.GenerativeModel(model_id, safety_settings=safety_settings)
+    """Chat and one-shot calls use google-genai.
+
+    Tool-calling agents still call configure_gemini() and build a
+    google.generativeai.GenerativeModel themselves.
+    """
+    from gemini_client import GeminiChatModel
+    return GeminiChatModel(model_id, system_instruction)
 
 
 async def generate_summary(title: str, content: str) -> str:

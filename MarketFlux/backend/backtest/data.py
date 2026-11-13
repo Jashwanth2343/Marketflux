@@ -1,6 +1,6 @@
 """OHLCV data loader for the backtester.
 
-Wraps yfinance with a small disk cache so repeated backtests over the same
+Wraps yfinance with a small in-process cache so repeated backtests over the same
 window are deterministic and cheap. All data is returned as a pandas DataFrame
 with a tz-naive DatetimeIndex and lowercase columns: open, high, low, close,
 volume.
@@ -8,9 +8,7 @@ volume.
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from typing import Dict, Iterable, Optional
 
 import pandas as pd
@@ -26,17 +24,9 @@ def _get_disk_cache():
     global _DISK_CACHE
     if _DISK_CACHE is not None:
         return _DISK_CACHE
-    try:
-        import diskcache  # type: ignore
+    from ttl_cache import TTLCache
 
-        cache_dir = os.environ.get(
-            "BACKTEST_CACHE_DIR",
-            os.path.join(os.path.dirname(__file__), ".cache"),
-        )
-        _DISK_CACHE = diskcache.Cache(cache_dir)
-    except Exception as exc:  # pragma: no cover - cache is best-effort
-        logger.info("backtest.data: disk cache unavailable (%s)", exc)
-        _DISK_CACHE = None
+    _DISK_CACHE = TTLCache()
     return _DISK_CACHE
 
 

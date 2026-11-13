@@ -37,6 +37,7 @@ import copilot_trading_tools as trading
 import copilot_memory
 import copilot_models
 from copilot_code_tool import run_python
+from runtime_config import code_sandbox_enabled, demo_mode
 from ai_service import GEMINI_FLASH, configure_gemini
 
 logger = logging.getLogger(__name__)
@@ -195,7 +196,19 @@ Compute:
 
 def _system_prompt() -> str:
     today = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
-    return _SYSTEM_TEMPLATE.replace("{{TODAY}}", today)
+    text = _SYSTEM_TEMPLATE.replace("{{TODAY}}", today)
+    if not code_sandbox_enabled():
+        text += (
+            "\n\nPython execution (run_python) is NOT available in this deployment. "
+            "Do not call it. Do arithmetic from the numbers the other tools return."
+        )
+    if demo_mode():
+        text += (
+            "\n\n== PUBLIC DEMO ==\n"
+            "This is a shared paper account. Every trade must be staged for approval. "
+            "Do not claim a trade was sent to the broker until the user approves it."
+        )
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +270,12 @@ _RESEARCH_MODE_TOOLS = [t for t in _ALL_TOOLS if t.__name__ not in trading.EXECU
 
 
 def _tools_for_mode(mode: str):
-    return _RESEARCH_MODE_TOOLS if mode == "research" else _ALL_TOOLS
+    tools = _RESEARCH_TOOLS + _TRADING_TOOLS + _INTELLIGENCE_TOOLS
+    if code_sandbox_enabled():
+        tools = tools + _CODE_TOOLS
+    if mode == "research":
+        return [t for t in tools if t.__name__ not in trading.EXECUTION_TOOLS]
+    return tools
 
 # name -> callable
 _TOOL_MAP: Dict[str, Any] = {fn.__name__: fn for fn in _ALL_TOOLS}
@@ -278,7 +296,7 @@ def _build_model(system_instruction: str, model_name: str = GEMINI_FLASH, tools=
         model_name=model_name,
         system_instruction=system_instruction,
         safety_settings=safety,
-        tools=tools if tools is not None else _ALL_TOOLS,
+        tools=tools if tools is not None else _tools_for_mode("trade"),
     )
 
 
@@ -287,7 +305,8 @@ _OPENAI_TOOLS_CACHE: Dict[str, List[dict]] = {}
 
 
 def _openai_tool_schemas(mode: str = "trade") -> List[dict]:
-    cached = _OPENAI_TOOLS_CACHE.get(mode)
+    cache_key = f"{mode}:{int(code_sandbox_enabled())}"
+    cached = _OPENAI_TOOLS_CACHE.get(cache_key)
     if cached is not None:
         return cached
     type_map = {float: "number", int: "integer", bool: "boolean", str: "string"}
@@ -304,7 +323,7 @@ def _openai_tool_schemas(mode: str = "trade") -> List[dict]:
             "description": (fn.__doc__ or "").strip()[:1024],
             "parameters": {"type": "object", "properties": props, "required": required},
         }})
-    _OPENAI_TOOLS_CACHE[mode] = schemas
+    _OPENAI_TOOLS_CACHE[cache_key] = schemas
     return schemas
 
 
@@ -337,6 +356,12 @@ async def _exec_tool(name: str, args: Dict[str, Any], db=None, user_id: str = ""
         except Exception as exc:  # noqa: BLE001
             logger.error(f"copilot context tool {name} failed: {exc}")
             return {"ok": False, "error": f"{name} failed: {exc}"}
+
+    if name == "run_python" and not code_sandbox_enabled():
+        return {
+            "ok": False,
+            "error": "Python execution is disabled on this server.",
+        }
 
     func = _TOOL_MAP.get(name) or getattr(agent_tools, name, None)
     if func is None:
@@ -848,6 +873,8 @@ async def run_copilot_agent(
     yield sse("model", key=resolved.key, label=resolved.label, provider=resolved.provider)
     yield sse("thinking", step="plan", message=f"Reading your portfolio and planning… (via {resolved.label})")
 
+    if demo_mode():
+        confirm = True
     mode = mode if mode in ("trade", "research") else "trade"
     system_prompt = _system_prompt()
     if mode == "research":

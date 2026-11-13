@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -92,10 +91,8 @@ class PilotCheckpointStore:
     def _init_redis(self):
         try:
             import redis
-            host = os.getenv("REDIS_HOST", "localhost")
-            port = int(os.getenv("REDIS_PORT", "6379"))
-            password = os.getenv("REDIS_PASSWORD") or None
-            r = redis.Redis(host=host, port=port, password=password, decode_responses=True)
+            from redis_settings import build_redis_url, redis_client_kwargs
+            r = redis.Redis.from_url(build_redis_url("0"), **redis_client_kwargs())
             r.ping()
             return r
         except Exception:

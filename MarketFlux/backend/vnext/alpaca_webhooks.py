@@ -156,7 +156,6 @@ async def _process_trade_event(
 
             if event_type == EVENT_FILL:
                 filled_avg_price = order_data.get("filled_avg_price")
-                filled_qty = order_data.get("filled_qty")
 
                 await conn.execute(
                     """
