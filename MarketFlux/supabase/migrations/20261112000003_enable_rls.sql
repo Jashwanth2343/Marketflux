@@ -169,13 +169,23 @@ CREATE POLICY personalities_owner ON public.personalities
     WITH CHECK (user_id = (SELECT auth.uid()));
 
 -- Child rows follow the parent owner.
+-- Public and seed journals are readable. DELETE only checks USING, so the
+-- public predicate must not live on a FOR ALL policy.
+DROP POLICY IF EXISTS journal_entries_read ON public.journal_entries;
 DROP POLICY IF EXISTS journal_entries_owner ON public.journal_entries;
+CREATE POLICY journal_entries_read ON public.journal_entries
+    FOR SELECT TO authenticated
+    USING (EXISTS (
+        SELECT 1 FROM public.personalities p
+        WHERE p.id = journal_entries.personality_id
+          AND (p.user_id = (SELECT auth.uid()) OR p."public" = true OR p.is_seed = true)
+    ));
 CREATE POLICY journal_entries_owner ON public.journal_entries
     FOR ALL TO authenticated
     USING (EXISTS (
         SELECT 1 FROM public.personalities p
         WHERE p.id = journal_entries.personality_id
-          AND (p.user_id = (SELECT auth.uid()) OR p."public" = true OR p.is_seed = true)
+          AND p.user_id = (SELECT auth.uid())
     ))
     WITH CHECK (EXISTS (
         SELECT 1 FROM public.personalities p
